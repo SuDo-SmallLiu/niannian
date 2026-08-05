@@ -1,0 +1,48 @@
+name: Deploy niannian
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  deploy:
+    name: Deploy to server (SSH)
+    needs: ci
+    runs-on: ubuntu-latest
+    # 仅 push 到 main 时自动部署；可在 Actions 页面手动触发（workflow_dispatch）
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 通过 SSH 部署
+        # 需要的 Secrets（仓库 Settings → Secrets and variables → Actions）：
+        #   SSH_HOST     服务器 IP 或域名
+        #   SSH_USERNAME SSH 用户名
+        #   SSH_KEY      私钥内容（整体粘贴）
+        #   DEPLOY_PATH  服务器上的项目目录，例如 /var/www/niannian
+        # 服务器需预先装好 Node 20+、git、pm2，且能 git pull 本仓库。
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git pull origin main
+            npm ci --omit=dev
+            npm run build
+            pm2 restart niannian || pm2 start npm --name niannian -- run start

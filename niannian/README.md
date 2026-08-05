@@ -34,3 +34,32 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## 部署（本项目：念念年年 / niannian）
+
+> ⚠️ 本项目**不适合纯静态托管（如 Vercel / 纯静态导出）**：它使用 `better-sqlite3`（原生模块 + 本地文件数据库 `data/niannian.db`），必须在**支持 Node.js 运行时且有可写文件系统**的环境里运行。
+
+### 运行前提
+- Node.js 20+（含 `npm`）
+- 能访问 GitHub 仓库（拉取代码）
+- 运行时需要以下环境变量（本地开发放 `.env.local`，服务器放同级环境变量）：
+  - `ARK_API_KEY`：火山引擎 Ark API Key（不填则进入演示模式，AI 返回模拟数据）
+  - `ARK_BASE_URL` / `ARK_VISION_MODEL` / `ARK_TEXT_MODEL`：可选，有默认值
+  - `DATABASE_PATH`：可选，默认 `./data/niannian.db`
+- 上传目录 `public/uploads/` 与数据库 `data/` 需要可写权限
+
+### 方式一：自有服务器（推荐）
+1. 在服务器上 `git clone` 并 `npm ci --omit=dev`
+2. 配置好上面的环境变量
+3. 启动：`npm run build && npm run start`（建议用 `pm2` 守护进程）
+4. 反向代理（Nginx 等）把 80/443 转到 `localhost:3000`
+
+### 方式二：GitHub Actions 自动部署
+仓库已包含 `.github/workflows/deploy.yml`：每次 push 到 `main` 会先跑 CI（lint + build），通过后再 SSH 到服务器部署。
+使用前请在 **仓库 Settings → Secrets and variables → Actions** 中配置：
+- `SSH_HOST`：服务器 IP 或域名
+- `SSH_USERNAME`：SSH 用户名
+- `SSH_KEY`：私钥内容（整体粘贴）
+- `DEPLOY_PATH`：服务器上的项目目录，例如 `/var/www/niannian`
+
+> 服务器需预先装好 Node 20+、git、pm2，且能通过 git 拉取本仓库（公开仓库可直接 pull；私有仓库请配置 deploy key 或使用带 token 的 HTTPS 地址）。首次部署建议先在服务器手动跑通一次 `npm ci && npm run build && npm run start`。
