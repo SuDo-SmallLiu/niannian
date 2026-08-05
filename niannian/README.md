@@ -55,7 +55,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 4. 反向代理（Nginx 等）把 80/443 转到 `localhost:3000`
 
 ### 方式二：GitHub Actions 自动部署
-仓库已包含 `.github/workflows/deploy.yml`：每次 push 到 `main` 会先跑 CI（lint + build），通过后再 SSH 到服务器部署。
+仓库已包含 `.github/workflows/deploy.yml`：每次 push 到 `main` 会先跑 CI（lint + build），通过后再 SSH 到服务器部署。首次在服务器搭建环境，可直接运行仓库里的 `scripts/setup-server.sh`（Ubuntu/Debian），一键完成系统依赖、Node 20、pm2、代码拉取、构建与启动。
 使用前请在 **仓库 Settings → Secrets and variables → Actions** 中配置：
 - `SSH_HOST`：服务器 IP 或域名
 - `SSH_USERNAME`：SSH 用户名
