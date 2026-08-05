@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #F8F4ED;
+  --bg-card: #FFFFFF;
+  --bg-warm: #FFF8F0;
+  --text-primary: #4B3B2F;
+  --text-secondary: #8B7355;
+  --text-muted: #B8A898;
+  --accent: #D98A45;
+  --accent-hover: #C47A3A;
+  --accent-light: #F0DCC8;
+  --red: #C04040;
+  --red-hover: #A03030;
+  --border: #E8DCC8;
+  --border-light: #F0E8D8;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 底部导航安全区 */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 慢动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lineIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes breatheGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 138, 69, 0.15); }
+  50% { box-shadow: 0 0 0 12px rgba(217, 138, 69, 0); }
+}
+
+@keyframes softPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-fade-in {
+  opacity: 0;
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-line-in {
+  opacity: 0;
+  animation: lineIn 0.6s ease-out forwards;
+}
+
+.animate-breathe {
+  animation: breatheGlow 3s ease-in-out infinite;
+}
+
+.animate-soft-pulse {
+  animation: softPulse 2s ease-in-out infinite;
+}
+
+/* 延迟 */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-800 { animation-delay: 0.8s; }
+.delay-1000 { animation-delay: 1.0s; }
+.delay-1500 { animation-delay: 1.5s; }
+
+/* 照片淡入 */
+@keyframes photoFadeIn {
+  from {
+    opacity: 0;
+    filter: brightness(1.2) sepia(0.3);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1) sepia(0);
+  }
+}
+
+.animate-photo-in {
+  opacity: 0;
+  animation: photoFadeIn 1.2s ease-out forwards;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D8CCB8;
+  border-radius: 2px;
+}
+
+/* 链接线 */
+@keyframes drawLine {
+  from { height: 0; }
+  to { height: 100%; }
+}
+
+.animate-draw-line {
+  animation: drawLine 1.5s ease-out forwards;
+}
