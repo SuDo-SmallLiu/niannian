@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ChapterCard from '@/components/ChapterCard';
+import { useSharePoster } from '@/hooks/useSharePoster';
 
 interface StoryItem {
   id: string;
@@ -25,8 +26,7 @@ export default function StoryPage() {
   const [familyName, setFamilyName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sharingStoryId, setSharingStoryId] = useState<string | null>(null);
-  const [shareUrls, setShareUrls] = useState<Record<string, string>>({});
+  const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
 
   const fetchData = useCallback(async () => {
     try {
@@ -55,23 +55,26 @@ export default function StoryPage() {
     fetchData();
   }, [fetchData]);
 
-  const handleShare = async (id: string) => {
-    setSharingStoryId(id);
+  const handleSharePoster = async (story: StoryItem) => {
+    let photoUrls: string[] = [];
     try {
-      const res = await fetch('/api/share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyId: id }),
-      });
+      const res = await fetch(`/api/story?storyId=${story.id}`);
       const data = await res.json();
-      if (res.ok) {
-        setShareUrls((prev) => ({ ...prev, [id]: data.shareUrl }));
+      if (res.ok && data.story?.photos_detail) {
+        photoUrls = data.story.photos_detail.map((p: { url: string }) => p.url);
       }
     } catch {
       // ignore
-    } finally {
-      setSharingStoryId(null);
     }
+
+    await openSharePoster({
+      type: 'story',
+      storyId: story.id,
+      title: story.title,
+      summary: story.description,
+      familyName: familyName || '',
+      photoUrls,
+    });
   };
 
   if (loading) {
@@ -101,6 +104,7 @@ export default function StoryPage() {
 
   return (
     <div className="min-h-screen px-6 pt-8 pb-24">
+      {shareModal}
       {/* 顶部 */}
       <div className="flex items-center justify-between mb-8">
         <Link href="/" className="text-[#B8A898] hover:text-[#8B7355] text-sm transition-colors">
@@ -136,9 +140,8 @@ export default function StoryPage() {
             timeline={story.timeline || []}
             connectionAction={story.connection_action || ''}
             photoCount={story.photos?.length || 0}
-            shareUrl={shareUrls[story.id] || null}
-            sharing={sharingStoryId === story.id}
-            onShare={() => handleShare(story.id)}
+            sharing={shareLoading}
+            onShare={() => handleSharePoster(story)}
           />
         ))}
       </div>

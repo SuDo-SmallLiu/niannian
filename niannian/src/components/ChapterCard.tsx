@@ -7,7 +7,6 @@ interface ChapterCardProps {
   timeline: Array<{ year: string; event: string }>;
   connectionAction: string;
   photoCount: number;
-  shareUrl: string | null;
   sharing: boolean;
   onShare: () => void;
 }
@@ -18,7 +17,6 @@ export default function ChapterCard({
   summary,
   timeline,
   connectionAction,
-  shareUrl,
   sharing,
   onShare,
 }: ChapterCardProps) {
@@ -81,32 +79,16 @@ export default function ChapterCard({
           💡 {connectionAction}
         </p>
 
-        {shareUrl ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 p-2.5 bg-white rounded-xl border border-[#F0E8D8]">
-              <input
-                type="text"
-                value={shareUrl}
-                readOnly
-                className="flex-1 bg-transparent text-xs text-[#4B3B2F] outline-none"
-              />
-              <button
-                onClick={() => navigator.clipboard.writeText(shareUrl)}
-                className="px-3 py-1.5 rounded-lg bg-[#D98A45] text-white text-xs hover:bg-[#C47A3A] transition-colors whitespace-nowrap"
-              >
-                复制
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={onShare}
-            disabled={sharing}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.98]"
-          >
-            {sharing ? '生成中...' : '分享给家人'}
-          </button>
-        )}
+        <button
+          onClick={onShare}
+          disabled={sharing}
+          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98] shadow-sm"
+        >
+          {sharing ? '生成中…' : '💬 生成分享海报 · 发微信'}
+        </button>
+        <p className="text-[10px] text-[#B8A898] mt-2 text-center">
+          保存海报后，打开微信发送给好友或朋友圈
+        </p>
       </div>
 
       {/* 章节分隔线 */}

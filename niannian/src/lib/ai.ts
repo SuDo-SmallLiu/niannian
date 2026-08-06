@@ -1,5 +1,12 @@
 import OpenAI from 'openai';
 import { type PhotoSourceFacts, buildSourceFactsPrompt } from '@/lib/google-photos-metadata';
+import {
+  type AffectUnderstanding,
+  type ChangeDetail,
+  buildAffectTheoryPrompt,
+  normalizeUnderstanding,
+  normalizeChangeDetail,
+} from '@/lib/affect-theory';
 
 // 创建 OpenAI 兼容客户端（火山引擎 Ark / 其他兼容 API）
 function getClient(): OpenAI | null {
@@ -29,9 +36,15 @@ export interface PhotoAnalysis {
   action: string;
   time: string;
   tags: string[];
+  /** @deprecated 使用 understanding.emotions，保留兼容 */
   emotions: string[];
+  /** @deprecated 使用 changeDetail，保留兼容 */
   changes: string[];
   significance: string;
+  /** 情动理论 — 理解层 */
+  understanding: AffectUnderstanding;
+  /** 情动理论 — 变化层 */
+  changeDetail: ChangeDetail;
   layeredTags: {
     objective: Array<{ key: string; value: string }>;
     behavior: Array<{ key: string; value: string }>;
@@ -40,9 +53,34 @@ export interface PhotoAnalysis {
   };
 }
 
+export interface UserSupplementContext {
+  userNotes: string;
+  voiceTranscript: string;
+  questions: Array<{ question: string; answer: string }>;
+}
+
+function buildSupplementPrompt(supplement: UserSupplementContext): string {
+  const parts: string[] = ['\n\n## 用户补充信息（请优先采信，用于修正 AI 推测）'];
+  if (supplement.userNotes) {
+    parts.push(`- 用户文字补充：${supplement.userNotes}`);
+  }
+  if (supplement.voiceTranscript) {
+    parts.push(`- 用户语音转写：${supplement.voiceTranscript}`);
+  }
+  for (const qa of supplement.questions) {
+    if (qa.answer) {
+      parts.push(`- 问：${qa.question}\n  答：${qa.answer}`);
+    }
+  }
+  if (parts.length === 1) return '';
+  parts.push('\n请结合用户补充，修正事实层（人物/时间/地点/动作）和理解层（情动构型/变化），用户明确说过的信息优先于视觉推测。');
+  return parts.join('\n');
+}
+
 export async function analyzePhoto(
   imageBase64: string,
-  sourceFacts?: PhotoSourceFacts
+  sourceFacts?: PhotoSourceFacts,
+  supplement?: UserSupplementContext
 ): Promise<PhotoAnalysis> {
   const client = getClient();
 
@@ -52,8 +90,15 @@ export async function analyzePhoto(
 
   const sourceContext = sourceFacts ? `\n\n${buildSourceFactsPrompt(sourceFacts)}\n` : '';
 
-  const prompt = `你是一位家庭记忆整理师。请分析这张家庭照片，生成一张「记忆卡」。
-${sourceContext}
+  const affectPrompt = buildAffectTheoryPrompt();
+
+  const supplementContext = supplement ? buildSupplementPrompt(supplement) : '';
+
+  const prompt = `你是一位家庭记忆整理师，熟悉情动理论（DH2012 + Russell 环形模型）。
+请分析这张家庭照片，生成一张「记忆卡」。
+${sourceContext}${supplementContext}
+${affectPrompt}
+
 请以JSON格式返回（只返回JSON，不要其他内容）：
 {
   "people": ["人物1", "人物2"],
@@ -61,22 +106,41 @@ ${sourceContext}
   "action": "行为描述",
   "time": "估计的时间，不确定填"未知"",
   "tags": ["标签1", "标签2"],
-  "emotions": ["可能情绪1", "可能情绪2"],
-  "changes": ["变化标签，如：第一次、长大、重逢，没有则[]"],
+  "understanding": {
+    "archetype": "主情动构型名称，如：温暖相依",
+    "secondaryArchetypes": ["次要构型，可选"],
+    "valence": "negative|neutral|positive",
+    "arousal": "low|medium|high",
+    "quadrant": "如：高愉悦·低唤醒",
+    "indicators": ["画面中的情动指示词，如：牵手、日落、生日蛋糕"],
+    "emotions": ["表层情绪词，辅助用，如：开心、放松"],
+    "confidence": "high|medium|low"
+  },
+  "changeDetail": {
+    "transitions": [
+      {
+        "type": "变化类型，如：首次",
+        "marker": "具体变化，如：第一次独自上学",
+        "lifePhase": "童年",
+        "affectShift": "紧张 → 骄傲"
+      }
+    ],
+    "summary": "一句话概括这张照片标记的变化意义"
+  },
   "significance": "一句话说明这张照片值得记住的原因",
   "layeredTags": {
     "objective": [{"key": "人物", "value": "爸爸"}, {"key": "地点", "value": "杭州"}],
     "behavior": [{"key": "行为", "value": "一起吃冰淇淋"}],
-    "change": [{"key": "变化", "value": "第一次"}],
-    "family_value": [{"key": "价值", "value": "爱与滋养"}]
+    "change": [{"key": "变化", "value": "首次"}, {"key": "阶段", "value": "童年"}],
+    "family_value": [{"key": "主题", "value": "爱与滋养"}]
   }
 }
 
 四层标签说明：
 1. objective（客观）：人物、时间、地点
 2. behavior（行为）：拥抱、骑车、旅行、做饭等
-3. change（变化）：第一次、重新开始、毕业、长大、重逢
-4. family_value（家庭价值）：爱与滋养、冒险成长、创造玩乐、传承根基
+3. change（变化）：变化类型 + 人生阶段 + 情动位移（从 changeDetail 提取）
+4. family_value（主题价值）：爱与滋养、冒险成长、创造玩乐、传承根基
 
 注意：不确定的信息标注"未知"或"可能"，不要编造。`;
 
@@ -95,7 +159,7 @@ ${sourceContext}
           ],
         },
       ],
-      max_tokens: 500,
+      max_tokens: 800,
       temperature: 0.7,
     });
 
@@ -115,22 +179,132 @@ ${sourceContext}
 
 function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis {
   const layered = (result.layeredTags || {}) as Record<string, Array<{ key: string; value: string }>>;
+  const understanding = normalizeUnderstanding(
+    (result.understanding as Record<string, unknown>) || {
+      emotions: result.emotions,
+    }
+  );
+  const changeDetail = normalizeChangeDetail(
+    (result.changeDetail as Record<string, unknown>) || {
+      transitions: ((result.changes as string[]) || []).map((c) => ({ type: c, marker: c })),
+    }
+  );
+
+  // 从 changeDetail 补充第三层标签
+  const changeTags = [...(layered.change || [])];
+  for (const t of changeDetail.transitions) {
+    if (t.type && !changeTags.some((tag) => tag.value === t.type)) {
+      changeTags.push({ key: '变化', value: t.type });
+    }
+    if (t.lifePhase && !changeTags.some((tag) => tag.value === t.lifePhase)) {
+      changeTags.push({ key: '阶段', value: t.lifePhase });
+    }
+    if (t.affectShift && !changeTags.some((tag) => tag.value === t.affectShift)) {
+      changeTags.push({ key: '情动位移', value: t.affectShift });
+    }
+  }
+
+  // 从 understanding 补充情动指示词到 tags（便于筛选）
+  const flatTags = (result.tags as string[]) || [];
+  for (const indicator of understanding.indicators) {
+    if (!flatTags.includes(indicator)) flatTags.push(indicator);
+  }
+
   return {
     people: (result.people as string[]) || [],
     scene: (result.scene as string) || '未知',
     action: (result.action as string) || '未知',
     time: (result.time as string) || '未知',
-    tags: (result.tags as string[]) || [],
-    emotions: (result.emotions as string[]) || [],
-    changes: (result.changes as string[]) || [],
-    significance: (result.significance as string) || '',
+    tags: flatTags,
+    emotions: understanding.emotions.length > 0
+      ? understanding.emotions
+      : ((result.emotions as string[]) || []),
+    changes: changeDetail.transitions.map((t) => t.marker || t.type).filter(Boolean),
+    significance: (result.significance as string) || changeDetail.summary || '',
+    understanding,
+    changeDetail,
     layeredTags: {
       objective: layered.objective || [],
       behavior: layered.behavior || [],
-      change: layered.change || [],
+      change: changeTags,
       family_value: layered.family_value || [],
     },
   };
+}
+
+// ============================================================
+// Sprint 2: AI 提问 + 结合用户补充
+// ============================================================
+
+export interface PhotoQuestionContext {
+  people: string[];
+  location: string;
+  action: string;
+  significance: string;
+  archetype?: string;
+}
+
+const DEFAULT_QUESTION_POOL = [
+  '这张照片里发生了什么？',
+  '你为什么会拍下这一瞬间？',
+  '后来发生了什么？',
+  '当时在场的人都有谁？',
+  '这张照片对你意味着什么？',
+  '有什么画面里看不出来、但你想记住的细节？',
+];
+
+function pickRandomQuestions(count: number): string[] {
+  const shuffled = [...DEFAULT_QUESTION_POOL].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
+export async function generatePhotoQuestions(
+  context: PhotoQuestionContext
+): Promise<Array<{ question: string }>> {
+  const client = getClient();
+  const count = 2 + Math.floor(Math.random() * 2); // 2–3
+
+  if (!client) {
+    return pickRandomQuestions(count).map((question) => ({ question }));
+  }
+
+  const prompt = `你是一位家庭记忆整理师。根据以下照片 AI 解析摘要，生成 ${count} 个引导用户补充记忆的问题。
+问题要具体、温暖、易回答，帮助挖掘照片背后 AI 看不到的故事。
+
+照片摘要：
+- 人物：${context.people.join('、') || '未知'}
+- 地点：${context.location || '未知'}
+- 动作：${context.action || '未知'}
+- 意义：${context.significance || '未知'}
+${context.archetype ? `- 情动构型：${context.archetype}` : ''}
+
+请以 JSON 数组返回（只返回 JSON）：
+[{"question": "问题1"}, {"question": "问题2"}]
+
+要求：
+- 每个问题一句话，口语化
+- 不要重复问同一件事
+- 优先问「发生了什么」「为什么拍」「后来怎样」类问题`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model: TEXT_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 400,
+      temperature: 0.8,
+    });
+
+    const text = response.choices[0]?.message?.content?.trim() || '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const items = JSON.parse(jsonMatch[0]) as Array<{ question: string }>;
+      return items.filter((q) => q.question).slice(0, 3);
+    }
+  } catch (error) {
+    console.error('生成提问失败:', error);
+  }
+
+  return pickRandomQuestions(count).map((question) => ({ question }));
 }
 
 // ============================================================
@@ -280,15 +454,28 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
       scene: '公园',
       action: '牵手散步',
       time: '2020年秋天',
-      tags: ['温馨', '陪伴', '成长'],
-      emotions: ['开心', '放松', '亲密'],
+      tags: ['温馨', '陪伴', '成长', '牵手', '祖孙'],
+      emotions: ['安心', '亲密'],
       changes: ['陪伴成长'],
       significance: '祖孙俩在公园牵手的日常瞬间，记录了无声的陪伴。',
+      understanding: {
+        archetype: '温暖相依',
+        valence: 'positive',
+        arousal: 'low',
+        quadrant: '高愉悦·低唤醒',
+        indicators: ['牵手', '祖孙', '公园'],
+        emotions: ['安心', '亲密'],
+        confidence: 'high',
+      },
+      changeDetail: {
+        transitions: [{ type: '日常沉淀', marker: '陪伴成长', lifePhase: '童年' }],
+        summary: '日常陪伴中积累的成长记忆',
+      },
       layeredTags: {
         objective: [{ key: '人物', value: '爷爷' }, { key: '人物', value: '孙子' }, { key: '地点', value: '公园' }],
         behavior: [{ key: '行为', value: '牵手散步' }],
-        change: [{ key: '变化', value: '陪伴成长' }],
-        family_value: [{ key: '价值', value: '爱与滋养' }],
+        change: [{ key: '变化', value: '日常沉淀' }, { key: '阶段', value: '童年' }],
+        family_value: [{ key: '主题', value: '爱与滋养' }],
       },
     },
     {
@@ -296,15 +483,29 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
       scene: '家中客厅',
       action: '春节团聚',
       time: '2023年春节',
-      tags: ['团聚', '幸福', '传统'],
+      tags: ['团聚', '幸福', '传统', '全家福', '餐桌'],
       emotions: ['温暖', '喜悦'],
-      changes: ['重逢'],
+      changes: ['重聚'],
       significance: '一家人围坐在一起的春节时刻，是传承根基的见证。',
+      understanding: {
+        archetype: '仪式传承',
+        secondaryArchetypes: ['欢聚庆典'],
+        valence: 'positive',
+        arousal: 'medium',
+        quadrant: '高愉悦·低唤醒',
+        indicators: ['全家福', '餐桌', '春节'],
+        emotions: ['温暖', '喜悦'],
+        confidence: 'high',
+      },
+      changeDetail: {
+        transitions: [{ type: '重聚', marker: '春节团聚', lifePhase: '全龄', affectShift: '思念 → 团圆' }],
+        summary: '久别后的春节重聚，标记家庭团圆时刻',
+      },
       layeredTags: {
         objective: [{ key: '人物', value: '全家' }, { key: '地点', value: '家中' }, { key: '时间', value: '2023年春节' }],
         behavior: [{ key: '行为', value: '团聚' }],
-        change: [{ key: '变化', value: '重逢' }],
-        family_value: [{ key: '价值', value: '传承根基' }],
+        change: [{ key: '变化', value: '重聚' }, { key: '情动位移', value: '思念 → 团圆' }],
+        family_value: [{ key: '主题', value: '传承根基' }],
       },
     },
     {
@@ -312,15 +513,28 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
       scene: '海边',
       action: '一起玩沙子',
       time: '2021年夏天',
-      tags: ['快乐', '亲子', '旅行'],
+      tags: ['快乐', '亲子', '旅行', '海边', '第一次'],
       emotions: ['兴奋', '自由'],
-      changes: ['第一次'],
+      changes: ['第一次去海边'],
       significance: '孩子第一次在海边玩沙子，是冒险成长的开始。',
+      understanding: {
+        archetype: '探索新奇',
+        valence: 'positive',
+        arousal: 'high',
+        quadrant: '高愉悦·高唤醒',
+        indicators: ['海边', '亲子', '沙滩'],
+        emotions: ['兴奋', '自由'],
+        confidence: 'high',
+      },
+      changeDetail: {
+        transitions: [{ type: '首次', marker: '第一次去海边', lifePhase: '童年', affectShift: '好奇 → 兴奋' }],
+        summary: '孩子第一次接触大海的冒险时刻',
+      },
       layeredTags: {
         objective: [{ key: '人物', value: '妈妈' }, { key: '人物', value: '孩子' }, { key: '地点', value: '海边' }],
         behavior: [{ key: '行为', value: '玩沙子' }, { key: '行为', value: '旅行' }],
-        change: [{ key: '变化', value: '第一次' }],
-        family_value: [{ key: '价值', value: '冒险成长' }],
+        change: [{ key: '变化', value: '首次' }, { key: '阶段', value: '童年' }],
+        family_value: [{ key: '主题', value: '冒险成长' }],
       },
     },
     {
@@ -328,15 +542,32 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
       scene: '户外',
       action: '教骑车',
       time: '2022年春天',
-      tags: ['成长', '父爱', '陪伴'],
+      tags: ['成长', '父爱', '陪伴', '自行车'],
       emotions: ['紧张', '期待', '骄傲'],
-      changes: ['第一次', '长大'],
+      changes: ['第一次骑车', '长大'],
       significance: '爸爸教孩子骑车的瞬间，标志着独立成长的里程碑。',
+      understanding: {
+        archetype: '挑战突破',
+        secondaryArchetypes: ['成长见证'],
+        valence: 'positive',
+        arousal: 'high',
+        quadrant: '低愉悦·高唤醒',
+        indicators: ['自行车', '亲子', '户外'],
+        emotions: ['紧张', '期待', '骄傲'],
+        confidence: 'high',
+      },
+      changeDetail: {
+        transitions: [
+          { type: '首次', marker: '第一次骑车', lifePhase: '童年', affectShift: '紧张 → 骄傲' },
+          { type: '成长', marker: '学会独立', lifePhase: '童年' },
+        ],
+        summary: '从依赖到独立的成长里程碑',
+      },
       layeredTags: {
         objective: [{ key: '人物', value: '爸爸' }, { key: '人物', value: '孩子' }, { key: '地点', value: '户外' }],
         behavior: [{ key: '行为', value: '教骑车' }],
-        change: [{ key: '变化', value: '第一次' }, { key: '变化', value: '长大' }],
-        family_value: [{ key: '价值', value: '创造玩乐' }],
+        change: [{ key: '变化', value: '首次' }, { key: '情动位移', value: '紧张 → 骄傲' }],
+        family_value: [{ key: '主题', value: '创造玩乐' }],
       },
     },
   ];

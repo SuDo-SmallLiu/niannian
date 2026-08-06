@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPhotosByFamily, updatePhotoAnalysis, createStory, getFamily, getLatestStoryByFamily, upsertMemoryCard, saveTagsForPhoto } from '@/lib/db';
-import { analyzePhoto, buildPhotoRelations, generateFamilyStory, type PhotoAnalysis } from '@/lib/ai';
-import {
-  type PhotoSourceFacts,
-  buildSourceFactsPrompt,
-  sourceFactsToTags,
-} from '@/lib/google-photos-metadata';
-import { readFileSync } from 'fs';
-import path from 'path';
+import { getPhotosByFamily, createStory, getFamily, getLatestStoryByFamily } from '@/lib/db';
+import { buildPhotoRelations, generateFamilyStory } from '@/lib/ai';
+import { type PhotoSourceFacts } from '@/lib/google-photos-metadata';
+import { analyzeAndSavePhoto } from '@/lib/analyze-photo';
 
 // 存储分析状态
 const analysisStatus = new Map<string, 'processing' | 'done' | 'error'>();
@@ -94,30 +89,15 @@ async function processAnalysis(
 
     for (const photo of photos) {
       try {
-        const filePath = path.join(process.cwd(), 'public', photo.url);
-        const fileBuffer = readFileSync(filePath);
-        const base64 = fileBuffer.toString('base64');
-
-        const sourceFacts =
-          photo.source_type === 'google_photos' && photo.source_metadata
-            ? (photo.source_metadata as PhotoSourceFacts)
-            : undefined;
-
-        const analysis = await analyzePhoto(base64, sourceFacts);
-
-        updatePhotoAnalysis(photo.id, {
-          people: mergePeople(analysis.people, sourceFacts?.people),
-          location: sourceFacts?.location || analysis.scene,
-          event: analysis.action,
-          ai_tags: analysis.tags,
-          taken_at: sourceFacts?.takenAtFormatted || analysis.time,
-        });
-
-        saveMemoryCardFromAnalysis(familyId, photo.id, analysis, sourceFacts);
+        const analysis = await analyzeAndSavePhoto(photo.id);
 
         photoAnalyses.push({
           id: photo.id,
-          ...analysis,
+          people: analysis.people,
+          scene: analysis.scene,
+          action: analysis.action,
+          time: analysis.time,
+          tags: analysis.tags,
         });
         console.log(`✅ 分析完成: ${photo.id}`);
       } catch (err) {
@@ -159,58 +139,4 @@ async function processAnalysis(
     console.error(`处理分析 ${familyId} 异常:`, err);
     analysisStatus.set(familyId, 'error');
   }
-}
-
-const LAYER_MAP: Record<string, number> = {
-  objective: 1,
-  behavior: 2,
-  change: 3,
-  family_value: 4,
-};
-
-function saveMemoryCardFromAnalysis(
-  familyId: string,
-  photoId: string,
-  analysis: PhotoAnalysis,
-  sourceFacts?: PhotoSourceFacts
-) {
-  upsertMemoryCard({
-    photo_id: photoId,
-    family_id: familyId,
-    taken_at: sourceFacts?.takenAtFormatted || analysis.time,
-    location: sourceFacts?.location || analysis.scene,
-    people: mergePeople(analysis.people, sourceFacts?.people),
-    action: analysis.action,
-    emotions: analysis.emotions,
-    changes: analysis.changes,
-    significance: sourceFacts?.description || analysis.significance,
-    user_notes: sourceFacts?.description || '',
-    analysis_status: 'analyzed',
-  });
-
-  const tags: Array<{ photo_id: string; layer: number; key: string; value: string }> = [];
-
-  if (sourceFacts) {
-    for (const tag of sourceFactsToTags(sourceFacts)) {
-      tags.push({ photo_id: photoId, ...tag });
-    }
-  }
-
-  for (const [layerName, items] of Object.entries(analysis.layeredTags)) {
-    const layer = LAYER_MAP[layerName];
-    if (!layer || !items) continue;
-    for (const item of items) {
-      // 避免与原始元数据标签重复
-      const dup = tags.some((t) => t.layer === layer && t.value === item.value);
-      if (!dup) {
-        tags.push({ photo_id: photoId, layer, key: item.key, value: item.value });
-      }
-    }
-  }
-  saveTagsForPhoto(photoId, tags);
-}
-
-function mergePeople(aiPeople: string[], sourcePeople?: string[]): string[] {
-  const merged = new Set([...(sourcePeople || []), ...aiPeople]);
-  return Array.from(merged).filter(Boolean);
 }

@@ -46,7 +46,7 @@ export const LAYER_LABELS: Record<number, string> = {
   1: '客观',
   2: '行为',
   3: '变化',
-  4: '家庭价值',
+  4: '主题价值',
 };
 
 export function defaultFilters(): MemoryCardFilters {

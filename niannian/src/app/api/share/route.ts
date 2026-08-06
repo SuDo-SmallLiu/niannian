@@ -1,24 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createShare, getShareByCode } from '@/lib/db';
+import {
+  getOrCreateStoryShare,
+  getOrCreatePhotoShare,
+  getPhoto,
+  getStory,
+  getShareByCode,
+} from '@/lib/db';
+
+function buildShareUrl(request: NextRequest, shareCode: string) {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    request.headers.get('origin') ||
+    'http://localhost:3000';
+  return `${baseUrl}/share/${shareCode}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { storyId } = await request.json();
+    const { storyId, photoId } = await request.json();
 
-    if (!storyId) {
-      return NextResponse.json({ error: '缺少故事ID' }, { status: 400 });
+    if (photoId) {
+      const photo = getPhoto(photoId);
+      if (!photo) {
+        return NextResponse.json({ error: '照片不存在' }, { status: 404 });
+      }
+      const shareCode = getOrCreatePhotoShare(photoId);
+      return NextResponse.json({
+        shareCode,
+        shareUrl: buildShareUrl(request, shareCode),
+        shareType: 'memory',
+      });
     }
 
-    const shareCode = createShare(storyId);
+    if (storyId) {
+      const story = getStory(storyId);
+      if (!story) {
+        return NextResponse.json({ error: '故事不存在' }, { status: 404 });
+      }
+      const shareCode = getOrCreateStoryShare(storyId);
+      return NextResponse.json({
+        shareCode,
+        shareUrl: buildShareUrl(request, shareCode),
+        shareType: 'story',
+      });
+    }
 
-    // 构建分享链接
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.headers.get('origin') || 'http://localhost:3000';
-    const shareUrl = `${baseUrl}/share/${shareCode}`;
-
-    return NextResponse.json({
-      shareCode,
-      shareUrl,
-    });
+    return NextResponse.json({ error: '缺少 storyId 或 photoId' }, { status: 400 });
   } catch (error) {
     console.error('创建分享失败:', error);
     return NextResponse.json({ error: '创建分享失败' }, { status: 500 });

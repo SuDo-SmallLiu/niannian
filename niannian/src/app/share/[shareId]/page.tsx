@@ -4,14 +4,31 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
-interface ShareData {
+interface StoryShareData {
+  share_type: 'story';
   story_title: string;
   story_description: string;
   story_timeline: Array<{ year: string; event: string }>;
   connection_action: string;
   family_name: string;
-  story_photos?: string[];
+  photo_urls?: string[];
 }
+
+interface MemoryShareData {
+  share_type: 'memory';
+  family_name: string;
+  photo: {
+    url: string;
+    taken_at: string;
+    location: string;
+    people: string[];
+    action: string;
+    significance: string;
+    archetype: string;
+  };
+}
+
+type ShareData = StoryShareData | MemoryShareData;
 
 export default function SharePage() {
   const params = useParams();
@@ -60,9 +77,65 @@ export default function SharePage() {
     );
   }
 
+  if (data.share_type === 'memory') {
+    const { photo, family_name } = data;
+    const subtitle = [photo.taken_at, photo.location].filter(Boolean).join(' · ');
+
+    return (
+      <div className="min-h-screen bg-[#F8F4ED]">
+        <div className="pt-16 pb-6 px-6 text-center">
+          <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3">
+            💌 一张家庭记忆
+          </p>
+          <p className="text-xs text-[#D8CCB8]">{family_name}</p>
+        </div>
+
+        <div className="px-6 pb-24">
+          <div className="rounded-2xl overflow-hidden shadow-md mb-6 animate-fade-in-up">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photo.url} alt="家庭照片" className="w-full aspect-[4/3] object-cover" />
+          </div>
+
+          {photo.archetype && (
+            <div className="text-center mb-4">
+              <span className="px-3 py-1.5 rounded-full bg-[#D98A45] text-white text-sm">
+                {photo.archetype}
+              </span>
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl p-6 mb-4 shadow-sm animate-fade-in-up delay-100">
+            {subtitle && (
+              <p className="text-xs text-[#B8A898] mb-3">{subtitle}</p>
+            )}
+            {photo.people.length > 0 && (
+              <p className="text-sm text-[#4B3B2F] mb-2">
+                人物：{photo.people.join('、')}
+              </p>
+            )}
+            {photo.action && (
+              <p className="text-sm text-[#4B3B2F] mb-3">{photo.action}</p>
+            )}
+            {photo.significance && (
+              <div className="border-l-[3px] border-[#D98A45] pl-4">
+                <p className="text-[#8B7355] font-serif leading-relaxed text-[15px]">
+                  {photo.significance}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-xs text-[#D8CCB8]">由 念念年年 生成</p>
+            <p className="text-xs text-[#E8DCC8] mt-2">让照片重新成为家人的连接</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F4ED]">
-      {/* 顶部装饰 */}
       <div className="pt-16 pb-8 px-6 text-center">
         <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3">
           💌 一封来自家人的信
@@ -71,25 +144,30 @@ export default function SharePage() {
       </div>
 
       <div className="px-6 pb-24">
-        {/* 故事标题 */}
+        {data.photo_urls && data.photo_urls.length > 0 && (
+          <div className={`grid gap-2 mb-6 ${data.photo_urls.length >= 4 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+            {data.photo_urls.slice(0, 4).map((url, i) => (
+              <div key={i} className="rounded-xl overflow-hidden aspect-square bg-[#F0E8D8]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="text-center mb-10 animate-fade-in-up">
           <h1 className="text-2xl font-serif font-bold text-[#4B3B2F] leading-snug">
             {data.story_title}
           </h1>
         </div>
 
-        {/* 时间线 */}
         {data.story_timeline && data.story_timeline.length > 0 && (
           <div className="bg-white rounded-3xl p-6 mb-6 animate-fade-in-up delay-100 shadow-sm">
             <div className="relative pl-6">
               <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#E8DCC8]" />
               <div className="space-y-5">
                 {data.story_timeline.map((item, i) => (
-                  <div
-                    key={i}
-                    className="relative"
-                    style={{ animationDelay: `${i * 0.2 + 0.2}s` }}
-                  >
+                  <div key={i} className="relative">
                     <div className="absolute -left-[23px] top-1 w-3 h-3 rounded-full bg-[#D98A45] ring-4 ring-white" />
                     <span className="text-sm font-medium text-[#D98A45]">{item.year}</span>
                     <p className="text-[#8B7355] mt-0.5">{item.event}</p>
@@ -100,7 +178,6 @@ export default function SharePage() {
           </div>
         )}
 
-        {/* 情感总结 */}
         <div className="bg-white rounded-3xl p-6 mb-6 animate-fade-in-up delay-300 shadow-sm">
           <div className="border-l-[3px] border-[#D98A45] pl-4">
             <p className="text-[#8B7355] font-serif leading-relaxed text-[15px]">
@@ -109,7 +186,6 @@ export default function SharePage() {
           </div>
         </div>
 
-        {/* 连接建议 */}
         {data.connection_action && (
           <div className="bg-[#FFF8F0] rounded-3xl p-6 animate-fade-in-up delay-400 border border-[#F0DCC8]">
             <p className="text-sm text-[#8B7355] leading-relaxed">
@@ -118,12 +194,9 @@ export default function SharePage() {
           </div>
         )}
 
-        {/* 底部 */}
         <div className="text-center mt-12 animate-fade-in-up delay-500">
           <p className="text-xs text-[#D8CCB8]">由 念念年年 生成</p>
-          <p className="text-xs text-[#E8DCC8] mt-2">
-            让照片重新成为家人的连接
-          </p>
+          <p className="text-xs text-[#E8DCC8] mt-2">让照片重新成为家人的连接</p>
         </div>
       </div>
     </div>

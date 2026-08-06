@@ -164,6 +164,29 @@ function migrateDatabase(database: Database.Database) {
   if (!colNames.has('source_type')) {
     database.exec(`ALTER TABLE photos ADD COLUMN source_type TEXT DEFAULT ''`);
   }
+
+  const mcCols = database.prepare('PRAGMA table_info(memory_cards)').all() as Array<{ name: string }>;
+  const mcColNames = new Set(mcCols.map((c) => c.name));
+  if (!mcColNames.has('understanding')) {
+    database.exec(`ALTER TABLE memory_cards ADD COLUMN understanding TEXT DEFAULT '{}'`);
+  }
+  if (!mcColNames.has('change_detail')) {
+    database.exec(`ALTER TABLE memory_cards ADD COLUMN change_detail TEXT DEFAULT '{}'`);
+  }
+  if (!mcColNames.has('ai_questions')) {
+    database.exec(`ALTER TABLE memory_cards ADD COLUMN ai_questions TEXT DEFAULT '[]'`);
+  }
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS photo_shares (
+      id TEXT PRIMARY KEY,
+      photo_id TEXT NOT NULL UNIQUE,
+      share_code TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (photo_id) REFERENCES photos(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_photo_shares_code ON photo_shares(share_code);
+  `);
 }
 
 // --- Family 操作 ---
@@ -348,7 +371,16 @@ export function getStory(id: string) {
 
 // --- Share 操作 ---
 
-export function createShare(storyId: string): string {
+export function getOrCreateStoryShare(storyId: string): string {
+  const database = getDb();
+  const existing = database
+    .prepare('SELECT share_code FROM shares WHERE story_id = ?')
+    .get(storyId) as { share_code: string } | undefined;
+  if (existing) return existing.share_code;
+  return createStoryShare(storyId);
+}
+
+export function createStoryShare(storyId: string): string {
   const id = generateId();
   const shareCode = generateShortCode();
   const database = getDb();
@@ -358,9 +390,73 @@ export function createShare(storyId: string): string {
   return shareCode;
 }
 
+/** @deprecated use getOrCreateStoryShare */
+export function createShare(storyId: string): string {
+  return getOrCreateStoryShare(storyId);
+}
+
+export function getOrCreatePhotoShare(photoId: string): string {
+  const database = getDb();
+  const existing = database
+    .prepare('SELECT share_code FROM photo_shares WHERE photo_id = ?')
+    .get(photoId) as { share_code: string } | undefined;
+  if (existing) return existing.share_code;
+
+  const id = generateId();
+  const shareCode = generateShortCode();
+  database.prepare(
+    'INSERT INTO photo_shares (id, photo_id, share_code) VALUES (?, ?, ?)'
+  ).run(id, photoId, shareCode);
+  return shareCode;
+}
+
 export function getShareByCode(shareCode: string) {
   const database = getDb();
-  const row = database
+
+  // 记忆卡分享
+  const photoShare = database
+    .prepare('SELECT photo_id FROM photo_shares WHERE share_code = ?')
+    .get(shareCode) as { photo_id: string } | undefined;
+
+  if (photoShare) {
+    const photoRow = database.prepare(`
+      SELECT p.*, f.name as family_name,
+             mc.significance, mc.action as mc_action, mc.people as mc_people,
+             mc.taken_at as mc_taken_at, mc.location as mc_location,
+             mc.understanding
+      FROM photos p
+      JOIN families f ON p.family_id = f.id
+      LEFT JOIN memory_cards mc ON mc.photo_id = p.id
+      WHERE p.id = ?
+    `).get(photoShare.photo_id) as any;
+    if (!photoRow) return null;
+
+    let understanding = null;
+    try {
+      understanding = JSON.parse(photoRow.understanding || '{}');
+    } catch {
+      understanding = null;
+    }
+
+    return {
+      share_type: 'memory' as const,
+      share_code: shareCode,
+      family_name: photoRow.family_name,
+      photo: {
+        id: photoRow.id,
+        url: photoRow.url,
+        taken_at: photoRow.mc_taken_at || photoRow.taken_at,
+        location: photoRow.mc_location || photoRow.location,
+        people: JSON.parse(photoRow.mc_people || photoRow.people || '[]'),
+        action: photoRow.mc_action || photoRow.event,
+        significance: photoRow.significance || '',
+        archetype: understanding?.archetype || '',
+      },
+    };
+  }
+
+  // 故事分享
+  const storyRow = database
     .prepare(
       `SELECT s.*, st.title as story_title, st.description as story_description,
               st.photos as story_photos, st.connection_action, st.timeline as story_timeline,
@@ -371,11 +467,24 @@ export function getShareByCode(shareCode: string) {
        WHERE s.share_code = ?`
     )
     .get(shareCode) as any;
-  if (!row) return null;
+  if (!storyRow) return null;
+
+  const photoIds = JSON.parse(storyRow.story_photos || '[]') as string[];
+  let photo_urls: string[] = [];
+  if (photoIds.length > 0) {
+    const placeholders = photoIds.map(() => '?').join(',');
+    const photoRows = database
+      .prepare(`SELECT url FROM photos WHERE id IN (${placeholders})`)
+      .all(...photoIds) as Array<{ url: string }>;
+    photo_urls = photoRows.map((p) => p.url);
+  }
+
   return {
-    ...row,
-    story_photos: JSON.parse(row.story_photos || '[]'),
-    story_timeline: JSON.parse(row.story_timeline || '[]'),
+    share_type: 'story' as const,
+    ...storyRow,
+    story_photos: photoIds,
+    photo_urls,
+    story_timeline: JSON.parse(storyRow.story_timeline || '[]'),
   };
 }
 
@@ -488,6 +597,14 @@ export function useInvitation(code: string, userId: string): { familyId: string;
 
 // --- Memory Card 操作 ---
 
+import type { AffectUnderstanding, ChangeDetail } from '@/lib/affect-theory';
+
+export interface AiQuestion {
+  id: string;
+  question: string;
+  answer: string;
+}
+
 export interface MemoryCardData {
   photo_id: string;
   family_id: string;
@@ -498,9 +615,18 @@ export interface MemoryCardData {
   emotions?: string[];
   changes?: string[];
   significance?: string;
+  understanding?: AffectUnderstanding;
+  change_detail?: ChangeDetail;
   user_notes?: string;
   voice_transcript?: string;
+  ai_questions?: AiQuestion[];
   analysis_status?: string;
+}
+
+export interface MemoryCardSupplement {
+  user_notes?: string;
+  voice_transcript?: string;
+  ai_questions?: AiQuestion[];
 }
 
 export interface TagData {
@@ -512,11 +638,20 @@ export interface TagData {
 }
 
 function parseMemoryCardRow(row: any) {
+  const understanding = row.understanding
+    ? JSON.parse(row.understanding)
+    : null;
+  const change_detail = row.change_detail
+    ? JSON.parse(row.change_detail)
+    : null;
   return {
     ...row,
     people: JSON.parse(row.people || '[]'),
     emotions: JSON.parse(row.emotions || '[]'),
     changes: JSON.parse(row.changes || '[]'),
+    understanding,
+    change_detail,
+    ai_questions: JSON.parse(row.ai_questions || '[]'),
   };
 }
 
@@ -531,8 +666,10 @@ export function upsertMemoryCard(data: MemoryCardData): string {
       UPDATE memory_cards SET
         taken_at = ?, location = ?, people = ?, action = ?,
         emotions = ?, changes = ?, significance = ?,
+        understanding = ?, change_detail = ?,
         user_notes = COALESCE(?, user_notes),
         voice_transcript = COALESCE(?, voice_transcript),
+        ai_questions = COALESCE(?, ai_questions),
         analysis_status = ?, updated_at = datetime('now')
       WHERE photo_id = ?
     `).run(
@@ -543,8 +680,11 @@ export function upsertMemoryCard(data: MemoryCardData): string {
       JSON.stringify(data.emotions || []),
       JSON.stringify(data.changes || []),
       data.significance || '',
+      JSON.stringify(data.understanding || {}),
+      JSON.stringify(data.change_detail || {}),
       data.user_notes ?? null,
       data.voice_transcript ?? null,
+      data.ai_questions ? JSON.stringify(data.ai_questions) : null,
       data.analysis_status || 'analyzed',
       data.photo_id
     );
@@ -555,8 +695,9 @@ export function upsertMemoryCard(data: MemoryCardData): string {
   database.prepare(`
     INSERT INTO memory_cards
       (id, photo_id, family_id, taken_at, location, people, action,
-       emotions, changes, significance, user_notes, voice_transcript, analysis_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       emotions, changes, significance, understanding, change_detail,
+       user_notes, voice_transcript, ai_questions, analysis_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     data.photo_id,
@@ -568,8 +709,11 @@ export function upsertMemoryCard(data: MemoryCardData): string {
     JSON.stringify(data.emotions || []),
     JSON.stringify(data.changes || []),
     data.significance || '',
+    JSON.stringify(data.understanding || {}),
+    JSON.stringify(data.change_detail || {}),
     data.user_notes || '',
     data.voice_transcript || '',
+    JSON.stringify(data.ai_questions || []),
     data.analysis_status || 'analyzed'
   );
   return id;
@@ -597,7 +741,49 @@ export function getMemoryCardWithPhoto(photoId: string) {
   if (!photo) return null;
   const card = getMemoryCardByPhoto(photoId);
   const tags = getTagsByPhoto(photoId);
-  return { photo, memoryCard: card, tags };
+  const family = getFamily(photo.family_id);
+  return {
+    photo,
+    memoryCard: card,
+    tags,
+    familyName: family?.name || '',
+  };
+}
+
+export function updateMemoryCardSupplement(
+  photoId: string,
+  supplement: MemoryCardSupplement
+): boolean {
+  const database = getDb();
+  const existing = getMemoryCardByPhoto(photoId);
+  if (!existing) return false;
+
+  database.prepare(`
+    UPDATE memory_cards SET
+      user_notes = ?,
+      voice_transcript = ?,
+      ai_questions = ?,
+      updated_at = datetime('now')
+    WHERE photo_id = ?
+  `).run(
+    supplement.user_notes ?? existing.user_notes ?? '',
+    supplement.voice_transcript ?? existing.voice_transcript ?? '',
+    JSON.stringify(supplement.ai_questions ?? existing.ai_questions ?? []),
+    photoId
+  );
+  return true;
+}
+
+export function setMemoryCardQuestions(photoId: string, questions: AiQuestion[]): boolean {
+  const database = getDb();
+  const existing = getMemoryCardByPhoto(photoId);
+  if (!existing) return false;
+
+  database.prepare(`
+    UPDATE memory_cards SET ai_questions = ?, updated_at = datetime('now')
+    WHERE photo_id = ?
+  `).run(JSON.stringify(questions), photoId);
+  return true;
 }
 
 // --- 标签操作 ---
