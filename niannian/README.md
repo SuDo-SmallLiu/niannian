@@ -61,6 +61,14 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 首次在服务器搭建环境，进入克隆后的 `niannian/` 子目录运行 `bash scripts/setup-server.sh`（Ubuntu/Debian）。
 
+**首次配置 GitHub Actions SSH 部署：** 在服务器上以 `clawdbot`（或实际运行 pm2 的用户）执行：
+
+```bash
+bash niannian/scripts/setup-github-deploy.sh
+```
+
+脚本会生成部署密钥并打印 4 个 Secret 的值。
+
 使用前请在 **仓库 Settings → Secrets and variables → Actions** 中配置：
 - `SSH_HOST`：服务器 IP 或域名
 - `SSH_USERNAME`：SSH 用户名
