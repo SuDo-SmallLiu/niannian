@@ -18,6 +18,7 @@ interface PhotoItem {
   } | null;
 }
 
+export default function PhotoLibraryPage() {
   const router = useRouter();
   const params = useParams();
   const familyId = params.id as string;
