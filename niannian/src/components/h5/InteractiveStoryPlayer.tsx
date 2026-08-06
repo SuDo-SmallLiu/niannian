@@ -1,24 +1,32 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { H5Slide } from '@/lib/h5-story-slides';
-import { ChevronLeft, Pause, Play, X } from 'lucide-react';
+import { getThemeFromSlide } from '@/lib/theme-music';
+import { useThemeMusic } from '@/hooks/useThemeMusic';
+import { ChevronLeft, Pause, Play, Share2, Volume2, VolumeX, X } from 'lucide-react';
 
 interface InteractiveStoryPlayerProps {
   slides: H5Slide[];
   onClose?: () => void;
+  onShare?: () => void;
   autoPlayMs?: number;
   showClose?: boolean;
+  enableMusic?: boolean;
 }
 
 export default function InteractiveStoryPlayer({
   slides,
   onClose,
+  onShare,
   autoPlayMs = 6000,
   showClose = true,
+  enableMusic = true,
 }: InteractiveStoryPlayerProps) {
   const [index, setIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [musicOn, setMusicOn] = useState(true);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [progressKey, setProgressKey] = useState(0);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
@@ -26,31 +34,59 @@ export default function InteractiveStoryPlayer({
   const total = slides.length;
   const slide = slides[index];
 
+  const activeTheme = useMemo(() => {
+    let lastTheme: string | undefined;
+    for (let i = 0; i <= index; i++) {
+      const t = getThemeFromSlide(slides[i]);
+      if (t) lastTheme = t;
+    }
+    return lastTheme;
+  }, [index, slides]);
+
+  useThemeMusic({
+    theme: activeTheme,
+    enabled: enableMusic && musicOn,
+    unlocked: audioUnlocked,
+  });
+
+  const unlockAudio = useCallback(() => {
+    setAudioUnlocked(true);
+  }, []);
+
   const goNext = useCallback(() => {
+    unlockAudio();
     setIndex((i) => {
       if (i >= total - 1) return i;
       setAnimKey((k) => k + 1);
       setProgressKey((k) => k + 1);
       return i + 1;
     });
-  }, [total]);
+  }, [total, unlockAudio]);
 
   const goPrev = useCallback(() => {
+    unlockAudio();
     setIndex((i) => {
       if (i <= 0) return i;
       setAnimKey((k) => k + 1);
       setProgressKey((k) => k + 1);
       return i - 1;
     });
-  }, []);
+  }, [unlockAudio]);
 
   const toggleAutoPlay = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    unlockAudio();
     setAutoPlay((v) => {
       if (!v) setProgressKey((k) => k + 1);
       return !v;
     });
-  }, []);
+  }, [unlockAudio]);
+
+  const toggleMusic = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    unlockAudio();
+    setMusicOn((v) => !v);
+  }, [unlockAudio]);
 
   useEffect(() => {
     if (!autoPlay || index >= total - 1) return;
@@ -124,6 +160,18 @@ export default function InteractiveStoryPlayer({
           <ChevronLeft className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2 pointer-events-auto">
+          {enableMusic && (
+            <button
+              type="button"
+              onClick={toggleMusic}
+              className={`w-11 h-11 rounded-full flex items-center justify-center touch-manipulation ${
+                musicOn ? 'bg-[#D98A45]/80 text-white' : 'bg-black/40 text-white/60'
+              }`}
+              aria-label={musicOn ? '关闭音乐' : '开启音乐'}
+            >
+              {musicOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleAutoPlay}
@@ -134,6 +182,20 @@ export default function InteractiveStoryPlayer({
             {autoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             {autoPlay ? '暂停' : '自动播放'}
           </button>
+          {onShare && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                unlockAudio();
+                onShare();
+              }}
+              className="w-11 h-11 rounded-full bg-black/40 flex items-center justify-center touch-manipulation"
+              aria-label="分享"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+          )}
           {showClose && onClose && (
             <button
               type="button"

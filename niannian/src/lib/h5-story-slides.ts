@@ -90,11 +90,12 @@ export function buildStorySlides(input: StoryH5Input): H5Slide[] {
           },
         }));
 
-  chapters.forEach((seg, idx) => {
+    chapters.forEach((seg, idx) => {
     const photo = photoMap.get(seg.photoId);
     slides.push({
       id: `chapter-${seg.photoId}-${idx}`,
       type: 'chapter',
+      theme: input.theme,
       chapterIndex: idx + 1,
       chapterTotal: chapters.length,
       photoUrl: photo?.url,
@@ -130,6 +131,7 @@ export function buildMovieSlides(
       type: 'cover',
       title: movieTitle,
       summary: `${familyName} · ${chapters.length} 个故事章节`,
+      theme: chapters[0]?.chapterTheme,
       familyName,
       coverUrl: chapters[0]?.story.photosDetail[0]?.url,
     },
@@ -150,6 +152,7 @@ export function buildMovieSlides(
 
     const storySlides = buildStorySlides({
       ...ch.story,
+      theme: ch.chapterTheme || ch.story.theme,
       familyName,
     }).filter((s) => s.type === 'chapter');
 

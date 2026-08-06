@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 
 export interface PosterInput {
-  type: 'story' | 'memory';
+  type: 'story' | 'memory' | 'movie';
   title: string;
   subtitle?: string;
   summary: string;
@@ -131,7 +131,11 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
   ctx.fillStyle = '#B8A898';
   ctx.font = '20px sans-serif';
   ctx.fillText(
-    input.type === 'story' ? '家庭记忆故事' : '家庭记忆卡',
+    input.type === 'movie'
+      ? '人生电影'
+      : input.type === 'story'
+        ? '家庭记忆故事'
+        : '家庭记忆卡',
     W / 2,
     108
   );
@@ -140,14 +144,14 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
   const photoX = 48;
   const photoY = 140;
   const photoW = W - 96;
-  const photoH = input.type === 'memory' ? 520 : 400;
+  const photoH = input.type === 'memory' ? 520 : input.type === 'movie' ? 440 : 400;
 
   ctx.save();
   drawRoundRect(ctx, photoX, photoY, photoW, photoH, 24);
   ctx.clip();
 
   const urls = input.photoUrls.filter(Boolean);
-  if (urls.length >= 4 && input.type === 'story') {
+  if (urls.length >= 4 && (input.type === 'story' || input.type === 'movie')) {
     const halfW = photoW / 2;
     const halfH = photoH / 2;
     const positions = [
@@ -165,7 +169,7 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
         ctx.fillRect(positions[i][0], positions[i][1], halfW, halfH);
       }
     }
-  } else if (urls.length >= 2 && input.type === 'story') {
+  } else if (urls.length >= 2 && (input.type === 'story' || input.type === 'movie')) {
     const halfW = photoW / 2;
     for (let i = 0; i < Math.min(2, urls.length); i++) {
       try {

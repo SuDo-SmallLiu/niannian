@@ -232,6 +232,15 @@ function migrateDatabase(database: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_photo_shares_code ON photo_shares(share_code);
 
+    CREATE TABLE IF NOT EXISTS movie_shares (
+      id TEXT PRIMARY KEY,
+      movie_id TEXT NOT NULL UNIQUE,
+      share_code TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (movie_id) REFERENCES life_movies(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_movie_shares_code ON movie_shares(share_code);
+
     CREATE TABLE IF NOT EXISTS life_movies (
       id TEXT PRIMARY KEY,
       family_id TEXT NOT NULL,
@@ -701,8 +710,62 @@ export function getOrCreatePhotoShare(photoId: string): string {
   return shareCode;
 }
 
+export function getOrCreateMovieShare(movieId: string): string {
+  const database = getDb();
+  const existing = database
+    .prepare('SELECT share_code FROM movie_shares WHERE movie_id = ?')
+    .get(movieId) as { share_code: string } | undefined;
+  if (existing) return existing.share_code;
+
+  const id = generateId();
+  const shareCode = generateShortCode();
+  database.prepare(
+    'INSERT INTO movie_shares (id, movie_id, share_code) VALUES (?, ?, ?)'
+  ).run(id, movieId, shareCode);
+  return shareCode;
+}
+
 export function getShareByCode(shareCode: string) {
   const database = getDb();
+
+  // 人生电影分享
+  const movieShare = database
+    .prepare('SELECT movie_id FROM movie_shares WHERE share_code = ?')
+    .get(shareCode) as { movie_id: string } | undefined;
+
+  if (movieShare) {
+    const movieRow = database.prepare(`
+      SELECT m.*, f.name as family_name
+      FROM life_movies m
+      JOIN families f ON m.family_id = f.id
+      WHERE m.id = ?
+    `).get(movieShare.movie_id) as any;
+    if (!movieRow) return null;
+
+    const chapterRows = getMovieChapters(movieShare.movie_id);
+    const photo_urls: string[] = [];
+    for (const ch of chapterRows.slice(0, 4)) {
+      const story = getStory(ch.story_id);
+      if (!story) continue;
+      const photoIds = JSON.parse(story.photos || '[]') as string[];
+      if (photoIds.length === 0) continue;
+      const photo = database
+        .prepare('SELECT url FROM photos WHERE id = ?')
+        .get(photoIds[0]) as { url: string } | undefined;
+      if (photo?.url) photo_urls.push(photo.url);
+    }
+
+    return {
+      share_type: 'movie' as const,
+      share_code: shareCode,
+      movie_id: movieRow.id,
+      movie_title: movieRow.title,
+      movie_summary: movieRow.summary || '',
+      family_name: movieRow.family_name,
+      chapter_count: chapterRows.length,
+      photo_urls,
+    };
+  }
 
   // 记忆卡分享
   const photoShare = database

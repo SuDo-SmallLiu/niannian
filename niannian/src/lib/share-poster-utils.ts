@@ -1,6 +1,7 @@
 import type { PosterInput } from '@/lib/share-poster';
 
-export function posterFilename(type: 'story' | 'memory') {
+export function posterFilename(type: 'story' | 'memory' | 'movie') {
+  if (type === 'movie') return `念念年年-人生电影-${Date.now()}.png`;
   return type === 'story'
     ? `念念年年-故事-${Date.now()}.png`
     : `念念年年-记忆-${Date.now()}.png`;
@@ -29,6 +30,25 @@ export function toAbsolutePhotoUrl(path: string): string {
   if (path.startsWith('http')) return path;
   if (typeof window === 'undefined') return path;
   return `${window.location.origin}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
+export function buildPosterInputFromShareMovie(data: {
+  family_name: string;
+  movie_title: string;
+  movie_summary?: string;
+  chapter_count?: number;
+  photo_urls?: string[];
+  shareUrl: string;
+}): PosterInput {
+  return {
+    type: 'movie',
+    title: data.movie_title,
+    subtitle: data.chapter_count ? `${data.chapter_count} 个故事章节` : undefined,
+    summary: data.movie_summary || '多个家庭故事串联 · 沉浸式人生电影',
+    familyName: data.family_name,
+    photoUrls: (data.photo_urls || []).map(toAbsolutePhotoUrl),
+    shareUrl: data.shareUrl,
+  };
 }
 
 export function buildPosterInputFromShareStory(data: {

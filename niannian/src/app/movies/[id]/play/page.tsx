@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import InteractiveStoryPlayer from '@/components/h5/InteractiveStoryPlayer';
+import { useSharePoster } from '@/hooks/useSharePoster';
 import { buildMovieSlides, type StoryH5Input } from '@/lib/h5-story-slides';
 
 export default function MoviePlayPage() {
@@ -12,11 +13,14 @@ export default function MoviePlayPage() {
 
   const [movieTitle, setMovieTitle] = useState('');
   const [familyName, setFamilyName] = useState('');
+  const [movieSummary, setMovieSummary] = useState('');
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [chapters, setChapters] = useState<
     Array<{ story: StoryH5Input; chapterTitle: string; chapterTheme: string }>
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
 
   useEffect(() => {
     async function load() {
@@ -28,8 +32,17 @@ export default function MoviePlayPage() {
           return;
         }
         setMovieTitle(data.movie.title);
+        setMovieSummary(data.movie.summary || '');
         setFamilyName(data.family?.name || '');
         setChapters(data.chapters || []);
+
+        const urls: string[] = [];
+        for (const ch of data.chapters || []) {
+          const url = ch.story?.photosDetail?.[0]?.url;
+          if (url) urls.push(url);
+          if (urls.length >= 4) break;
+        }
+        setPhotoUrls(urls);
       } catch {
         setError('加载失败');
       } finally {
@@ -43,6 +56,18 @@ export default function MoviePlayPage() {
     () => buildMovieSlides(movieTitle, familyName, chapters),
     [movieTitle, familyName, chapters]
   );
+
+  const handleShare = async () => {
+    await openSharePoster({
+      type: 'movie',
+      movieId,
+      title: movieTitle,
+      subtitle: `${chapters.length} 个故事章节`,
+      summary: movieSummary || `${familyName} · 人生电影`,
+      familyName,
+      photoUrls,
+    });
+  };
 
   if (loading) {
     return (
@@ -68,10 +93,14 @@ export default function MoviePlayPage() {
   }
 
   return (
-    <InteractiveStoryPlayer
-      slides={slides}
-      onClose={() => router.push('/movies')}
-      autoPlayMs={8000}
-    />
+    <>
+      {shareModal}
+      <InteractiveStoryPlayer
+        slides={slides}
+        onClose={() => router.push('/movies')}
+        onShare={shareLoading ? undefined : handleShare}
+        autoPlayMs={8000}
+      />
+    </>
   );
 }

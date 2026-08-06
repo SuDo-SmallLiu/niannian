@@ -6,9 +6,10 @@ import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import type { PosterInput } from '@/lib/share-poster';
 
 interface UseSharePosterOptions {
-  type: 'story' | 'memory';
+  type: 'story' | 'memory' | 'movie';
   storyId?: string;
   photoId?: string;
+  movieId?: string;
   title: string;
   subtitle?: string;
   summary: string;
@@ -33,7 +34,9 @@ export function useSharePoster() {
       const body =
         options.type === 'story'
           ? { storyId: options.storyId }
-          : { photoId: options.photoId };
+          : options.type === 'movie'
+            ? { movieId: options.movieId }
+            : { photoId: options.photoId };
 
       const res = await fetch('/api/share', {
         method: 'POST',

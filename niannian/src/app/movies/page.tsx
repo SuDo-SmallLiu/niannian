@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
-import { Film, Play } from 'lucide-react';
+import { useSharePoster } from '@/hooks/useSharePoster';
+import { Film, Play, Share2 } from 'lucide-react';
 
 interface LifeMovie {
   id: string;
@@ -14,11 +15,13 @@ interface LifeMovie {
   created_at: string;
   family_name?: string;
   chapter_count?: number;
+  photo_urls?: string[];
 }
 
 export default function MoviesPage() {
   const router = useRouter();
   const { showLoading, hideLoading, alert } = useAppDialog();
+  const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
   const [movies, setMovies] = useState<LifeMovie[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingFamilyId, setGeneratingFamilyId] = useState<string | null>(null);
@@ -44,6 +47,12 @@ export default function MoviesPage() {
             ...m,
             family_name: family.name,
             chapter_count: chData.chapters?.length || 0,
+            photo_urls: (chData.chapters || [])
+              .map((ch: { story?: { photosDetail?: Array<{ url: string }> } }) =>
+                ch.story?.photosDetail?.[0]?.url
+              )
+              .filter(Boolean)
+              .slice(0, 4),
           });
         }
       }
@@ -79,8 +88,22 @@ export default function MoviesPage() {
     }
   }
 
+  async function handleShare(movie: LifeMovie, e: React.MouseEvent) {
+    e.stopPropagation();
+    await openSharePoster({
+      type: 'movie',
+      movieId: movie.id,
+      title: movie.title,
+      subtitle: `${movie.chapter_count || 0} 个故事章节`,
+      summary: movie.summary || `${movie.family_name} · 人生电影`,
+      familyName: movie.family_name || '',
+      photoUrls: movie.photo_urls || [],
+    });
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#1a1612] text-white">
+      {shareModal}
       <Header />
       <main className="flex-1 px-6 py-8 pb-24">
         <div className="text-center mb-8">
@@ -104,13 +127,15 @@ export default function MoviesPage() {
         ) : (
           <div className="space-y-4 max-w-md mx-auto">
             {movies.map((movie) => (
-              <button
+              <div
                 key={movie.id}
-                type="button"
-                onClick={() => router.push(`/movies/${movie.id}/play`)}
-                className="w-full text-left rounded-2xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 transition-all active:scale-[0.99]"
+                className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
               >
-                <div className="p-5">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/movies/${movie.id}/play`)}
+                  className="w-full text-left p-5 active:scale-[0.99] transition-transform"
+                >
                   <p className="text-xs text-[#D98A45] mb-1">{movie.family_name}</p>
                   <h2 className="text-lg font-serif font-semibold mb-2">{movie.title}</h2>
                   <p className="text-sm text-white/50 line-clamp-2">{movie.summary}</p>
@@ -122,8 +147,19 @@ export default function MoviesPage() {
                       <Play className="w-4 h-4" /> 播放
                     </span>
                   </div>
+                </button>
+                <div className="px-5 pb-4">
+                  <button
+                    type="button"
+                    disabled={shareLoading}
+                    onClick={(e) => handleShare(movie, e)}
+                    className="w-full py-2.5 rounded-xl border border-white/15 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    {shareLoading ? '生成中…' : '💬 分享人生电影'}
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
 
             <div className="pt-4 border-t border-white/10">

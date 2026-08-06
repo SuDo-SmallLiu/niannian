@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { generateSharePoster, sharePosterNative, downloadPoster } from '@/lib/share-poster';
 import {
   buildPosterInputFromShareMemory,
+  buildPosterInputFromShareMovie,
   buildPosterInputFromShareStory,
   saveOrSharePoster,
   posterFilename,
@@ -18,7 +19,7 @@ export default function SharePage() {
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [posterType, setPosterType] = useState<'story' | 'memory'>('story');
+  const [posterType, setPosterType] = useState<'story' | 'memory' | 'movie'>('story');
 
   useEffect(() => {
     async function load() {
@@ -38,7 +39,16 @@ export default function SharePage() {
         const input =
           result.share.share_type === 'memory'
             ? buildPosterInputFromShareMemory({ ...result.share, shareUrl })
-            : buildPosterInputFromShareStory({
+            : result.share.share_type === 'movie'
+              ? buildPosterInputFromShareMovie({
+                  family_name: result.share.family_name,
+                  movie_title: result.share.movie_title,
+                  movie_summary: result.share.movie_summary,
+                  chapter_count: result.share.chapter_count,
+                  photo_urls: result.share.photo_urls,
+                  shareUrl,
+                })
+              : buildPosterInputFromShareStory({
                 family_name: result.share.family_name,
                 story_title: result.share.story_title,
                 story_description: result.share.story_description,
