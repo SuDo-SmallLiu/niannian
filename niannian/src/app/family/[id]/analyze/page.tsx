@@ -76,12 +76,10 @@ export default function AnalyzePage() {
           const pollRes = await fetch(`/api/analyze?familyId=${familyId}`);
           const pollData = await pollRes.json();
 
-          if (pollData.status === 'done' && pollData.story) {
+          if (pollData.status === 'done') {
             setProgress(100);
-            // 跳转故事页
-            setTimeout(() => {
-              router.push(`/family/${familyId}/story?storyId=${pollData.story.id}`);
-            }, 500);
+            const redirectTo = pollData.redirectTo || `/family/${familyId}/photos`;
+            setTimeout(() => router.push(redirectTo), 500);
             return;
           }
 

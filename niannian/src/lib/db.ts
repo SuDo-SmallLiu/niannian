@@ -112,6 +112,44 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_family_users_user ON family_users(user_id);
     CREATE INDEX IF NOT EXISTS idx_invitations_code ON invitations(code);
     CREATE INDEX IF NOT EXISTS idx_verify_codes_phone ON verify_codes(phone);
+
+    -- Memory Card（记忆卡）
+    CREATE TABLE IF NOT EXISTS memory_cards (
+      id TEXT PRIMARY KEY,
+      photo_id TEXT NOT NULL UNIQUE,
+      family_id TEXT NOT NULL,
+      taken_at TEXT DEFAULT '',
+      location TEXT DEFAULT '',
+      people TEXT DEFAULT '[]',
+      action TEXT DEFAULT '',
+      emotions TEXT DEFAULT '[]',
+      changes TEXT DEFAULT '[]',
+      significance TEXT DEFAULT '',
+      user_notes TEXT DEFAULT '',
+      voice_transcript TEXT DEFAULT '',
+      analysis_status TEXT DEFAULT 'pending',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (photo_id) REFERENCES photos(id),
+      FOREIGN KEY (family_id) REFERENCES families(id)
+    );
+
+    -- 标签系统 V2（四层）
+    CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      photo_id TEXT NOT NULL,
+      layer INTEGER NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      source TEXT DEFAULT 'ai',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (photo_id) REFERENCES photos(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_memory_cards_family ON memory_cards(family_id);
+    CREATE INDEX IF NOT EXISTS idx_memory_cards_photo ON memory_cards(photo_id);
+    CREATE INDEX IF NOT EXISTS idx_tags_photo ON tags(photo_id);
+    CREATE INDEX IF NOT EXISTS idx_tags_layer ON tags(layer);
   `);
 }
 
@@ -415,6 +453,150 @@ export function useInvitation(code: string, userId: string): { familyId: string;
     'UPDATE invitations SET used_by = ?, used_at = datetime(\'now\') WHERE id = ?'
   ).run(userId, inv.id);
   return { familyId: inv.family_id, success: true };
+}
+
+// --- Memory Card 操作 ---
+
+export interface MemoryCardData {
+  photo_id: string;
+  family_id: string;
+  taken_at?: string;
+  location?: string;
+  people?: string[];
+  action?: string;
+  emotions?: string[];
+  changes?: string[];
+  significance?: string;
+  user_notes?: string;
+  voice_transcript?: string;
+  analysis_status?: string;
+}
+
+export interface TagData {
+  photo_id: string;
+  layer: number;
+  key: string;
+  value: string;
+  source?: string;
+}
+
+function parseMemoryCardRow(row: any) {
+  return {
+    ...row,
+    people: JSON.parse(row.people || '[]'),
+    emotions: JSON.parse(row.emotions || '[]'),
+    changes: JSON.parse(row.changes || '[]'),
+  };
+}
+
+export function upsertMemoryCard(data: MemoryCardData): string {
+  const database = getDb();
+  const existing = database
+    .prepare('SELECT id FROM memory_cards WHERE photo_id = ?')
+    .get(data.photo_id) as any;
+
+  if (existing) {
+    database.prepare(`
+      UPDATE memory_cards SET
+        taken_at = ?, location = ?, people = ?, action = ?,
+        emotions = ?, changes = ?, significance = ?,
+        user_notes = COALESCE(?, user_notes),
+        voice_transcript = COALESCE(?, voice_transcript),
+        analysis_status = ?, updated_at = datetime('now')
+      WHERE photo_id = ?
+    `).run(
+      data.taken_at || '',
+      data.location || '',
+      JSON.stringify(data.people || []),
+      data.action || '',
+      JSON.stringify(data.emotions || []),
+      JSON.stringify(data.changes || []),
+      data.significance || '',
+      data.user_notes ?? null,
+      data.voice_transcript ?? null,
+      data.analysis_status || 'analyzed',
+      data.photo_id
+    );
+    return existing.id;
+  }
+
+  const id = generateId();
+  database.prepare(`
+    INSERT INTO memory_cards
+      (id, photo_id, family_id, taken_at, location, people, action,
+       emotions, changes, significance, user_notes, voice_transcript, analysis_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    data.photo_id,
+    data.family_id,
+    data.taken_at || '',
+    data.location || '',
+    JSON.stringify(data.people || []),
+    data.action || '',
+    JSON.stringify(data.emotions || []),
+    JSON.stringify(data.changes || []),
+    data.significance || '',
+    data.user_notes || '',
+    data.voice_transcript || '',
+    data.analysis_status || 'analyzed'
+  );
+  return id;
+}
+
+export function getMemoryCardByPhoto(photoId: string) {
+  const database = getDb();
+  const row = database
+    .prepare('SELECT * FROM memory_cards WHERE photo_id = ?')
+    .get(photoId) as any;
+  if (!row) return null;
+  return parseMemoryCardRow(row);
+}
+
+export function getMemoryCardsByFamily(familyId: string) {
+  const database = getDb();
+  const rows = database
+    .prepare('SELECT * FROM memory_cards WHERE family_id = ? ORDER BY created_at DESC')
+    .all(familyId) as any[];
+  return rows.map(parseMemoryCardRow);
+}
+
+export function getMemoryCardWithPhoto(photoId: string) {
+  const photo = getPhoto(photoId);
+  if (!photo) return null;
+  const card = getMemoryCardByPhoto(photoId);
+  const tags = getTagsByPhoto(photoId);
+  return { photo, memoryCard: card, tags };
+}
+
+// --- 标签操作 ---
+
+export function saveTagsForPhoto(photoId: string, tags: TagData[]): void {
+  const database = getDb();
+  database.prepare('DELETE FROM tags WHERE photo_id = ? AND source = ?').run(photoId, 'ai');
+  const insert = database.prepare(
+    'INSERT INTO tags (id, photo_id, layer, key, value, source) VALUES (?, ?, ?, ?, ?, ?)'
+  );
+  for (const tag of tags) {
+    insert.run(generateId(), photoId, tag.layer, tag.key, tag.value, tag.source || 'ai');
+  }
+}
+
+export function getTagsByPhoto(photoId: string) {
+  const database = getDb();
+  return database
+    .prepare('SELECT * FROM tags WHERE photo_id = ? ORDER BY layer, key')
+    .all(photoId) as any[];
+}
+
+export function getTagsByFamily(familyId: string) {
+  const database = getDb();
+  return database.prepare(`
+    SELECT t.* FROM tags t
+    JOIN photos p ON t.photo_id = p.id
+    WHERE p.family_id = ?
+    ORDER BY t.layer, t.key
+  `).all(familyId) as any[];
 }
 
 // --- 工具函数 ---

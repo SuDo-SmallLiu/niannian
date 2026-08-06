@@ -10,6 +10,7 @@ interface ShareData {
   story_timeline: Array<{ year: string; event: string }>;
   connection_action: string;
   family_name: string;
+  story_photos?: string[];
 }
 
 export default function SharePage() {
@@ -59,8 +60,6 @@ export default function SharePage() {
     );
   }
 
-  const { share } = data;
-
   return (
     <div className="min-h-screen bg-[#F8F4ED]">
       {/* 顶部装饰 */}
@@ -68,24 +67,24 @@ export default function SharePage() {
         <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3">
           💌 一封来自家人的信
         </p>
-        <p className="text-xs text-[#D8CCB8]">{share.family_name}</p>
+        <p className="text-xs text-[#D8CCB8]">{data.family_name}</p>
       </div>
 
       <div className="px-6 pb-24">
         {/* 故事标题 */}
         <div className="text-center mb-10 animate-fade-in-up">
           <h1 className="text-2xl font-serif font-bold text-[#4B3B2F] leading-snug">
-            {share.story_title}
+            {data.story_title}
           </h1>
         </div>
 
         {/* 时间线 */}
-        {share.story_timeline && share.story_timeline.length > 0 && (
+        {data.story_timeline && data.story_timeline.length > 0 && (
           <div className="bg-white rounded-3xl p-6 mb-6 animate-fade-in-up delay-100 shadow-sm">
             <div className="relative pl-6">
               <div className="absolute left-[7px] top-2 bottom-2 w-px bg-[#E8DCC8]" />
               <div className="space-y-5">
-                {share.story_timeline.map((item, i) => (
+                {data.story_timeline.map((item, i) => (
                   <div
                     key={i}
                     className="relative"
@@ -105,16 +104,16 @@ export default function SharePage() {
         <div className="bg-white rounded-3xl p-6 mb-6 animate-fade-in-up delay-300 shadow-sm">
           <div className="border-l-[3px] border-[#D98A45] pl-4">
             <p className="text-[#8B7355] font-serif leading-relaxed text-[15px]">
-              {share.story_description}
+              {data.story_description}
             </p>
           </div>
         </div>
 
         {/* 连接建议 */}
-        {share.connection_action && (
+        {data.connection_action && (
           <div className="bg-[#FFF8F0] rounded-3xl p-6 animate-fade-in-up delay-400 border border-[#F0DCC8]">
             <p className="text-sm text-[#8B7355] leading-relaxed">
-              💡 {share.connection_action}
+              💡 {data.connection_action}
             </p>
           </div>
         )}

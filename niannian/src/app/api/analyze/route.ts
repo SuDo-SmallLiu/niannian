@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPhotosByFamily, updatePhotoAnalysis, createStory, getFamily, getLatestStoryByFamily } from '@/lib/db';
-import { analyzePhoto, buildPhotoRelations, generateFamilyStory } from '@/lib/ai';
+import { getPhotosByFamily, updatePhotoAnalysis, createStory, getFamily, getLatestStoryByFamily, upsertMemoryCard, saveTagsForPhoto } from '@/lib/db';
+import { analyzePhoto, buildPhotoRelations, generateFamilyStory, type PhotoAnalysis } from '@/lib/ai';
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -57,10 +57,9 @@ export async function GET(request: NextRequest) {
   const status = analysisStatus.get(familyId);
 
   if (status === 'done') {
-    // 获取最新生成的故事
     const story = getLatestStoryByFamily(familyId);
-    analysisStatus.delete(familyId); // 清理状态
-    return NextResponse.json({ status: 'done', story });
+    analysisStatus.delete(familyId);
+    return NextResponse.json({ status: 'done', story, redirectTo: `/family/${familyId}/photos` });
   }
 
   if (status === 'error') {
@@ -103,6 +102,8 @@ async function processAnalysis(
           ai_tags: analysis.tags,
           taken_at: analysis.time,
         });
+
+        saveMemoryCardFromAnalysis(familyId, photo.id, analysis);
 
         photoAnalyses.push({
           id: photo.id,
@@ -148,4 +149,36 @@ async function processAnalysis(
     console.error(`处理分析 ${familyId} 异常:`, err);
     analysisStatus.set(familyId, 'error');
   }
+}
+
+const LAYER_MAP: Record<string, number> = {
+  objective: 1,
+  behavior: 2,
+  change: 3,
+  family_value: 4,
+};
+
+function saveMemoryCardFromAnalysis(familyId: string, photoId: string, analysis: PhotoAnalysis) {
+  upsertMemoryCard({
+    photo_id: photoId,
+    family_id: familyId,
+    taken_at: analysis.time,
+    location: analysis.scene,
+    people: analysis.people,
+    action: analysis.action,
+    emotions: analysis.emotions,
+    changes: analysis.changes,
+    significance: analysis.significance,
+    analysis_status: 'analyzed',
+  });
+
+  const tags: Array<{ photo_id: string; layer: number; key: string; value: string }> = [];
+  for (const [layerName, items] of Object.entries(analysis.layeredTags)) {
+    const layer = LAYER_MAP[layerName];
+    if (!layer || !items) continue;
+    for (const item of items) {
+      tags.push({ photo_id: photoId, layer, key: item.key, value: item.value });
+    }
+  }
+  saveTagsForPhoto(photoId, tags);
 }

@@ -99,8 +99,8 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
     <div>
       {/* 上传区域 */}
       <div
-        className={`upload-dashed p-10 text-center cursor-pointer transition-all ${
-          dragOver ? 'bg-[#f0ebe4]' : 'bg-white/50 hover:bg-[#faf8f5]'
+        className={`rounded-2xl border-2 border-dashed border-[#E8DCC8] p-10 text-center cursor-pointer transition-all ${
+          dragOver ? 'bg-[#FFFBF5] border-[#D98A45]/40' : 'bg-white hover:bg-[#FFFBF5] hover:border-[#D98A45]/40'
         }`}
         onDragOver={(e) => {
           e.preventDefault();
@@ -124,8 +124,8 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
         />
 
         <div className="text-4xl mb-3">📸</div>
-        <p className="text-[#2d2a26] font-medium mb-1">点击或拖拽上传照片</p>
-        <p className="text-sm text-[#8b8178]">
+        <p className="text-[#4B3B2F] font-medium mb-1">点击或拖拽上传照片</p>
+        <p className="text-sm text-[#B8A898]">
           支持 JPG / PNG / HEIC，建议 10-50 张，单张不超过 20MB
         </p>
       </div>
@@ -134,8 +134,8 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
       {previews.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-[#8b8178]">
-              已选择 <span className="text-[#2d2a26] font-medium">{files.length}</span> 张照片
+            <p className="text-sm text-[#8B7355]">
+              已选择 <span className="text-[#4B3B2F] font-medium">{files.length}</span> 张照片
             </p>
             <button
               onClick={() => {
@@ -143,7 +143,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
                 setFiles([]);
                 setPreviews([]);
               }}
-              className="text-sm text-[#8b8178] hover:text-[#d4786e] transition-colors"
+              className="text-sm text-[#B8A898] hover:text-[#D98A45] transition-colors"
             >
               清空全部
             </button>
@@ -151,7 +151,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
             {previews.map((preview, i) => (
-              <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[#e8e0d8]">
+              <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[#E8DCC8]">
                 <img
                   src={preview}
                   alt={`照片 ${i + 1}`}
@@ -188,7 +188,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
           <button
             onClick={handleUpload}
             disabled={uploading}
-            className="w-full py-4 rounded-full bg-[#d4786e] text-white font-medium text-lg hover:bg-[#c0655a] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#d4786e]/20"
+            className="w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg hover:bg-[#C47A3A] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#D98A45]/20"
           >
             {uploading ? (
               <span className="flex items-center justify-center gap-2">

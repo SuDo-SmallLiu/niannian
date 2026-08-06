@@ -34,7 +34,7 @@ export default function StoriesPage() {
       // 获取每个家庭的故事
       const allStories: Story[] = [];
       for (const family of families) {
-        const storyRes = await fetch(`/api/story?family_id=${family.id}`);
+        const storyRes = await fetch(`/api/story?familyId=${family.id}`);
         const storyData = await storyRes.json();
         for (const s of (storyData.stories || [])) {
           allStories.push({ ...s, family_name: family.name });
