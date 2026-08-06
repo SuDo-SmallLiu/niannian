@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import SharePosterModal from '@/components/SharePosterModal';
+import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import type { PosterInput } from '@/lib/share-poster';
 
 interface UseSharePosterOptions {
@@ -19,6 +20,7 @@ export function useSharePoster() {
   const [open, setOpen] = useState(false);
   const [poster, setPoster] = useState<PosterInput | null>(null);
   const [loading, setLoading] = useState(false);
+  const { alert } = useAppDialog();
 
   const toAbsoluteUrl = (path: string) => {
     if (path.startsWith('http')) return path;
@@ -52,11 +54,14 @@ export function useSharePoster() {
       });
       setOpen(true);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '分享失败，请重试');
+      await alert({
+        title: '分享失败',
+        description: err instanceof Error ? err.message : '请稍后重试',
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [alert]);
 
   const modal = (
     <SharePosterModal open={open} onClose={() => setOpen(false)} poster={poster} />

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import BottomNav from '@/components/BottomNav';
+import AppProviders from '@/components/providers/app-providers';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -23,10 +24,12 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen antialiased">
-        <div className="min-h-screen flex flex-col max-w-md mx-auto bg-[var(--bg-primary)] relative">
-          <main className="flex-1">{children}</main>
-          <BottomNav />
-        </div>
+        <AppProviders>
+          <div className="min-h-screen flex flex-col max-w-md mx-auto bg-[var(--bg-primary)] relative">
+            <main className="flex-1">{children}</main>
+            <BottomNav />
+          </div>
+        </AppProviders>
       </body>
     </html>
   );

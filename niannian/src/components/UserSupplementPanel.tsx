@@ -1,8 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { FIXED_SUPPLEMENT_QUESTIONS } from '@/lib/supplement-questions';
+import {
+  AccessibleChatPanel,
+  type ChatMessage,
+} from '@/components/ui/accessible-chat';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 
 export interface AiQuestion {
   id: string;
@@ -76,6 +82,54 @@ export default function UserSupplementPanel({
   const [dirty, setDirty] = useState(false);
 
   const speech = useSpeechRecognition();
+
+  const chatMessages = useMemo((): ChatMessage[] => {
+    const msgs: ChatMessage[] = [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content:
+          '你好，我是念念助手。AI 看不到照片背后的故事，请告诉我：时间、地点、人物关系，以及当时发生了什么。',
+        label: '念念助手',
+      },
+    ];
+
+    for (const q of FIXED_SUPPLEMENT_QUESTIONS) {
+      msgs.push({
+        id: `fixed-${q}`,
+        role: 'assistant',
+        content: q,
+        label: '引导问题',
+      });
+    }
+
+    if (loadingQuestions) {
+      msgs.push({
+        id: 'loading-q',
+        role: 'assistant',
+        content: '正在准备更多问题…',
+      });
+    } else {
+      for (const q of questions) {
+        msgs.push({
+          id: q.id,
+          role: 'assistant',
+          content: q.question,
+          label: 'AI 提问',
+        });
+      }
+    }
+
+    if (notes.trim()) {
+      msgs.push({
+        id: 'user-notes',
+        role: 'user',
+        content: notes.trim(),
+      });
+    }
+
+    return msgs;
+  }, [questions, notes, loadingQuestions]);
 
   const loadQuestions = useCallback(async () => {
     setLoadingQuestions(true);
@@ -159,15 +213,17 @@ export default function UserSupplementPanel({
   };
 
   const hasSupplement = !!notes.trim();
+  const busy = disabled || saving || reanalyzing;
 
   return (
     <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-      <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-2">用户层 · 补充记忆</h2>
+      <h2 className="text-base text-[#D98A45] font-medium mb-1">用户层 · 补充记忆</h2>
+      <p className="text-sm text-muted-foreground mb-4">与念念助手对话，补充 AI 看不到的故事</p>
 
       {notes.trim() && integratedSummary && (
         <div className="mb-4 rounded-xl bg-[#F5FFF8] border border-[#D4EDDA] px-4 py-3.5">
-          <p className="text-xs text-[#5A8F6B] mb-2 font-medium">已结合你的补充理解</p>
-          <div className="space-y-1 text-sm text-[#4B3B2F] leading-relaxed">
+          <p className="text-sm text-[#5A8F6B] mb-2 font-medium">已结合你的补充理解</p>
+          <div className="space-y-1 text-base text-[#4B3B2F] leading-relaxed">
             {integratedSummary.people.length > 0 && (
               <p>
                 <span className="text-[#B8A898]">人物 · </span>
@@ -193,100 +249,70 @@ export default function UserSupplementPanel({
         </div>
       )}
 
-      <div className="mb-5 rounded-xl bg-[#FFFBF5] border border-[#F0E6D8] px-4 py-3.5">
-        <p className="text-xs text-[#B8A898] mb-3 leading-relaxed">
-          写下 AI 看不到的故事。可以参考下面的问题：
-        </p>
-        <ul className="space-y-2.5">
-          {FIXED_SUPPLEMENT_QUESTIONS.map((question) => (
-            <li
-              key={question}
-              className="text-sm text-[#6B5A48] leading-relaxed pl-3 border-l-2 border-[#D98A45]/40"
-            >
-              <span className="text-[10px] text-[#D98A45] mr-1.5 align-middle">固定</span>
-              {question}
-            </li>
-          ))}
-          {loadingQuestions ? (
-            <li className="text-xs text-[#D98A45] animate-pulse leading-relaxed pl-3">
-              正在准备更多引导问题…
-            </li>
-          ) : (
-            questions.map((q) => (
-              <li
-                key={q.id}
-                className="text-sm text-[#6B5A48] leading-relaxed pl-3 border-l-2 border-[#E8DCC8]"
-              >
-                {q.question}
-              </li>
-            ))
-          )}
-        </ul>
-      </div>
+      <AccessibleChatPanel messages={chatMessages} className="mb-4 h-[320px]" />
 
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs text-[#B8A898]">你的补充</p>
+          <p className="text-sm text-muted-foreground">写下你的回答</p>
           {speech.supported && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() =>
                 speech.start((text) => {
                   onNotesChange(notes ? `${notes}\n${text}` : text);
                   setDirty(true);
                 })
               }
-              disabled={disabled || reanalyzing}
-              className={`text-xs px-2.5 py-1 rounded-lg transition-all ${
-                speech.listening
-                  ? 'bg-[#D98A45] text-white animate-pulse'
-                  : 'bg-[#FFF8F0] text-[#D98A45] border border-[#F0DCC8]'
-              }`}
+              disabled={busy}
+              className={speech.listening ? 'bg-primary text-white animate-pulse' : ''}
             >
               {speech.listening ? '聆听中…' : '🎤 语音输入'}
-            </button>
+            </Button>
           )}
         </div>
-        <textarea
+        <Textarea
           value={notes}
           onChange={(e) => {
             onNotesChange(e.target.value);
             setDirty(true);
           }}
-          disabled={disabled || reanalyzing}
-          placeholder="请尽量补充：时间（某年某月某日）、地点（国家/城市/家中/学校）、人物及关系，再加上当时的故事…"
+          disabled={busy}
+          placeholder="请补充：时间、地点、人物及关系，再加上当时的故事…"
           rows={5}
-          className="w-full px-3.5 py-3 rounded-xl bg-[#FFF8F0] border border-[#F0DCC8] text-sm text-[#4B3B2F] leading-relaxed placeholder:text-[#D8CCB8] focus:outline-none focus:border-[#D98A45]/50 resize-y min-h-[120px]"
+          className="min-h-[140px] text-base"
         />
       </div>
 
       {message && (
         <p
-          className={`text-xs mb-3 text-center leading-relaxed ${
-            message.includes('失败') ? 'text-red-500' : 'text-[#D98A45]'
+          className={`text-sm mb-3 text-center leading-relaxed ${
+            message.includes('失败') ? 'text-destructive' : 'text-[#D98A45]'
           }`}
         >
           {message}
         </p>
       )}
 
-      <div className="flex gap-2">
-        <button
+      <div className="flex gap-3">
+        <Button
           type="button"
+          variant="outline"
+          className="flex-1"
           onClick={() => saveSupplement()}
-          disabled={disabled || saving || reanalyzing || !dirty}
-          className="flex-1 py-3 rounded-xl border border-[#D98A45] text-[#D98A45] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#FFF8F0] transition-colors"
+          disabled={busy || !dirty}
         >
           {saving ? '保存中…' : '保存'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          className="flex-1"
           onClick={handleReanalyzeWithSupplement}
-          disabled={disabled || saving || reanalyzing || !hasSupplement}
-          className="flex-1 py-3 rounded-xl bg-[#D98A45] text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#C47A3A] transition-colors"
+          disabled={busy || !hasSupplement}
         >
           {reanalyzing ? '理解中…' : '结合补充重新理解'}
-        </button>
+        </Button>
       </div>
     </section>
   );

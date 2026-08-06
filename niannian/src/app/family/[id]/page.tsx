@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAppDialog } from '@/components/providers/app-dialog-provider';
 
 interface FamilyDetail {
   id: string;
@@ -21,6 +22,7 @@ export default function FamilyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
+  const { confirm, showLoading, hideLoading } = useAppDialog();
 
   useEffect(() => {
     async function load() {
@@ -40,13 +42,18 @@ export default function FamilyDetailPage() {
 
   const handleGenerateStories = async () => {
     if (!family || generating) return;
-    const ok = window.confirm(
-      '将根据已解析的记忆卡自动发现 3–5 个主题故事，并替换当前家庭下的旧故事。继续吗？'
-    );
+    const ok = await confirm({
+      title: '自动发现故事？',
+      description:
+        '将根据已解析的记忆卡自动发现 3–5 个主题故事，并替换当前家庭下的旧故事。此操作不可撤销。',
+      confirmText: '开始发现',
+      cancelText: '再想想',
+    });
     if (!ok) return;
 
     setGenerating(true);
     setGenerateError('');
+    showLoading('正在发现故事', 'AI 正在聚类并撰写，请稍候…');
     try {
       const res = await fetch('/api/story/generate', {
         method: 'POST',
@@ -61,6 +68,7 @@ export default function FamilyDetailPage() {
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : '生成失败');
     } finally {
+      hideLoading();
       setGenerating(false);
     }
   };
