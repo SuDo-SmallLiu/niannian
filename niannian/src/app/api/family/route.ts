@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createFamily } from '@/lib/db';
+import { createFamily, getDb } from '@/lib/db';
+
+export async function GET() {
+  try {
+    const database = getDb();
+    const families = database.prepare(
+      'SELECT f.*, COUNT(DISTINCT p.id) as photo_count, COUNT(DISTINCT s.id) as story_count FROM families f LEFT JOIN photos p ON f.id = p.family_id LEFT JOIN stories s ON f.id = s.family_id GROUP BY f.id ORDER BY f.created_at DESC'
+    ).all() as any[];
+
+    return NextResponse.json({
+      families: families.map((f: any) => ({
+        ...f,
+        members: JSON.parse(f.members || '[]'),
+      })),
+    });
+  } catch (error) {
+    console.error('获取家庭列表失败:', error);
+    return NextResponse.json({ families: [] });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

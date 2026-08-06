@@ -12,7 +12,7 @@ if (!fs.existsSync(dataDir)) {
 
 let db: Database.Database;
 
-function getDb(): Database.Database {
+export function getDb(): Database.Database {
   if (!db) {
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
@@ -209,6 +209,19 @@ export function getStoriesByFamily(familyId: string) {
     photos: JSON.parse(row.photos || '[]'),
     timeline: JSON.parse(row.timeline || '[]'),
   }));
+}
+
+export function getLatestStoryByFamily(familyId: string) {
+  const database = getDb();
+  const row = database
+    .prepare('SELECT * FROM stories WHERE family_id = ? ORDER BY created_at DESC LIMIT 1')
+    .get(familyId) as any;
+  if (!row) return null;
+  return {
+    ...row,
+    photos: JSON.parse(row.photos || '[]'),
+    timeline: JSON.parse(row.timeline || '[]'),
+  };
 }
 
 export function getStory(id: string) {

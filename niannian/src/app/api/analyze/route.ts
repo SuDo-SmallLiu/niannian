@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPhotosByFamily, updatePhotoAnalysis, createStory, getFamily } from '@/lib/db';
+import { getPhotosByFamily, updatePhotoAnalysis, createStory, getFamily, getLatestStoryByFamily } from '@/lib/db';
 import { analyzePhoto, buildPhotoRelations, generateFamilyStory } from '@/lib/ai';
 import { readFileSync } from 'fs';
 import path from 'path';
 
+// 存储分析状态
+const analysisStatus = new Map<string, 'processing' | 'done' | 'error'>();
+
+// 启动 POST: 开始异步分析
 export async function POST(request: NextRequest) {
   try {
     const { familyId } = await request.json();
@@ -22,6 +26,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '该家庭没有照片，请先上传照片' }, { status: 400 });
     }
 
+    // 如果已经在分析中，直接返回
+    if (analysisStatus.get(familyId) === 'processing') {
+      return NextResponse.json({ status: 'processing' });
+    }
+
+    // 标记为处理中
+    analysisStatus.set(familyId, 'processing');
+
+    // 异步处理（不等待）
+    processAnalysis(familyId, family.name, family.members, photos).catch((err) => {
+      console.error(`分析家庭 ${familyId} 失败:`, err);
+      analysisStatus.set(familyId, 'error');
+    });
+
+    return NextResponse.json({ status: 'processing', familyId });
+  } catch (error) {
+    console.error('AI分析启动失败:', error);
+    return NextResponse.json({ error: '分析启动失败' }, { status: 500 });
+  }
+}
+
+// GET: 轮询分析状态
+export async function GET(request: NextRequest) {
+  const familyId = request.nextUrl.searchParams.get('familyId');
+  if (!familyId) {
+    return NextResponse.json({ error: '缺少familyId' }, { status: 400 });
+  }
+
+  const status = analysisStatus.get(familyId);
+
+  if (status === 'done') {
+    // 获取最新生成的故事
+    const story = getLatestStoryByFamily(familyId);
+    analysisStatus.delete(familyId); // 清理状态
+    return NextResponse.json({ status: 'done', story });
+  }
+
+  if (status === 'error') {
+    analysisStatus.delete(familyId);
+    return NextResponse.json({ status: 'error', message: '分析失败，请重试' });
+  }
+
+  return NextResponse.json({ status: status || 'unknown' });
+}
+
+async function processAnalysis(
+  familyId: string,
+  familyName: string,
+  familyMembers: string[],
+  photos: Array<{ id: string; url: string }>
+) {
+  try {
     // Step 1: 逐张分析照片
     const photoAnalyses: Array<{
       id: string;
@@ -34,14 +90,12 @@ export async function POST(request: NextRequest) {
 
     for (const photo of photos) {
       try {
-        // 读取照片文件并转为 base64
         const filePath = path.join(process.cwd(), 'public', photo.url);
         const fileBuffer = readFileSync(filePath);
         const base64 = fileBuffer.toString('base64');
 
         const analysis = await analyzePhoto(base64);
 
-        // 更新数据库
         updatePhotoAnalysis(photo.id, {
           people: analysis.people,
           location: analysis.scene,
@@ -54,10 +108,15 @@ export async function POST(request: NextRequest) {
           id: photo.id,
           ...analysis,
         });
+        console.log(`✅ 分析完成: ${photo.id}`);
       } catch (err) {
         console.error(`分析照片 ${photo.id} 失败:`, err);
-        // 跳过失败的照片，继续处理
       }
+    }
+
+    if (photoAnalyses.length === 0) {
+      analysisStatus.set(familyId, 'error');
+      return;
     }
 
     // Step 2: 建立照片关系
@@ -67,14 +126,14 @@ export async function POST(request: NextRequest) {
 
     // Step 3: 生成故事
     const story = await generateFamilyStory(
-      family.name,
-      family.members,
+      familyName,
+      familyMembers,
       photoAnalyses,
       relations
     );
 
     // 保存故事到数据库
-    const storyId = createStory(
+    createStory(
       familyId,
       story.title,
       story.emotionSummary,
@@ -83,17 +142,10 @@ export async function POST(request: NextRequest) {
       story.timeline
     );
 
-    return NextResponse.json({
-      success: true,
-      storyId,
-      story: {
-        ...story,
-        photoCount: photoAnalyses.length,
-      },
-      relations: relations.slice(0, 5),
-    });
-  } catch (error) {
-    console.error('AI分析失败:', error);
-    return NextResponse.json({ error: '分析失败，请重试' }, { status: 500 });
+    console.log(`✅ 故事生成完成: ${familyId}, ${story.title}`);
+    analysisStatus.set(familyId, 'done');
+  } catch (err) {
+    console.error(`处理分析 ${familyId} 异常:`, err);
+    analysisStatus.set(familyId, 'error');
   }
 }

@@ -14,6 +14,9 @@ const LOADING_PHRASES = [
   '正在寻找那些没有说出口的话……',
 ];
 
+const POLL_INTERVAL = 3000; // 3秒轮询一次
+const POLL_TIMEOUT = 120000; // 总共等待最多2分钟
+
 export default function AnalyzePage() {
   const router = useRouter();
   const params = useParams();
@@ -22,6 +25,7 @@ export default function AnalyzePage() {
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [dots, setDots] = useState('');
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
   const hasRun = useRef(false);
 
   // 循环切换短语
@@ -40,30 +44,62 @@ export default function AnalyzePage() {
     return () => clearInterval(dotTimer);
   }, []);
 
-  // 触发 AI 分析
+  // 触发 AI 分析 + 轮询状态
   useEffect(() => {
     if (hasRun.current) return;
     hasRun.current = true;
 
-    async function analyze() {
+    async function startAndPoll() {
       try {
-        const res = await fetch('/api/analyze', {
+        // Step 1: 启动分析
+        const startRes = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ familyId }),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.error || '分析失败');
+        const startData = await startRes.json();
+
+        if (!startRes.ok) {
+          setError(startData.error || '启动分析失败');
           return;
         }
-        // 分析完成，跳转故事页
-        router.push(`/family/${familyId}/story?storyId=${data.storyId}`);
+
+        // Step 2: 轮询等待结果
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < POLL_TIMEOUT) {
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+
+          // 更新进度条
+          setProgress((prev) => Math.min(prev + 8, 90));
+
+          const pollRes = await fetch(`/api/analyze?familyId=${familyId}`);
+          const pollData = await pollRes.json();
+
+          if (pollData.status === 'done' && pollData.story) {
+            setProgress(100);
+            // 跳转故事页
+            setTimeout(() => {
+              router.push(`/family/${familyId}/story?storyId=${pollData.story.id}`);
+            }, 500);
+            return;
+          }
+
+          if (pollData.status === 'error') {
+            setError(pollData.message || '分析失败，请重试');
+            return;
+          }
+          // status === 'processing' 继续轮询
+        }
+
+        // 超时
+        setError('分析超时，但可能仍在后台处理中。请稍后查看故事页面。');
       } catch {
         setError('网络错误，分析中断');
       }
     }
-    analyze();
+
+    startAndPoll();
   }, [familyId, router]);
 
   return (
@@ -74,6 +110,17 @@ export default function AnalyzePage() {
           <div className="w-20 h-20 mx-auto rounded-full bg-[#D98A45]/10 flex items-center justify-center animate-soft-pulse">
             <span className="text-3xl">🎞️</span>
           </div>
+        </div>
+
+        {/* 进度条 */}
+        <div className="mb-6">
+          <div className="w-full h-1.5 bg-[#F0E8D8] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#D98A45] rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-[#B8A898] mt-2">{progress > 0 ? 'AI 正在分析中…' : '正在连接 AI…'}</p>
         </div>
 
         {/* 动态短语 */}
@@ -102,12 +149,20 @@ export default function AnalyzePage() {
         {error && (
           <div className="mt-8 p-4 rounded-xl bg-[#FFF8F0] text-[#C04040] text-sm">
             <p>{error}</p>
-            <button
-              onClick={() => router.push(`/family/${familyId}/upload`)}
-              className="mt-3 text-[#D98A45] underline underline-offset-2"
-            >
-              返回重新上传
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => router.push(`/family/${familyId}/upload`)}
+                className="mt-3 text-[#D98A45] underline underline-offset-2"
+              >
+                返回重新上传
+              </button>
+              <button
+                onClick={() => router.push(`/family/${familyId}`)}
+                className="mt-3 text-[#D98A45] underline underline-offset-2"
+              >
+                查看家庭主页
+              </button>
+            </div>
           </div>
         )}
 
