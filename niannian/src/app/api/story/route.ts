@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getStoriesByFamily,
   getStory,
-  getPhotosByFamily,
   getFamily,
-  getLatestStoryVersion,
   getStoryMemoryCards,
 } from '@/lib/db';
+import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,21 +19,26 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: '故事不存在' }, { status: 404 });
       }
 
-      const photos = getPhotosByFamily(story.family_id);
+      const segments = getStorySegments(
+        storyId,
+        story.photos as string[],
+        story.summary || story.description
+      );
+      const orderedPhotoIds = segments.map((s) => s.photoId);
+      const photos = getStoryPhotosDetail(
+        story.family_id,
+        orderedPhotoIds.length > 0 ? orderedPhotoIds : (story.photos as string[])
+      );
       const family = getFamily(story.family_id);
-
-      // 只返回故事中引用的照片
-      const storyPhotos = photos.filter((p) => story.photos.includes(p.id));
       const memoryLinks = getStoryMemoryCards(storyId);
-      const version = getLatestStoryVersion(storyId);
 
       return NextResponse.json({
         story: {
           ...story,
           description: story.summary || story.description,
-          photos_detail: storyPhotos,
+          photos_detail: photos,
           memory_cards: memoryLinks,
-          segments: version?.content || [],
+          segments,
         },
         family: family
           ? { name: family.name, members: family.members }
