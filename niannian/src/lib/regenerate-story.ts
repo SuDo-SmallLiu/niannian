@@ -28,6 +28,7 @@ function photoToAnalysis(photoId: string) {
       tags,
       significance: card.significance || '',
       userNotes: card.user_notes?.trim() || '',
+      narrativeFrame: card.narrative_frame,
     };
   }
 

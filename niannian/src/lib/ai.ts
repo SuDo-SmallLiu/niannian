@@ -6,6 +6,16 @@ import {
   normalizeUnderstanding,
   normalizeChangeDetail,
 } from '@/lib/affect-theory';
+import {
+  type NarrativeFrame,
+  buildNarrativeFramePrompt,
+  normalizeNarrativeFrame,
+} from '@/lib/narrative-frame';
+import {
+  type StoryLayer,
+  buildStoryLayerPrompt,
+  normalizeStoryLayer,
+} from '@/lib/story-layer';
 import { AiServiceError, formatAiError } from '@/lib/ai-errors';
 import { chatWithKeyAndModelFallback, extractAssistantText, extractJsonBlob, getApiKeyChain, getTextModelChain, getVisionModelChain } from '@/lib/ai-model-fallback';
 
@@ -38,6 +48,10 @@ export interface PhotoAnalysis {
   understanding: AffectUnderstanding;
   /** 情动理论 — 变化层 */
   changeDetail: ChangeDetail;
+  /** 叙事层 — 故事线 + 镜头语言（供 Story Engine 聚类编排） */
+  narrativeFrame: NarrativeFrame;
+  /** Story Layer — 聚类语义字段 */
+  storyLayer: StoryLayer;
   layeredTags: {
     objective: Array<{ key: string; value: string }>;
     behavior: Array<{ key: string; value: string }>;
@@ -99,11 +113,13 @@ export async function analyzePhoto(
   const prompt = useCompactPrompt
     ? `分析这张照片，生成记忆卡。${familyContext}${sourceContext}${supplementContext}
 只返回JSON（人物用简短中文，不确定关系时用外貌描述，不要编造爷爷/爸爸等）：
-{"people":[],"scene":"","action":"","time":"","tags":[],"understanding":{"archetype":"","valence":"positive","arousal":"medium","quadrant":"","indicators":[],"emotions":[],"confidence":"medium"},"changeDetail":{"transitions":[],"summary":""},"significance":"","layeredTags":{"objective":[],"behavior":[],"change":[],"family_value":[]}}`
+{"people":[],"scene":"","action":"","time":"","tags":[],"understanding":{"archetype":"","valence":"positive","arousal":"medium","quadrant":"","indicators":[],"emotions":[],"confidence":"medium"},"changeDetail":{"transitions":[],"summary":""},"significance":"","narrativeFrame":{"storyline":"","storylineNote":"","shotType":"","shotNote":"","shotTags":[]},"storyLayer":{"scene_type":"","change":"","relationship":"","meaning":"","importance":3},"layeredTags":{"objective":[],"behavior":[],"change":[],"family_value":[]}}`
     : `你是一位家庭记忆整理师，熟悉情动理论（DH2012 + Russell 环形模型）。
 请分析这张照片，生成一张「记忆卡」。
 ${familyContext}${sourceContext}${supplementContext}
 ${affectPrompt}
+${buildNarrativeFramePrompt()}
+${buildStoryLayerPrompt()}
 
 请以JSON格式返回（只返回JSON，不要其他内容）：
 {
@@ -134,6 +150,20 @@ ${affectPrompt}
     "summary": "一句话概括这张照片标记的变化意义"
   },
   "significance": "一句话说明这张照片值得记住的原因",
+  "narrativeFrame": {
+    "storyline": "故事线角色，如：陪伴",
+    "storylineNote": "组合成故事时的叙事功能，一句话",
+    "shotType": "景别，如：中景",
+    "shotNote": "镜头语言描述",
+    "shotTags": ["面向镜头", "自然光"]
+  },
+  "storyLayer": {
+    "scene_type": "陪伴",
+    "change": "陌生→熟悉",
+    "relationship": "父亲",
+    "meaning": "陪伴",
+    "importance": 4
+  },
   "layeredTags": {
     "objective": [{"key": "人物", "value": "爸爸"}, {"key": "地点", "value": "杭州"}],
     "behavior": [{"key": "行为", "value": "一起吃冰淇淋"}],
@@ -245,6 +275,8 @@ function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis 
       transitions: ((result.changes as string[]) || []).map((c) => ({ type: c, marker: c })),
     }
   );
+  const narrativeFrame = normalizeNarrativeFrame(result.narrativeFrame);
+  const storyLayer = normalizeStoryLayer(result.storyLayer);
 
   // 从 changeDetail 补充第三层标签
   const changeTags = [...(layered.change || [])];
@@ -265,6 +297,9 @@ function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis 
   for (const indicator of understanding.indicators) {
     if (!flatTags.includes(indicator)) flatTags.push(indicator);
   }
+  for (const tag of narrativeFrame.shotTags) {
+    if (!flatTags.includes(tag)) flatTags.push(tag);
+  }
 
   return {
     people: normalizePeople(result.people),
@@ -279,6 +314,8 @@ function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis 
     significance: (result.significance as string) || changeDetail.summary || '',
     understanding,
     changeDetail,
+    narrativeFrame,
+    storyLayer,
     layeredTags: {
       objective: layered.objective,
       behavior: layered.behavior,
@@ -421,6 +458,7 @@ export async function generateFamilyStory(
     tags: string[];
     significance?: string;
     userNotes?: string;
+    narrativeFrame?: import('@/lib/narrative-frame').NarrativeFrame | null;
   }>,
   relations: PhotoRelation[]
 ): Promise<StoryOutput> {
@@ -434,6 +472,9 @@ export async function generateFamilyStory(
       const extras = [
         p.significance ? `意义"${p.significance}"` : '',
         p.userNotes ? `用户补充"${p.userNotes}"` : '',
+        p.narrativeFrame?.storyline ? `故事线"${p.narrativeFrame.storyline}"` : '',
+        p.narrativeFrame?.shotType ? `景别"${p.narrativeFrame.shotType}"` : '',
+        p.narrativeFrame?.shotNote ? `镜头"${p.narrativeFrame.shotNote}"` : '',
       ]
         .filter(Boolean)
         .join('，');
@@ -539,6 +580,20 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
         change: [{ key: '变化', value: '日常沉淀' }, { key: '阶段', value: '童年' }],
         family_value: [{ key: '主题', value: '爱与滋养' }],
       },
+      narrativeFrame: {
+        storyline: '陪伴',
+        storylineNote: '可作为成长故事中的安静陪伴段落',
+        shotType: '中景',
+        shotNote: '祖孙并肩行走，人物与背景均衡，情绪内敛',
+        shotTags: ['牵手', '自然光', '背影感'],
+      },
+      storyLayer: {
+        scene_type: '陪伴',
+        change: '依赖→独立',
+        relationship: '祖孙',
+        meaning: '陪伴',
+        importance: 4,
+      },
     },
     {
       people: ['全家'],
@@ -569,6 +624,20 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
         change: [{ key: '变化', value: '重聚' }, { key: '情动位移', value: '思念 → 团圆' }],
         family_value: [{ key: '主题', value: '传承根基' }],
       },
+      narrativeFrame: {
+        storyline: '高潮',
+        storylineNote: '团圆主题故事的情感高点镜头',
+        shotType: '全景',
+        shotNote: '多人同框，画面信息丰富，节庆氛围集中',
+        shotTags: ['合影', '多人同框', '室内光'],
+      },
+      storyLayer: {
+        scene_type: '庆祝',
+        change: '分散→团圆',
+        relationship: '多人',
+        meaning: '传承',
+        importance: 5,
+      },
     },
     {
       people: ['妈妈', '孩子'],
@@ -597,6 +666,20 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
         behavior: [{ key: '行为', value: '玩沙子' }, { key: '行为', value: '旅行' }],
         change: [{ key: '变化', value: '首次' }, { key: '阶段', value: '童年' }],
         family_value: [{ key: '主题', value: '冒险成长' }],
+      },
+      narrativeFrame: {
+        storyline: '探索',
+        storylineNote: '旅行/第一次类故事的开场或发展镜头',
+        shotType: '全景',
+        shotNote: '环境占比较大，人物互动居中，空间感强',
+        shotTags: ['户外', '亲子', '广角感'],
+      },
+      storyLayer: {
+        scene_type: '探索',
+        change: '陌生→熟悉',
+        relationship: '母亲',
+        meaning: '成长',
+        importance: 4,
       },
     },
     {
@@ -630,6 +713,20 @@ function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
         behavior: [{ key: '行为', value: '教骑车' }],
         change: [{ key: '变化', value: '首次' }, { key: '情动位移', value: '紧张 → 骄傲' }],
         family_value: [{ key: '主题', value: '创造玩乐' }],
+      },
+      narrativeFrame: {
+        storyline: '转折',
+        storylineNote: '成长故事中「学会独立」的关键转折镜头',
+        shotType: '中景',
+        shotNote: '亲子互动清晰，动作是画面焦点，有轻微紧张感',
+        shotTags: ['抓拍', '动作焦点', '户外'],
+      },
+      storyLayer: {
+        scene_type: '成长',
+        change: '不会→学会',
+        relationship: '父亲',
+        meaning: '勇气',
+        importance: 5,
       },
     },
   ];

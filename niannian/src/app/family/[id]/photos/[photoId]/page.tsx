@@ -6,6 +6,8 @@ import UserSupplementPanel, {
   type AiQuestion,
   saveMemoryCardSupplement,
 } from '@/components/UserSupplementPanel';
+import type { NarrativeFrame } from '@/lib/narrative-frame';
+import type { StoryLayer } from '@/lib/story-layer';
 import { useSharePoster } from '@/hooks/useSharePoster';
 
 interface Tag {
@@ -69,6 +71,8 @@ interface MemoryCardDetail {
     significance: string;
     understanding: AffectUnderstanding | null;
     change_detail: ChangeDetail | null;
+    narrative_frame: NarrativeFrame | null;
+    story_layer: StoryLayer | null;
     user_notes: string;
     voice_transcript: string;
     ai_questions: AiQuestion[];
@@ -83,6 +87,8 @@ const LAYER_NAMES: Record<number, { label: string; color: string }> = {
   2: { label: '行为标签', color: 'bg-green-50 text-green-700' },
   3: { label: '变化标签', color: 'bg-purple-50 text-purple-700' },
   4: { label: '主题价值', color: 'bg-amber-50 text-amber-700' },
+  5: { label: '叙事标签', color: 'bg-rose-50 text-rose-700' },
+  6: { label: '故事层', color: 'bg-indigo-50 text-indigo-700' },
 };
 
 export default function MemoryCardPage() {
@@ -381,6 +387,94 @@ export default function MemoryCardPage() {
               </div>
             )}
           </section>
+
+          {/* 叙事层 */}
+          {memoryCard.narrative_frame &&
+            (memoryCard.narrative_frame.storyline ||
+              memoryCard.narrative_frame.shotType ||
+              memoryCard.narrative_frame.shotNote) && (
+            <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
+              <h2 className="text-xs tracking-wider text-rose-600 font-medium mb-3">叙事层 · 故事线与镜头</h2>
+
+              <div className="flex flex-wrap gap-2 mb-3">
+                {memoryCard.narrative_frame.storyline && (
+                  <span className="px-3 py-1.5 rounded-full bg-rose-500 text-white text-sm font-medium">
+                    故事线 · {memoryCard.narrative_frame.storyline}
+                  </span>
+                )}
+                {memoryCard.narrative_frame.shotType && (
+                  <span className="px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 text-sm border border-rose-100">
+                    景别 · {memoryCard.narrative_frame.shotType}
+                  </span>
+                )}
+              </div>
+
+              {memoryCard.narrative_frame.storylineNote && (
+                <p className="text-sm text-[#6B5A48] mb-2 leading-relaxed">
+                  <span className="text-[#B8A898]">叙事功能 · </span>
+                  {memoryCard.narrative_frame.storylineNote}
+                </p>
+              )}
+
+              {memoryCard.narrative_frame.shotNote && (
+                <p className="text-sm text-[#6B5A48] mb-3 leading-relaxed">
+                  <span className="text-[#B8A898]">镜头语言 · </span>
+                  {memoryCard.narrative_frame.shotNote}
+                </p>
+              )}
+
+              {memoryCard.narrative_frame.shotTags?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {memoryCard.narrative_frame.shotTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2.5 py-1 rounded-full bg-rose-50/80 text-xs text-rose-700"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Story Layer */}
+          {memoryCard.story_layer &&
+            (memoryCard.story_layer.meaning ||
+              memoryCard.story_layer.scene_type ||
+              memoryCard.story_layer.relationship) && (
+            <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
+              <h2 className="text-xs tracking-wider text-indigo-600 font-medium mb-3">Story Layer · 聚类语义</h2>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {memoryCard.story_layer.meaning && (
+                  <span className="px-3 py-1.5 rounded-full bg-indigo-500 text-white text-sm font-medium">
+                    意义 · {memoryCard.story_layer.meaning}
+                  </span>
+                )}
+                {memoryCard.story_layer.scene_type && (
+                  <span className="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm border border-indigo-100">
+                    场景 · {memoryCard.story_layer.scene_type}
+                  </span>
+                )}
+                {memoryCard.story_layer.relationship && (
+                  <span className="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm border border-indigo-100">
+                    关系 · {memoryCard.story_layer.relationship}
+                  </span>
+                )}
+                {memoryCard.story_layer.importance > 0 && (
+                  <span className="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-sm border border-indigo-100">
+                    重要度 · {memoryCard.story_layer.importance}/5
+                  </span>
+                )}
+              </div>
+              {memoryCard.story_layer.change && (
+                <p className="text-sm text-[#6B5A48] leading-relaxed">
+                  <span className="text-[#B8A898]">变化弧线 · </span>
+                  {memoryCard.story_layer.change}
+                </p>
+              )}
+            </section>
+          )}
 
           {/* 变化层 */}
           {(memoryCard.change_detail?.transitions?.length || memoryCard.changes.length > 0) && (

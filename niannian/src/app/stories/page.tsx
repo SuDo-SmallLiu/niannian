@@ -172,17 +172,26 @@ export default function StoriesPage() {
                     {sharingId === story.id ? '生成中…' : '💬 分享给家人'}
                   </button>
                   {!isDemo && story.family_id && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          `/family/${story.family_id}/story?storyId=${story.id}`
-                        )
-                      }
-                      className="px-4 py-2.5 rounded-xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
-                    >
-                      查看详情
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/stories/${story.id}`)}
+                        className="px-4 py-2.5 rounded-xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
+                      >
+                        章节详情
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/family/${story.family_id}/story?storyId=${story.id}`
+                          )
+                        }
+                        className="px-4 py-2.5 rounded-xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
+                      >
+                        家庭故事页
+                      </button>
+                    </>
                   )}
                   <span className="text-xs text-[#D8CCB8] ml-auto">
                     {story.created_at?.slice(0, 10)}

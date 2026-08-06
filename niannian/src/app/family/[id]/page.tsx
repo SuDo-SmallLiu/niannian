@@ -19,6 +19,8 @@ export default function FamilyDetailPage() {
 
   const [family, setFamily] = useState<FamilyDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -35,6 +37,33 @@ export default function FamilyDetailPage() {
     }
     load();
   }, [familyId]);
+
+  const handleGenerateStories = async () => {
+    if (!family || generating) return;
+    const ok = window.confirm(
+      '将根据已解析的记忆卡自动发现 3–5 个主题故事，并替换当前家庭下的旧故事。继续吗？'
+    );
+    if (!ok) return;
+
+    setGenerating(true);
+    setGenerateError('');
+    try {
+      const res = await fetch('/api/story/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyId, replaceExisting: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '生成失败');
+      }
+      router.push(`/family/${familyId}/story`);
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : '生成失败');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -112,6 +141,25 @@ export default function FamilyDetailPage() {
           <span>📖 {family.story_count || 0} 个故事</span>
         </div>
       </div>
+
+      {(family.photo_count || 0) > 0 && (
+        <div className="mb-6 animate-fade-in-up delay-75">
+          <button
+            type="button"
+            onClick={handleGenerateStories}
+            disabled={generating}
+            className="w-full rounded-2xl py-4 px-5 bg-[#D98A45] text-white font-medium shadow-sm hover:bg-[#C47A3A] disabled:opacity-60 transition-all active:scale-[0.99]"
+          >
+            {generating ? '正在发现故事…' : '✨ 发现故事（Life Story Engine）'}
+          </button>
+          <p className="text-xs text-center text-[#B8A898] mt-2">
+            从已解析记忆卡中聚类生成 3–5 个主题故事
+          </p>
+          {generateError && (
+            <p className="text-xs text-center text-red-500 mt-2">{generateError}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 animate-fade-in-up delay-100">
         {actions.map((action) => (

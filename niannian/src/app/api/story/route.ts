@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStoriesByFamily, getStory, getPhotosByFamily, getFamily } from '@/lib/db';
+import {
+  getStoriesByFamily,
+  getStory,
+  getPhotosByFamily,
+  getFamily,
+  getLatestStoryVersion,
+  getStoryMemoryCards,
+} from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,11 +25,16 @@ export async function GET(request: NextRequest) {
 
       // 只返回故事中引用的照片
       const storyPhotos = photos.filter((p) => story.photos.includes(p.id));
+      const memoryLinks = getStoryMemoryCards(storyId);
+      const version = getLatestStoryVersion(storyId);
 
       return NextResponse.json({
         story: {
           ...story,
+          description: story.summary || story.description,
           photos_detail: storyPhotos,
+          memory_cards: memoryLinks,
+          segments: version?.content || [],
         },
         family: family
           ? { name: family.name, members: family.members }

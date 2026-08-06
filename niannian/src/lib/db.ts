@@ -176,8 +176,53 @@ function migrateDatabase(database: Database.Database) {
   if (!mcColNames.has('ai_questions')) {
     database.exec(`ALTER TABLE memory_cards ADD COLUMN ai_questions TEXT DEFAULT '[]'`);
   }
+  if (!mcColNames.has('narrative_frame')) {
+    database.exec(`ALTER TABLE memory_cards ADD COLUMN narrative_frame TEXT DEFAULT '{}'`);
+  }
+  if (!mcColNames.has('story_layer')) {
+    database.exec(`ALTER TABLE memory_cards ADD COLUMN story_layer TEXT DEFAULT '{}'`);
+  }
+
+  const storyCols = database.prepare('PRAGMA table_info(stories)').all() as Array<{ name: string }>;
+  const storyColNames = new Set(storyCols.map((c) => c.name));
+  if (!storyColNames.has('summary')) {
+    database.exec(`ALTER TABLE stories ADD COLUMN summary TEXT DEFAULT ''`);
+  }
+  if (!storyColNames.has('theme')) {
+    database.exec(`ALTER TABLE stories ADD COLUMN theme TEXT DEFAULT ''`);
+  }
+  if (!storyColNames.has('cover_photo_id')) {
+    database.exec(`ALTER TABLE stories ADD COLUMN cover_photo_id TEXT`);
+  }
+  if (!storyColNames.has('updated_at')) {
+    database.exec(`ALTER TABLE stories ADD COLUMN updated_at TEXT`);
+  }
 
   database.exec(`
+    CREATE TABLE IF NOT EXISTS story_memory_cards (
+      story_id TEXT NOT NULL,
+      memory_card_id TEXT NOT NULL,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      scene_id TEXT,
+      PRIMARY KEY (story_id, memory_card_id),
+      FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_story_memory_cards_story ON story_memory_cards(story_id, order_index);
+
+    CREATE TABLE IF NOT EXISTS story_versions (
+      id TEXT PRIMARY KEY,
+      story_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      theme TEXT NOT NULL DEFAULT '',
+      title TEXT NOT NULL DEFAULT '',
+      summary TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '[]',
+      regen_mode TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_story_versions_story ON story_versions(story_id, version DESC);
+
     CREATE TABLE IF NOT EXISTS photo_shares (
       id TEXT PRIMARY KEY,
       photo_id TEXT NOT NULL UNIQUE,
@@ -187,6 +232,45 @@ function migrateDatabase(database: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_photo_shares_code ON photo_shares(share_code);
   `);
+
+  migrateStoriesV1ToV2(database);
+  migrateStoryPhotosToMemoryCards(database);
+}
+
+function migrateStoriesV1ToV2(database: Database.Database) {
+  database.exec(`
+    UPDATE stories
+    SET summary = description
+    WHERE (summary IS NULL OR summary = '') AND description IS NOT NULL AND description != ''
+  `);
+  database.exec(`
+    UPDATE stories
+    SET updated_at = created_at
+    WHERE updated_at IS NULL OR updated_at = ''
+  `);
+}
+
+function migrateStoryPhotosToMemoryCards(database: Database.Database) {
+  const stories = database
+    .prepare('SELECT id, photos FROM stories WHERE photos IS NOT NULL AND photos != \'[]\'')
+    .all() as Array<{ id: string; photos: string }>;
+
+  const insert = database.prepare(`
+    INSERT OR IGNORE INTO story_memory_cards (story_id, memory_card_id, order_index)
+    VALUES (?, ?, ?)
+  `);
+
+  for (const story of stories) {
+    let photoIds: string[] = [];
+    try {
+      photoIds = JSON.parse(story.photos || '[]');
+    } catch {
+      photoIds = [];
+    }
+    photoIds.forEach((photoId, index) => {
+      insert.run(story.id, photoId, index);
+    });
+  }
 }
 
 // --- Family 操作 ---
@@ -308,6 +392,17 @@ export function getPhotoCount(familyId: string): number {
 
 // --- Story 操作 ---
 
+function parseStoryRow(row: any) {
+  return {
+    ...row,
+    photos: JSON.parse(row.photos || '[]'),
+    timeline: JSON.parse(row.timeline || '[]'),
+    summary: row.summary || row.description || '',
+    theme: row.theme || '',
+    cover_photo_id: row.cover_photo_id || null,
+  };
+}
+
 export function createStory(
   familyId: string,
   title: string,
@@ -338,11 +433,7 @@ export function getStoriesByFamily(familyId: string) {
   const rows = database
     .prepare('SELECT * FROM stories WHERE family_id = ? ORDER BY created_at DESC')
     .all(familyId) as any[];
-  return rows.map((row) => ({
-    ...row,
-    photos: JSON.parse(row.photos || '[]'),
-    timeline: JSON.parse(row.timeline || '[]'),
-  }));
+  return rows.map(parseStoryRow);
 }
 
 export function getLatestStoryByFamily(familyId: string) {
@@ -351,21 +442,131 @@ export function getLatestStoryByFamily(familyId: string) {
     .prepare('SELECT * FROM stories WHERE family_id = ? ORDER BY created_at DESC LIMIT 1')
     .get(familyId) as any;
   if (!row) return null;
-  return {
-    ...row,
-    photos: JSON.parse(row.photos || '[]'),
-    timeline: JSON.parse(row.timeline || '[]'),
-  };
+  return parseStoryRow(row);
 }
 
 export function getStory(id: string) {
   const database = getDb();
   const row = database.prepare('SELECT * FROM stories WHERE id = ?').get(id) as any;
   if (!row) return null;
+  return parseStoryRow(row);
+}
+
+export interface CreateStoryV2Input {
+  familyId: string;
+  title: string;
+  summary: string;
+  theme: string;
+  coverPhotoId?: string;
+  photoIds: string[];
+  connectionAction: string;
+  timeline: Array<{ year: string; event: string }>;
+}
+
+export function createStoryV2(input: CreateStoryV2Input): string {
+  const id = generateId();
+  const database = getDb();
+  database.prepare(
+    `INSERT INTO stories
+      (id, family_id, title, description, summary, theme, cover_photo_id, photos, connection_action, timeline, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+  ).run(
+    id,
+    input.familyId,
+    input.title,
+    input.summary,
+    input.summary,
+    input.theme,
+    input.coverPhotoId || null,
+    JSON.stringify(input.photoIds),
+    input.connectionAction,
+    JSON.stringify(input.timeline)
+  );
+  return id;
+}
+
+export function deleteStoriesByFamily(familyId: string): number {
+  const database = getDb();
+  const stories = database
+    .prepare('SELECT id FROM stories WHERE family_id = ?')
+    .all(familyId) as Array<{ id: string }>;
+
+  for (const story of stories) {
+    database.prepare('DELETE FROM shares WHERE story_id = ?').run(story.id);
+  }
+
+  const result = database.prepare('DELETE FROM stories WHERE family_id = ?').run(familyId);
+  return result.changes;
+}
+
+export function setStoryMemoryCards(
+  storyId: string,
+  items: Array<{ photoId: string; orderIndex: number; sceneId?: string }>
+): void {
+  const database = getDb();
+  database.prepare('DELETE FROM story_memory_cards WHERE story_id = ?').run(storyId);
+  const insert = database.prepare(`
+    INSERT INTO story_memory_cards (story_id, memory_card_id, order_index, scene_id)
+    VALUES (?, ?, ?, ?)
+  `);
+  for (const item of items) {
+    insert.run(storyId, item.photoId, item.orderIndex, item.sceneId || null);
+  }
+}
+
+export function getStoryMemoryCards(storyId: string) {
+  const database = getDb();
+  return database
+    .prepare(
+      'SELECT * FROM story_memory_cards WHERE story_id = ? ORDER BY order_index ASC'
+    )
+    .all(storyId) as Array<{
+    story_id: string;
+    memory_card_id: string;
+    order_index: number;
+    scene_id: string | null;
+  }>;
+}
+
+export function createStoryVersion(data: {
+  storyId: string;
+  version: number;
+  theme: string;
+  title: string;
+  summary: string;
+  content: unknown;
+  regenMode?: string;
+}): string {
+  const id = generateId();
+  const database = getDb();
+  database.prepare(
+    `INSERT INTO story_versions
+      (id, story_id, version, theme, title, summary, content, regen_mode)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id,
+    data.storyId,
+    data.version,
+    data.theme,
+    data.title,
+    data.summary,
+    JSON.stringify(data.content),
+    data.regenMode || null
+  );
+  return id;
+}
+
+export function getLatestStoryVersion(storyId: string) {
+  const database = getDb();
+  const row = database
+    .prepare(
+      'SELECT * FROM story_versions WHERE story_id = ? ORDER BY version DESC LIMIT 1'
+    )
+    .get(storyId) as any;
+  if (!row) return null;
   return {
     ...row,
-    photos: JSON.parse(row.photos || '[]'),
-    timeline: JSON.parse(row.timeline || '[]'),
+    content: JSON.parse(row.content || '[]'),
   };
 }
 
@@ -384,12 +585,15 @@ export function updateStory(
       `UPDATE stories SET
         title = ?,
         description = ?,
+        summary = ?,
         connection_action = ?,
-        timeline = ?
+        timeline = ?,
+        updated_at = datetime('now')
       WHERE id = ?`
     )
     .run(
       data.title,
+      data.description,
       data.description,
       data.connectionAction,
       JSON.stringify(data.timeline),
@@ -627,6 +831,8 @@ export function useInvitation(code: string, userId: string): { familyId: string;
 // --- Memory Card 操作 ---
 
 import type { AffectUnderstanding, ChangeDetail } from '@/lib/affect-theory';
+import type { NarrativeFrame } from '@/lib/narrative-frame';
+import type { StoryLayer } from '@/lib/story-layer';
 
 export interface AiQuestion {
   id: string;
@@ -646,6 +852,8 @@ export interface MemoryCardData {
   significance?: string;
   understanding?: AffectUnderstanding;
   change_detail?: ChangeDetail;
+  narrative_frame?: NarrativeFrame;
+  story_layer?: StoryLayer;
   user_notes?: string;
   voice_transcript?: string;
   ai_questions?: AiQuestion[];
@@ -673,6 +881,18 @@ function parseMemoryCardRow(row: any) {
   const change_detail = row.change_detail
     ? JSON.parse(row.change_detail)
     : null;
+  let narrative_frame = null;
+  try {
+    narrative_frame = JSON.parse(row.narrative_frame || '{}');
+  } catch {
+    narrative_frame = null;
+  }
+  let story_layer = null;
+  try {
+    story_layer = JSON.parse(row.story_layer || '{}');
+  } catch {
+    story_layer = null;
+  }
   return {
     ...row,
     people: JSON.parse(row.people || '[]'),
@@ -680,6 +900,8 @@ function parseMemoryCardRow(row: any) {
     changes: JSON.parse(row.changes || '[]'),
     understanding,
     change_detail,
+    narrative_frame,
+    story_layer,
     ai_questions: JSON.parse(row.ai_questions || '[]'),
   };
 }
@@ -696,6 +918,8 @@ export function upsertMemoryCard(data: MemoryCardData): string {
         taken_at = ?, location = ?, people = ?, action = ?,
         emotions = ?, changes = ?, significance = ?,
         understanding = ?, change_detail = ?,
+        narrative_frame = ?,
+        story_layer = ?,
         user_notes = COALESCE(?, user_notes),
         voice_transcript = COALESCE(?, voice_transcript),
         ai_questions = COALESCE(?, ai_questions),
@@ -711,6 +935,8 @@ export function upsertMemoryCard(data: MemoryCardData): string {
       data.significance || '',
       JSON.stringify(data.understanding || {}),
       JSON.stringify(data.change_detail || {}),
+      JSON.stringify(data.narrative_frame || {}),
+      JSON.stringify(data.story_layer || {}),
       data.user_notes ?? null,
       data.voice_transcript ?? null,
       data.ai_questions ? JSON.stringify(data.ai_questions) : null,
@@ -725,8 +951,8 @@ export function upsertMemoryCard(data: MemoryCardData): string {
     INSERT INTO memory_cards
       (id, photo_id, family_id, taken_at, location, people, action,
        emotions, changes, significance, understanding, change_detail,
-       user_notes, voice_transcript, ai_questions, analysis_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       narrative_frame, story_layer, user_notes, voice_transcript, ai_questions, analysis_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     data.photo_id,
@@ -740,6 +966,8 @@ export function upsertMemoryCard(data: MemoryCardData): string {
     data.significance || '',
     JSON.stringify(data.understanding || {}),
     JSON.stringify(data.change_detail || {}),
+    JSON.stringify(data.narrative_frame || {}),
+    JSON.stringify(data.story_layer || {}),
     data.user_notes || '',
     data.voice_transcript || '',
     JSON.stringify(data.ai_questions || []),
@@ -762,6 +990,18 @@ export function getMemoryCardsByFamily(familyId: string) {
   const rows = database
     .prepare('SELECT * FROM memory_cards WHERE family_id = ? ORDER BY created_at DESC')
     .all(familyId) as any[];
+  return rows.map(parseMemoryCardRow);
+}
+
+export function getAnalyzedMemoryCardsForEngine(familyId: string) {
+  const database = getDb();
+  const rows = database.prepare(`
+    SELECT mc.*, p.url as photo_url
+    FROM memory_cards mc
+    JOIN photos p ON mc.photo_id = p.id
+    WHERE mc.family_id = ? AND mc.analysis_status = 'analyzed'
+    ORDER BY mc.taken_at ASC, mc.created_at ASC
+  `).all(familyId) as any[];
   return rows.map(parseMemoryCardRow);
 }
 

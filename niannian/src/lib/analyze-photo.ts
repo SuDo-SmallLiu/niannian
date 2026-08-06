@@ -20,6 +20,7 @@ const LAYER_MAP: Record<string, number> = {
   behavior: 2,
   change: 3,
   family_value: 4,
+  narrative: 5,
 };
 
 function mergePeople(aiPeople: string[], sourcePeople?: string[]): string[] {
@@ -48,6 +49,8 @@ export function saveMemoryCardFromAnalysis(
     significance: analysis.significance || sourceFacts?.description || '',
     understanding: analysis.understanding,
     change_detail: analysis.changeDetail,
+    narrative_frame: analysis.narrativeFrame,
+    story_layer: analysis.storyLayer,
     user_notes: existing?.user_notes?.trim() ? existing.user_notes : undefined,
     voice_transcript: existing?.voice_transcript || undefined,
     ai_questions: existing?.ai_questions || undefined,
@@ -74,6 +77,31 @@ export function saveMemoryCardFromAnalysis(
       }
     }
   }
+
+  const nf = analysis.narrativeFrame;
+  if (nf?.storyline) {
+    tags.push({ photo_id: photoId, layer: 5, key: '故事线', value: nf.storyline });
+  }
+  if (nf?.shotType) {
+    tags.push({ photo_id: photoId, layer: 5, key: '景别', value: nf.shotType });
+  }
+  for (const st of nf?.shotTags || []) {
+    if (!tags.some((t) => t.layer === 5 && t.value === st)) {
+      tags.push({ photo_id: photoId, layer: 5, key: '镜头', value: st });
+    }
+  }
+
+  const sl = analysis.storyLayer;
+  if (sl?.meaning) {
+    tags.push({ photo_id: photoId, layer: 6, key: '意义', value: sl.meaning });
+  }
+  if (sl?.scene_type) {
+    tags.push({ photo_id: photoId, layer: 6, key: '场景类型', value: sl.scene_type });
+  }
+  if (sl?.relationship) {
+    tags.push({ photo_id: photoId, layer: 6, key: '关系', value: sl.relationship });
+  }
+
   saveTagsForPhoto(photoId, tags);
 }
 
