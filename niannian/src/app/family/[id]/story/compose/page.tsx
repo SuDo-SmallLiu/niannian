@@ -3,17 +3,39 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import MemoryCardComposeItem, {
+  getMemoryCardComposeHints,
+} from '@/components/MemoryCardComposeItem';
+
+interface MemoryCardData {
+  analysis_status?: string;
+  action?: string;
+  taken_at?: string;
+  location?: string;
+  people?: string[];
+  significance?: string;
+  understanding?: {
+    archetype?: string;
+    emotions?: string[];
+  } | null;
+  narrative_frame?: {
+    storyline?: string;
+    storylineNote?: string;
+    shotType?: string;
+  } | null;
+  story_layer?: {
+    scene_type?: string;
+    meaning?: string;
+    relationship?: string;
+    change?: string;
+    importance?: number;
+  } | null;
+}
 
 interface AnalyzedPhoto {
   id: string;
   url: string;
-  memoryCard?: {
-    analysis_status?: string;
-    action?: string;
-    taken_at?: string;
-    location?: string;
-    significance?: string;
-  } | null;
+  memoryCard?: MemoryCardData | null;
 }
 
 export default function ManualStoryComposePage() {
@@ -94,7 +116,7 @@ export default function ManualStoryComposePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-36">
+    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-[22rem]">
       <Link
         href={`/family/${familyId}/story`}
         className="text-[#B8A898] hover:text-[#8B7355] text-sm mb-6 inline-block"
@@ -102,10 +124,10 @@ export default function ManualStoryComposePage() {
         ← 家庭故事
       </Link>
 
-      <div className="text-center mb-8">
+      <div className="text-center mb-6">
         <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">人工组合故事</h1>
         <p className="text-sm text-[#B8A898] leading-relaxed">
-          选择照片并调整顺序，AI 将按你的编排生成一个故事
+          参考 AI 解析提示选片、排序，再生成故事
         </p>
       </div>
 
@@ -126,31 +148,23 @@ export default function ManualStoryComposePage() {
       ) : (
         <>
           <p className="text-xs text-[#B8A898] mb-3">
-            点击选择 · 已选 {selectedIds.length} 张
+            点击卡片选择 · 已选 {selectedIds.length} 张 · 橙色标签为 AI 编排提示
           </p>
-          <div className="grid grid-cols-3 gap-2 mb-8">
+          <div className="space-y-3 max-w-lg mx-auto">
             {photos.map((photo) => {
               const selected = selectedIds.includes(photo.id);
-              const order = selectedIds.indexOf(photo.id);
+              const order = selected ? selectedIds.indexOf(photo.id) + 1 : undefined;
+              const hints = getMemoryCardComposeHints(photo.memoryCard);
+
               return (
-                <button
+                <MemoryCardComposeItem
                   key={photo.id}
-                  type="button"
+                  photoUrl={photo.url}
+                  hints={hints}
+                  selected={selected}
+                  order={order}
                   onClick={() => togglePhoto(photo.id)}
-                  className={`relative rounded-xl overflow-hidden aspect-square border-2 transition-all ${
-                    selected
-                      ? 'border-[#D98A45] ring-2 ring-[#D98A45]/30'
-                      : 'border-transparent'
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt="" className="w-full h-full object-cover" />
-                  {selected && (
-                    <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-[#D98A45] text-white text-xs font-medium flex items-center justify-center">
-                      {order + 1}
-                    </span>
-                  )}
-                </button>
+                />
               );
             })}
           </div>
@@ -158,51 +172,64 @@ export default function ManualStoryComposePage() {
       )}
 
       {selectedPhotos.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E8DCC8] px-4 pt-4 pb-6 shadow-lg">
-          <p className="text-xs text-[#B8A898] mb-2">故事顺序（点击 ↑↓ 调整）</p>
-          <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-hide">
-            {selectedPhotos.map((photo, index) => (
-              <div key={photo.id} className="shrink-0 w-20">
-                <div className="relative rounded-lg overflow-hidden aspect-square mb-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo.url} alt="" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeFromSelected(photo.id)}
-                    className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/50 text-white text-[10px]"
-                  >
-                    ✕
-                  </button>
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E8DCC8] px-4 pt-4 pb-6 shadow-lg max-h-[50vh] flex flex-col">
+          <p className="text-xs text-[#B8A898] mb-2 shrink-0">
+            故事顺序（↑↓ 调整 · 参考 AI 提示编排节奏）
+          </p>
+          <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide shrink-0">
+            {selectedPhotos.map((photo, index) => {
+              const hints = getMemoryCardComposeHints(photo.memoryCard);
+              return (
+                <div key={photo.id} className="shrink-0 w-[100px]">
+                  <div className="relative rounded-lg overflow-hidden aspect-square mb-1 border-2 border-[#D98A45]/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                    <span className="absolute top-1 left-1 w-5 h-5 rounded-full bg-[#D98A45] text-white text-[10px] font-medium flex items-center justify-center">
+                      {index + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFromSelected(photo.id)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white text-[10px]"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {hints.tags[0] && (
+                    <p className="text-[9px] text-[#D98A45] text-center line-clamp-1 mb-0.5">
+                      {hints.tags[0]}
+                    </p>
+                  )}
+                  <div className="flex justify-center gap-1">
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => movePhoto(index, -1)}
+                      className="px-2 py-0.5 rounded bg-[#F8F4ED] text-xs text-[#8B7355] disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === selectedPhotos.length - 1}
+                      onClick={() => movePhoto(index, 1)}
+                      className="px-2 py-0.5 rounded bg-[#F8F4ED] text-xs text-[#8B7355] disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-center gap-1">
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => movePhoto(index, -1)}
-                    className="px-2 py-0.5 rounded bg-[#F8F4ED] text-xs text-[#8B7355] disabled:opacity-30"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === selectedPhotos.length - 1}
-                    onClick={() => movePhoto(index, 1)}
-                    className="px-2 py-0.5 rounded bg-[#F8F4ED] text-xs text-[#8B7355] disabled:opacity-30"
-                  >
-                    ↓
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {error && <p className="text-xs text-red-500 mb-2 text-center">{error}</p>}
+          {error && <p className="text-xs text-red-500 mb-2 text-center shrink-0">{error}</p>}
 
           <button
             type="button"
             onClick={handleGenerate}
             disabled={generating || selectedIds.length === 0}
-            className="w-full py-3.5 rounded-2xl bg-[#D98A45] text-white font-medium disabled:opacity-50"
+            className="w-full py-3.5 rounded-2xl bg-[#D98A45] text-white font-medium disabled:opacity-50 shrink-0"
           >
             {generating ? 'AI 撰写中…' : `生成故事（${selectedIds.length} 张照片）`}
           </button>
