@@ -20,6 +20,7 @@ export default function InteractiveStoryPlayer({
   const [index, setIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [animKey, setAnimKey] = useState(0);
+  const [progressKey, setProgressKey] = useState(0);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const total = slides.length;
@@ -29,6 +30,7 @@ export default function InteractiveStoryPlayer({
     setIndex((i) => {
       if (i >= total - 1) return i;
       setAnimKey((k) => k + 1);
+      setProgressKey((k) => k + 1);
       return i + 1;
     });
   }, [total]);
@@ -37,7 +39,16 @@ export default function InteractiveStoryPlayer({
     setIndex((i) => {
       if (i <= 0) return i;
       setAnimKey((k) => k + 1);
+      setProgressKey((k) => k + 1);
       return i - 1;
+    });
+  }, []);
+
+  const toggleAutoPlay = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAutoPlay((v) => {
+      if (!v) setProgressKey((k) => k + 1);
+      return !v;
     });
   }, []);
 
@@ -45,27 +56,25 @@ export default function InteractiveStoryPlayer({
     if (!autoPlay || index >= total - 1) return;
     const timer = setTimeout(goNext, autoPlayMs);
     return () => clearTimeout(timer);
-  }, [autoPlay, index, total, autoPlayMs, goNext]);
-
-  const handleTap = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    if (x < rect.width * 0.35) goPrev();
-    else goNext();
-  };
+  }, [autoPlay, index, total, autoPlayMs, goNext, progressKey]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = (side: 'prev' | 'next') => (e: React.TouchEvent) => {
+    e.stopPropagation();
     if (!touchStart.current) return;
     const dx = e.changedTouches[0].clientX - touchStart.current.x;
     const dy = e.changedTouches[0].clientY - touchStart.current.y;
     touchStart.current = null;
-    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
-    if (dx < -40) goNext();
-    else if (dx > 40) goPrev();
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) goNext();
+      else goPrev();
+      return;
+    }
+    if (side === 'prev') goPrev();
+    else goNext();
   };
 
   if (!slide) return null;
@@ -74,36 +83,53 @@ export default function InteractiveStoryPlayer({
     <div
       className="fixed inset-0 z-[200] bg-black text-white select-none overflow-hidden"
       onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       {/* 进度条 */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex gap-1 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="absolute top-0 left-0 right-0 z-40 flex gap-1 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pointer-events-none">
         {slides.map((s, i) => (
           <div key={s.id} className="flex-1 h-1 rounded-full bg-white/25 overflow-hidden">
             <div
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: i <= index ? '100%' : '0%' }}
+              key={i === index ? `progress-${progressKey}` : s.id}
+              className={`h-full bg-white rounded-full ${
+                i < index
+                  ? 'w-full'
+                  : i === index && autoPlay
+                    ? 'h5-progress-active w-0'
+                    : i === index
+                      ? 'w-full'
+                      : 'w-0'
+              }`}
+              style={
+                i === index && autoPlay
+                  ? ({ '--progress-ms': `${autoPlayMs}ms` } as React.CSSProperties)
+                  : undefined
+              }
             />
           </div>
         ))}
       </div>
 
       {/* 顶栏控制 */}
-      <div className="absolute top-[max(2rem,env(safe-area-inset-top))] left-0 right-0 z-30 flex items-center justify-between px-4">
+      <div className="absolute top-[max(2rem,env(safe-area-inset-top))] left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none">
         <button
           type="button"
-          onClick={goPrev}
+          onClick={(e) => {
+            e.stopPropagation();
+            goPrev();
+          }}
           disabled={index === 0}
-          className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center disabled:opacity-30"
+          className="pointer-events-auto w-11 h-11 rounded-full bg-black/40 flex items-center justify-center disabled:opacity-30 touch-manipulation"
           aria-label="上一页"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pointer-events-auto">
           <button
             type="button"
-            onClick={() => setAutoPlay((v) => !v)}
-            className="h-10 px-3 rounded-full bg-black/30 flex items-center gap-1.5 text-sm"
+            onClick={toggleAutoPlay}
+            className={`h-11 px-4 rounded-full flex items-center gap-1.5 text-sm touch-manipulation ${
+              autoPlay ? 'bg-[#D98A45] text-white' : 'bg-black/40 text-white'
+            }`}
           >
             {autoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             {autoPlay ? '暂停' : '自动播放'}
@@ -111,8 +137,11 @@ export default function InteractiveStoryPlayer({
           {showClose && onClose && (
             <button
               type="button"
-              onClick={onClose}
-              className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="w-11 h-11 rounded-full bg-black/40 flex items-center justify-center touch-manipulation"
               aria-label="关闭"
             >
               <X className="w-5 h-5" />
@@ -121,29 +150,57 @@ export default function InteractiveStoryPlayer({
         </div>
       </div>
 
-      {/* 点击区域 */}
-      <div className="absolute inset-0 z-20" onClick={handleTap} role="presentation" />
+      {/* 左右点击区（不与顶栏重叠） */}
+      <button
+        type="button"
+        aria-label="上一页"
+        className="absolute left-0 top-24 bottom-24 w-[35%] z-30 touch-manipulation"
+        onClick={(e) => {
+          e.stopPropagation();
+          goPrev();
+        }}
+        onTouchEnd={handleTouchEnd('prev')}
+      />
+      <button
+        type="button"
+        aria-label="下一页"
+        className="absolute right-0 top-24 bottom-24 w-[65%] z-30 touch-manipulation"
+        onClick={(e) => {
+          e.stopPropagation();
+          goNext();
+        }}
+        onTouchEnd={handleTouchEnd('next')}
+      />
 
       {/* 幻灯片内容 */}
-      <div key={animKey} className="absolute inset-0 h5-slide-enter">
+      <div key={animKey} className="absolute inset-0 h5-slide-enter pointer-events-none">
         <SlideContent slide={slide} />
       </div>
 
       {/* 底部提示 */}
-      {index < total - 1 && (
-        <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-30 text-center pointer-events-none">
+      {index < total - 1 && !autoPlay && (
+        <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-40 text-center pointer-events-none">
           <p className="text-white/60 text-sm animate-soft-pulse">
             {index === 0 ? '点击或左滑继续 →' : '← 点击左右切换 →'}
           </p>
         </div>
       )}
 
-      {index === total - 1 && (
-        <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-30 flex justify-center px-6">
+      {autoPlay && index < total - 1 && (
+        <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-40 text-center pointer-events-none">
+          <p className="text-[#D98A45] text-sm">自动播放中…</p>
+        </div>
+      )}
+
+      {index === total - 1 && onClose && (
+        <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-40 flex justify-center px-6 pointer-events-none">
           <button
             type="button"
-            onClick={onClose}
-            className="pointer-events-auto h-12 px-8 rounded-full bg-white text-[#4B3B2F] font-medium text-base"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="pointer-events-auto h-12 px-8 rounded-full bg-white text-[#4B3B2F] font-medium text-base touch-manipulation"
           >
             返回
           </button>
@@ -249,7 +306,6 @@ function SlideContent({ slide }: { slide: H5Slide }) {
     );
   }
 
-  // outro
   return (
     <div className="relative w-full h-full bg-gradient-to-br from-[#4B3B2F] via-[#6B5A48] to-[#D98A45] flex flex-col items-center justify-center px-8 text-center">
       <p className="text-4xl mb-6 h5-text-enter">✦</p>

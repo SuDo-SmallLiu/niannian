@@ -523,6 +523,40 @@ export function deleteStoriesByFamily(familyId: string): number {
   return result.changes;
 }
 
+export function deleteStoryById(storyId: string): boolean {
+  const database = getDb();
+  const story = getStory(storyId);
+  if (!story) return false;
+
+  database.prepare('DELETE FROM shares WHERE story_id = ?').run(storyId);
+  database.prepare('DELETE FROM movie_chapters WHERE story_id = ?').run(storyId);
+  const result = database.prepare('DELETE FROM stories WHERE id = ?').run(storyId);
+  return result.changes > 0;
+}
+
+export function deletePhotoById(photoId: string): boolean {
+  const database = getDb();
+  const photo = getPhoto(photoId);
+  if (!photo) return false;
+
+  database.prepare('DELETE FROM tags WHERE photo_id = ?').run(photoId);
+  database.prepare('DELETE FROM memory_cards WHERE photo_id = ?').run(photoId);
+  database.prepare('DELETE FROM story_memory_cards WHERE memory_card_id = ?').run(photoId);
+  database.prepare('DELETE FROM photo_shares WHERE photo_id = ?').run(photoId);
+  database.prepare('DELETE FROM photos WHERE id = ?').run(photoId);
+
+  if (photo.url?.startsWith('/uploads/')) {
+    const filePath = path.join(process.cwd(), 'public', photo.url);
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch {
+      // 文件可能已不存在，忽略
+    }
+  }
+
+  return true;
+}
+
 export function setStoryMemoryCards(
   storyId: string,
   items: Array<{ photoId: string; orderIndex: number; sceneId?: string }>

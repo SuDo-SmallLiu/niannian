@@ -43,6 +43,8 @@ export default function StoryPage() {
   const [regenerateError, setRegenerateError] = useState('');
   const [regenerateSuccess, setRegenerateSuccess] = useState('');
   const [confirmStory, setConfirmStory] = useState<StoryItem | null>(null);
+  const [deleteStoryTarget, setDeleteStoryTarget] = useState<StoryItem | null>(null);
+  const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
   const { showLoading, hideLoading } = useAppDialog();
 
@@ -158,6 +160,24 @@ export default function StoryPage() {
     }
   };
 
+  const handleDeleteStory = async (story: StoryItem) => {
+    setDeletingStoryId(story.id);
+    try {
+      const res = await fetch(`/api/story?storyId=${story.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '删除失败');
+      setStories((prev) => prev.filter((s) => s.id !== story.id));
+      if (storyId === story.id) {
+        window.location.href = `/family/${familyId}/story`;
+      }
+    } catch (err) {
+      setRegenerateError(err instanceof Error ? err.message : '删除失败');
+    } finally {
+      setDeletingStoryId(null);
+      setDeleteStoryTarget(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -246,6 +266,31 @@ export default function StoryPage() {
         </AlertDialog>
       )}
 
+      {deleteStoryTarget && (
+        <AlertDialog open onOpenChange={(open) => !open && setDeleteStoryTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>删除这个故事？</AlertDialogTitle>
+              <AlertDialogDescription>
+                将永久删除「{deleteStoryTarget.title}」，此操作不可恢复。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteStoryTarget(null)}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-[#A03030]"
+                onClick={() => {
+                  const target = deleteStoryTarget;
+                  void handleDeleteStory(target);
+                }}
+              >
+                确认删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
       {/* 顶部 */}
       <div className="flex items-center justify-between mb-8">
         <Link href="/" className="text-[#B8A898] hover:text-[#8B7355] text-sm transition-colors">
@@ -307,6 +352,8 @@ export default function StoryPage() {
             regenerating={regeneratingStoryId === story.id}
             onShare={() => handleSharePoster(story)}
             onRegenerate={() => setConfirmStory(story)}
+            onDelete={() => setDeleteStoryTarget(story)}
+            deleting={deletingStoryId === story.id}
           />
         ))}
       </div>

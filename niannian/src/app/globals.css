@@ -190,6 +190,15 @@ body {
 .h5-delay-3 { animation-delay: 0.45s; }
 .h5-delay-4 { animation-delay: 0.6s; }
 
+@keyframes h5ProgressFill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.h5-progress-active {
+  animation: h5ProgressFill var(--progress-ms, 6s) linear forwards;
+}
+
 /* 照片淡入 */
 @keyframes photoFadeIn {
   from {

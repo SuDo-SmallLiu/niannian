@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import StoryChapterTimeline from '@/components/StoryChapterTimeline';
 import { useSharePoster } from '@/hooks/useSharePoster';
+import { useAppDialog } from '@/components/providers/app-dialog-provider';
 
 interface StorySegment {
   photoId: string;
@@ -51,7 +52,9 @@ export default function StoryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { openSharePoster, modal: shareModal } = useSharePoster();
+  const { confirm, alert } = useAppDialog();
 
   useEffect(() => {
     async function load() {
@@ -87,6 +90,33 @@ export default function StoryDetailPage() {
       });
     } finally {
       setSharing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!story) return;
+    const ok = await confirm({
+      title: '删除这个故事？',
+      description: `将永久删除「${story.title}」，此操作不可恢复。`,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/story?storyId=${story.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '删除失败');
+      router.push('/stories');
+    } catch (err) {
+      await alert({
+        title: '删除失败',
+        description: err instanceof Error ? err.message : '请稍后重试',
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -152,6 +182,17 @@ export default function StoryDetailPage() {
         photosDetail={story.photos_detail || []}
         connectionAction={story.connection_action}
       />
+
+      <div className="max-w-md mx-auto mt-8">
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting || sharing}
+          className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50"
+        >
+          {deleting ? '删除中…' : '🗑 删除这个故事'}
+        </button>
+      </div>
     </div>
   );
 }

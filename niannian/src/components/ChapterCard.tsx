@@ -10,8 +10,10 @@ interface ChapterCardProps {
   photoUrls: string[];
   sharing: boolean;
   regenerating?: boolean;
+  deleting?: boolean;
   onShare: () => void;
   onRegenerate?: () => void;
+  onDelete?: () => void;
 }
 
 export default function ChapterCard({
@@ -22,8 +24,10 @@ export default function ChapterCard({
   photoUrls,
   sharing,
   regenerating = false,
+  deleting = false,
   onShare,
   onRegenerate,
+  onDelete,
 }: ChapterCardProps) {
   return (
     <section className="mb-10">
@@ -44,7 +48,7 @@ export default function ChapterCard({
           <button
             type="button"
             onClick={onRegenerate}
-            disabled={regenerating || sharing}
+            disabled={regenerating || sharing || deleting}
             className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-[#D98A45] text-[#D98A45] text-sm font-medium hover:bg-[#FFF8F0] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
             {regenerating ? (
@@ -61,11 +65,22 @@ export default function ChapterCard({
         <button
           type="button"
           onClick={onShare}
-          disabled={sharing || regenerating}
+          disabled={sharing || regenerating || deleting}
           className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98] shadow-sm touch-manipulation"
         >
           {sharing ? '生成海报中…' : '💬 分享给家人'}
         </button>
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={sharing || regenerating || deleting}
+            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-all touch-manipulation"
+          >
+            {deleting ? '删除中…' : '🗑 删除故事'}
+          </button>
+        )}
       </div>
     </section>
   );

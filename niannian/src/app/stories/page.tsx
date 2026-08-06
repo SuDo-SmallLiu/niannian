@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import SharePosterCard from '@/components/SharePosterCard';
 import { useSharePoster } from '@/hooks/useSharePoster';
+import { useAppDialog } from '@/components/providers/app-dialog-provider';
 
 interface Story {
   id: string;
@@ -23,7 +24,9 @@ export default function StoriesPage() {
   const [photoUrlsByStory, setPhotoUrlsByStory] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
+  const { confirm, alert } = useAppDialog();
 
   useEffect(() => {
     fetchStories();
@@ -94,6 +97,32 @@ export default function StoriesPage() {
     }
   };
 
+  const handleDelete = async (story: Story) => {
+    const ok = await confirm({
+      title: '删除这个故事？',
+      description: `将永久删除「${story.title}」，此操作不可恢复。`,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setDeletingId(story.id);
+    try {
+      const res = await fetch(`/api/story?storyId=${story.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '删除失败');
+      setStories((prev) => prev.filter((s) => s.id !== story.id));
+    } catch (err) {
+      await alert({
+        title: '删除失败',
+        description: err instanceof Error ? err.message : '请稍后重试',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
       {shareModal}
@@ -155,6 +184,14 @@ export default function StoriesPage() {
                     className="px-4 py-3 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
                   >
                     章节详情
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(story)}
+                    disabled={deletingId === story.id || sharingId === story.id}
+                    className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
+                  >
+                    {deletingId === story.id ? '删除中…' : '🗑 删除故事'}
                   </button>
                 </div>
                 <p className="text-xs text-[#D8CCB8] text-center mt-2">

@@ -1,11 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  deleteStoryById,
   getStoriesByFamily,
   getStory,
   getFamily,
   getStoryMemoryCards,
 } from '@/lib/db';
 import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const storyId = request.nextUrl.searchParams.get('storyId');
+    if (!storyId) {
+      return NextResponse.json({ error: '缺少 storyId' }, { status: 400 });
+    }
+    const ok = deleteStoryById(storyId);
+    if (!ok) {
+      return NextResponse.json({ error: '故事不存在' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('删除故事失败:', error);
+    return NextResponse.json({ error: '删除失败' }, { status: 500 });
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {

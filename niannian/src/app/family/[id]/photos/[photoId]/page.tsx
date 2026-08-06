@@ -9,6 +9,7 @@ import UserSupplementPanel, {
 import type { NarrativeFrame } from '@/lib/narrative-frame';
 import type { StoryLayer } from '@/lib/story-layer';
 import { useSharePoster } from '@/hooks/useSharePoster';
+import { useAppDialog } from '@/components/providers/app-dialog-provider';
 
 interface Tag {
   layer: number;
@@ -100,10 +101,12 @@ export default function MemoryCardPage() {
   const [data, setData] = useState<MemoryCardDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [userNotes, setUserNotes] = useState('');
   const [aiQuestions, setAiQuestions] = useState<AiQuestion[]>([]);
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
+  const { confirm, alert } = useAppDialog();
 
   function applyMemoryCardData(result: {
     photo: MemoryCardDetail['photo'];
@@ -175,6 +178,33 @@ export default function MemoryCardPage() {
       setError('重新解析失败，请重试');
     } finally {
       setReanalyzing(false);
+    }
+  }
+
+  async function handleDelete() {
+    const ok = await confirm({
+      title: '删除这张记忆卡？',
+      description: '将永久删除照片及 AI 解析结果，此操作不可恢复。',
+      confirmText: '确认删除',
+      cancelText: '取消',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setDeleting(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/photos?photoId=${photoId}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || '删除失败');
+      router.push(`/family/${familyId}/photos`);
+    } catch (err) {
+      await alert({
+        title: '删除失败',
+        description: err instanceof Error ? err.message : '请稍后重试',
+      });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -577,10 +607,10 @@ export default function MemoryCardPage() {
 
       {/* 底部固定操作栏 */}
       <div className="fixed bottom-20 left-0 right-0 px-6 z-40">
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md mx-auto space-y-3">
           <button
             onClick={handleReanalyze}
-            disabled={reanalyzing}
+            disabled={reanalyzing || deleting}
             className="flex items-center justify-center gap-2 w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg hover:bg-[#C47A3A] disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-lg shadow-[#D98A45]/20"
           >
             {reanalyzing ? (
@@ -593,6 +623,14 @@ export default function MemoryCardPage() {
             ) : (
               '✨ 开始 AI 解析'
             )}
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting || reanalyzing}
+            className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
+          >
+            {deleting ? '删除中…' : '🗑 删除记忆卡'}
           </button>
         </div>
       </div>
