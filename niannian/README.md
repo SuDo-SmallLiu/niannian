@@ -54,19 +54,18 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 3. 启动：`npm run build && npm run start`（建议用 `pm2` 守护进程）
 4. 反向代理（Nginx 等）把 80/443 转到 `localhost:3000`
 
-### 方式二：GitHub Actions 自动部署
-仓库根目录已包含 `.github/workflows/deploy.yml`（**不是** `niannian/.github/` 下）：每次 push 到 `main` 会先跑 CI（build），通过后在本机 self-hosted runner 上部署。
+### 方式二：自动部署
 
-**仓库结构说明：** git 根目录下的 Next.js 应用在 `niannian/` 子目录（`package.json` 所在位置）。
+**CI（GitHub Actions）：** push 到 `main` 会在云端跑 build 校验（`.github/workflows/deploy.yml`）。
 
-首次在服务器搭建环境，进入克隆后的 `niannian/` 子目录运行 `bash scripts/setup-server.sh`（Ubuntu/Debian）。
-
-**内网服务器（当前方案）：** 服务器在 `10.x` 内网时，GitHub 云端无法 SSH 进来。需在本机注册 self-hosted runner，deploy job 会直接 `git pull + build + pm2 restart`：
+**生产部署（本机 cron）：** 当前服务器在内网，无法通过 HTTPS 访问 `github.com`（443 超时），因此 self-hosted runner / SSH deploy 均不可用。改用 **git SSH 轮询** 自动部署：
 
 ```bash
-# 1. 打开仓库 Settings → Actions → Runners → New self-hosted runner，复制 token
-# 2. 以 clawdbot 运行：
-RUNNER_TOKEN=你的token bash niannian/scripts/setup-github-runner.sh
+# 一次性安装（每 5 分钟检查 main 是否有更新）
+bash niannian/scripts/install-auto-deploy-cron.sh
 ```
 
-**有公网 IP 的服务器（可选 SSH 部署）：** 运行 `bash niannian/scripts/setup-github-deploy.sh` 生成密钥，并在仓库 Secrets 配置 `SSH_HOST`、`SSH_USERNAME`、`SSH_KEY`、`DEPLOY_PATH`（需把 workflow deploy job 改回 SSH 方式）。
+手动部署：`bash niannian/scripts/auto-deploy.sh`  
+日志：`/home/clawdbot/niannian/deploy.log`
+
+**若服务器有公网 IP 且能访问 github.com:443：** 可用 self-hosted runner（`setup-github-runner.sh`）或 SSH deploy（`setup-github-deploy.sh`）。

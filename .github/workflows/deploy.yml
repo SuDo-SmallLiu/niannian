@@ -23,30 +23,5 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  deploy:
-    name: Deploy on server
-    needs: ci
-    # 内网服务器：使用本机 self-hosted runner，无需 SSH
-    runs-on: self-hosted
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: 拉取并部署
-        env:
-          REPO_ROOT: /home/clawdbot/niannian
-        run: |
-          set -e
-          APP_DIR="$REPO_ROOT/niannian"
-
-          if [ ! -d "$REPO_ROOT/.git" ]; then
-            echo "错误: 未找到 git 仓库 $REPO_ROOT"
-            exit 1
-          fi
-
-          cd "$REPO_ROOT"
-          git fetch origin main
-          git reset --hard origin/main
-
-          cd "$APP_DIR"
-          npm ci --omit=dev
-          npm run build
-          pm2 restart niannian || pm2 start npm --name niannian --cwd "$APP_DIR" -- run start
+  # 生产部署由服务器 cron 执行 scripts/auto-deploy.sh（内网无法 HTTPS 连 GitHub）
+  # 见 README「方式二：自动部署」
