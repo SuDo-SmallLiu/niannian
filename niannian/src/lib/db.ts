@@ -151,6 +151,19 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_tags_photo ON tags(photo_id);
     CREATE INDEX IF NOT EXISTS idx_tags_layer ON tags(layer);
   `);
+
+  migrateDatabase(database);
+}
+
+function migrateDatabase(database: Database.Database) {
+  const cols = database.prepare('PRAGMA table_info(photos)').all() as Array<{ name: string }>;
+  const colNames = new Set(cols.map((c) => c.name));
+  if (!colNames.has('source_metadata')) {
+    database.exec(`ALTER TABLE photos ADD COLUMN source_metadata TEXT DEFAULT '{}'`);
+  }
+  if (!colNames.has('source_type')) {
+    database.exec(`ALTER TABLE photos ADD COLUMN source_type TEXT DEFAULT ''`);
+  }
 }
 
 // --- Family 操作 ---
@@ -194,22 +207,40 @@ export function getPhotosByFamily(familyId: string) {
   const rows = database
     .prepare('SELECT * FROM photos WHERE family_id = ? ORDER BY created_at DESC')
     .all(familyId) as any[];
-  return rows.map((row) => ({
+  return rows.map(parsePhotoRow);
+}
+
+function parsePhotoRow(row: any) {
+  let source_metadata = {};
+  try {
+    source_metadata = JSON.parse(row.source_metadata || '{}');
+  } catch {
+    source_metadata = {};
+  }
+  return {
     ...row,
     people: JSON.parse(row.people || '[]'),
     ai_tags: JSON.parse(row.ai_tags || '[]'),
-  }));
+    source_metadata,
+  };
 }
 
 export function getPhoto(id: string) {
   const database = getDb();
   const row = database.prepare('SELECT * FROM photos WHERE id = ?').get(id) as any;
   if (!row) return null;
-  return {
-    ...row,
-    people: JSON.parse(row.people || '[]'),
-    ai_tags: JSON.parse(row.ai_tags || '[]'),
-  };
+  return parsePhotoRow(row);
+}
+
+export function updatePhotoSourceMetadata(
+  id: string,
+  sourceType: string,
+  sourceMetadata: Record<string, unknown>
+) {
+  const database = getDb();
+  database.prepare(
+    'UPDATE photos SET source_type = ?, source_metadata = ? WHERE id = ?'
+  ).run(sourceType, JSON.stringify(sourceMetadata), id);
 }
 
 export function updatePhotoAnalysis(

@@ -1,44 +1,54 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import { isGooglePhotosJsonFile, isImageFile } from '@/lib/google-photos-metadata';
 
 interface PhotoUploaderProps {
-  onUploadComplete: (result: { photos: Array<{ id: string; url: string; name: string }>; totalCount: number }) => void;
+  onUploadComplete: (result: {
+    photos: Array<{ id: string; url: string; name: string }>;
+    totalCount: number;
+    metadata?: { jsonFiles: number; matched: number };
+  }) => void;
   familyId: string;
 }
 
 export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploaderProps) {
   const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<Array<{ url: string; isJson: boolean }>>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const imageCount = files.filter((f) => isImageFile(f.name)).length;
+  const jsonCount = files.filter((f) => isGooglePhotosJsonFile(f.name)).length;
+
   const handleFiles = useCallback(
     (newFiles: FileList | null) => {
       if (!newFiles) return;
 
       const validFiles: File[] = [];
-      const validPreviews: string[] = [];
+      const validPreviews: Array<{ url: string; isJson: boolean }> = [];
 
       for (let i = 0; i < newFiles.length; i++) {
         const file = newFiles[i];
-        // 验证文件类型
-        if (!file.type.match(/^image\/(jpeg|png|heic|heif|webp)$/)) {
-          continue;
-        }
-        // 验证文件大小 (20MB)
-        if (file.size > 20 * 1024 * 1024) {
-          continue;
-        }
+        const isJson = isGooglePhotosJsonFile(file.name);
+        const isImage = isImageFile(file.name);
+        if (!isJson && !isImage) continue;
+        if (!isJson && file.size > 20 * 1024 * 1024) continue;
+
         validFiles.push(file);
-        validPreviews.push(URL.createObjectURL(file));
+        validPreviews.push({
+          url: isJson ? '' : URL.createObjectURL(file),
+          isJson,
+        });
       }
 
-      if (validFiles.length + files.length > 50) {
-        setError('最多上传50张照片');
+      const newImageCount = validFiles.filter((f) => isImageFile(f.name)).length;
+      const existingImageCount = files.filter((f) => isImageFile(f.name)).length;
+      if (newImageCount + existingImageCount > 50) {
+        setError('最多上传 50 张照片');
         return;
       }
 
@@ -46,24 +56,23 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
       setPreviews((prev) => [...prev, ...validPreviews]);
       setError('');
     },
-    [files.length]
+    [files]
   );
 
   const removeFile = (index: number) => {
-    URL.revokeObjectURL(previews[index]);
+    if (previews[index]?.url) URL.revokeObjectURL(previews[index].url);
     setFiles((prev) => prev.filter((_, i) => i !== index));
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleUpload = async () => {
-    if (files.length === 0) {
+    if (imageCount === 0) {
       setError('请先选择照片');
       return;
     }
 
-    if (files.length < 10) {
-      setError('建议上传至少10张照片以获得更好的故事效果');
-      // 不阻止上传，只提示
+    if (imageCount < 10) {
+      setError('建议上传至少 10 张照片以获得更好的故事效果');
     }
 
     setUploading(true);
@@ -74,11 +83,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
     files.forEach((file) => formData.append('photos', file));
 
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
 
       if (!res.ok) {
@@ -97,27 +102,19 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
 
   return (
     <div>
-      {/* 上传区域 */}
       <div
         className={`rounded-2xl border-2 border-dashed border-[#E8DCC8] p-10 text-center cursor-pointer transition-all ${
           dragOver ? 'bg-[#FFFBF5] border-[#D98A45]/40' : 'bg-white hover:bg-[#FFFBF5] hover:border-[#D98A45]/40'
         }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          handleFiles(e.dataTransfer.files);
-        }}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
         onClick={() => fileInputRef.current?.click()}
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/heic,image/heif,image/webp"
+          accept="image/jpeg,image/png,image/heic,image/heif,image/webp,.json,application/json"
           multiple
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
@@ -125,21 +122,26 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
 
         <div className="text-4xl mb-3">📸</div>
         <p className="text-[#4B3B2F] font-medium mb-1">点击或拖拽上传照片</p>
-        <p className="text-sm text-[#B8A898]">
-          支持 JPG / PNG / HEIC，建议 10-50 张，单张不超过 20MB
+        <p className="text-sm text-[#B8A898] mb-2">
+          支持 JPG / PNG / HEIC，建议 10–50 张，单张不超过 20MB
+        </p>
+        <p className="text-xs text-[#D98A45]">
+          📦 Google Photos 导出包：请同时选中照片 + .json 侧车文件
         </p>
       </div>
 
-      {/* 照片预览 */}
-      {previews.length > 0 && (
+      {files.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-[#8B7355]">
-              已选择 <span className="text-[#4B3B2F] font-medium">{files.length}</span> 张照片
+              已选 <span className="text-[#4B3B2F] font-medium">{imageCount}</span> 张照片
+              {jsonCount > 0 && (
+                <span className="text-[#D98A45]"> + {jsonCount} 个 JSON 元数据</span>
+              )}
             </p>
             <button
               onClick={() => {
-                previews.forEach((p) => URL.revokeObjectURL(p));
+                previews.forEach((p) => { if (p.url) URL.revokeObjectURL(p.url); });
                 setFiles([]);
                 setPreviews([]);
               }}
@@ -150,40 +152,38 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {previews.map((preview, i) => (
-              <div key={i} className="relative group aspect-square rounded-xl overflow-hidden border border-[#E8DCC8]">
-                <img
-                  src={preview}
-                  alt={`照片 ${i + 1}`}
-                  className="w-full h-full object-cover"
-                />
+            {files.map((file, i) => (
+              <div
+                key={`${file.name}-${i}`}
+                className="relative group aspect-square rounded-xl overflow-hidden border border-[#E8DCC8] bg-[#FFF8F0] flex items-center justify-center"
+              >
+                {previews[i]?.isJson ? (
+                  <div className="text-center p-2">
+                    <div className="text-2xl mb-1">📄</div>
+                    <p className="text-[10px] text-[#8B7355] leading-tight line-clamp-3">{file.name}</p>
+                  </div>
+                ) : (
+                  <img src={previews[i]?.url} alt="" className="w-full h-full object-cover" />
+                )}
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeFile(i);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); removeFile(i); }}
                   className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
                 >
                   ×
                 </button>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-xs py-1 px-2 truncate">
-                  {files[i]?.name}
-                </div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* 错误提示 */}
       {error && (
         <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-100 text-amber-700 text-sm">
           {error}
         </div>
       )}
 
-      {/* 上传按钮 */}
-      {files.length > 0 && (
+      {imageCount > 0 && (
         <div className="mt-8">
           <button
             onClick={handleUpload}
@@ -196,7 +196,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
                 上传中... {progress}%
               </span>
             ) : (
-              `上传 ${files.length} 张照片`
+              `上传 ${imageCount} 张照片${jsonCount > 0 ? `（含 ${jsonCount} 个 JSON）` : ''}`
             )}
           </button>
         </div>

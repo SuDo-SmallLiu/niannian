@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { type PhotoSourceFacts, buildSourceFactsPrompt } from '@/lib/google-photos-metadata';
 
 // 创建 OpenAI 兼容客户端（火山引擎 Ark / 其他兼容 API）
 function getClient(): OpenAI | null {
@@ -39,16 +40,20 @@ export interface PhotoAnalysis {
   };
 }
 
-export async function analyzePhoto(imageBase64: string): Promise<PhotoAnalysis> {
+export async function analyzePhoto(
+  imageBase64: string,
+  sourceFacts?: PhotoSourceFacts
+): Promise<PhotoAnalysis> {
   const client = getClient();
 
   if (!client) {
-    // 演示模式：返回模拟数据
-    return getMockPhotoAnalysis();
+    return getMockPhotoAnalysis(sourceFacts);
   }
 
-  const prompt = `你是一位家庭记忆整理师。请分析这张家庭照片，生成一张「记忆卡」。
+  const sourceContext = sourceFacts ? `\n\n${buildSourceFactsPrompt(sourceFacts)}\n` : '';
 
+  const prompt = `你是一位家庭记忆整理师。请分析这张家庭照片，生成一张「记忆卡」。
+${sourceContext}
 请以JSON格式返回（只返回JSON，不要其他内容）：
 {
   "people": ["人物1", "人物2"],
@@ -105,7 +110,7 @@ export async function analyzePhoto(imageBase64: string): Promise<PhotoAnalysis> 
     console.error('图片分析失败:', error);
   }
 
-  return getMockPhotoAnalysis();
+  return getMockPhotoAnalysis(sourceFacts);
 }
 
 function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis {
@@ -268,7 +273,7 @@ ${relationSummary || '暂无明显的共同人物关系'}
 // 演示模式模拟数据
 // ============================================================
 
-function getMockPhotoAnalysis(): PhotoAnalysis {
+function getMockPhotoAnalysis(sourceFacts?: PhotoSourceFacts): PhotoAnalysis {
   const mocks: PhotoAnalysis[] = [
     {
       people: ['爷爷', '孙子'],
@@ -335,7 +340,16 @@ function getMockPhotoAnalysis(): PhotoAnalysis {
       },
     },
   ];
-  return mocks[Math.floor(Math.random() * mocks.length)];
+  const base = mocks[Math.floor(Math.random() * mocks.length)];
+  if (!sourceFacts) return base;
+
+  return {
+    ...base,
+    people: sourceFacts.people.length > 0 ? sourceFacts.people : base.people,
+    scene: sourceFacts.location || base.scene,
+    time: sourceFacts.takenAtFormatted || base.time,
+    significance: sourceFacts.description || base.significance,
+  };
 }
 
 function getMockStory(

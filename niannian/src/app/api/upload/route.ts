@@ -1,50 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addPhoto, getPhotoCount } from '@/lib/db';
+import { addPhoto, getPhotoCount, updatePhotoSourceMetadata } from '@/lib/db';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import {
+  isGooglePhotosJsonFile,
+  isImageFile,
+  parseGooglePhotosJson,
+  extractPhotoSourceFacts,
+  findMetadataForPhoto,
+  type PhotoSourceFacts,
+} from '@/lib/google-photos-metadata';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const familyId = formData.get('familyId') as string;
-    const files = formData.getAll('photos') as File[];
+    const allFiles = formData.getAll('photos') as File[];
 
     if (!familyId) {
       return NextResponse.json({ error: '缺少家庭ID' }, { status: 400 });
     }
 
-    if (!files || files.length === 0) {
+    const imageFiles = allFiles.filter((f) => isImageFile(f.name));
+    const jsonFiles = allFiles.filter((f) => isGooglePhotosJsonFile(f.name));
+
+    if (imageFiles.length === 0) {
       return NextResponse.json({ error: '请至少上传一张照片' }, { status: 400 });
     }
 
-    // 限制最多50张
-    if (files.length > 50) {
+    if (imageFiles.length > 50) {
       return NextResponse.json({ error: '最多上传50张照片' }, { status: 400 });
     }
 
-    // 确保上传目录存在
+    // 预解析 Google Photos JSON 侧车文件
+    const jsonEntries: Array<{ fileName: string; facts: PhotoSourceFacts }> = [];
+    for (const jf of jsonFiles) {
+      const content = await jf.text();
+      const parsed = parseGooglePhotosJson(content);
+      if (parsed) {
+        jsonEntries.push({ fileName: jf.name, facts: extractPhotoSourceFacts(parsed) });
+      }
+    }
+
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', familyId);
     await mkdir(uploadDir, { recursive: true });
 
-    const uploadedPhotos: Array<{ id: string; url: string; name: string }> = [];
+    const uploadedPhotos: Array<{ id: string; url: string; name: string; hasMetadata: boolean }> = [];
+    let metadataMatched = 0;
 
-    for (const file of files) {
-      // 生成唯一文件名
+    for (const file of imageFiles) {
       const ext = file.name.split('.').pop() || 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
       const filePath = path.join(uploadDir, fileName);
 
-      // 读取文件内容
       const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, Buffer.from(bytes));
 
-      // 写入磁盘
-      await writeFile(filePath, buffer);
-
-      // 记录到数据库
       const url = `/uploads/${familyId}/${fileName}`;
       const id = addPhoto(familyId, url, file.name);
-      uploadedPhotos.push({ id, url, name: file.name });
+
+      const sourceFacts = findMetadataForPhoto(file.name, jsonEntries);
+      if (sourceFacts) {
+        updatePhotoSourceMetadata(id, 'google_photos', sourceFacts as unknown as Record<string, unknown>);
+        metadataMatched += 1;
+      }
+
+      uploadedPhotos.push({ id, url, name: file.name, hasMetadata: !!sourceFacts });
     }
 
     const totalCount = getPhotoCount(familyId);
@@ -53,6 +74,10 @@ export async function POST(request: NextRequest) {
       success: true,
       photos: uploadedPhotos,
       totalCount,
+      metadata: {
+        jsonFiles: jsonFiles.length,
+        matched: metadataMatched,
+      },
     });
   } catch (error) {
     console.error('上传照片失败:', error);

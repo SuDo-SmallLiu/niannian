@@ -18,6 +18,18 @@ interface MemoryCardDetail {
     location: string;
     event: string;
     taken_at: string;
+    source_type?: string;
+    source_metadata?: {
+      takenAtFormatted?: string;
+      location?: string;
+      description?: string;
+      people?: string[];
+      deviceType?: string;
+      uploadedAt?: string;
+      favorited?: boolean;
+      latitude?: number | null;
+      longitude?: number | null;
+    };
   };
   memoryCard: {
     taken_at: string;
@@ -86,6 +98,7 @@ export default function MemoryCardPage() {
   }
 
   const { photo, memoryCard, tags } = data;
+  const source = photo.source_type === 'google_photos' ? photo.source_metadata : null;
   const tagsByLayer = tags.reduce<Record<number, Tag[]>>((acc, tag) => {
     if (!acc[tag.layer]) acc[tag.layer] = [];
     acc[tag.layer].push(tag);
@@ -123,6 +136,47 @@ export default function MemoryCardPage() {
         </div>
       ) : (
         <div className="px-6 space-y-4 animate-fade-in-up delay-100">
+          {/* Google Photos 原始信息 */}
+          {source && (
+            <section className="bg-[#F0F7FF] rounded-2xl p-5 border border-blue-100 shadow-sm">
+              <h2 className="text-xs tracking-wider text-blue-600 font-medium mb-3">
+                📦 Google Photos 原始信息
+              </h2>
+              <div className="space-y-2 text-sm">
+                {source.takenAtFormatted && (
+                  <div className="flex">
+                    <span className="text-blue-400 w-16 shrink-0">拍摄</span>
+                    <span className="text-[#4B3B2F]">{source.takenAtFormatted}</span>
+                  </div>
+                )}
+                {source.location && (
+                  <div className="flex">
+                    <span className="text-blue-400 w-16 shrink-0">GPS</span>
+                    <span className="text-[#4B3B2F]">{source.location}</span>
+                  </div>
+                )}
+                {source.description && (
+                  <div className="flex">
+                    <span className="text-blue-400 w-16 shrink-0">描述</span>
+                    <span className="text-[#4B3B2F]">{source.description}</span>
+                  </div>
+                )}
+                {source.people && source.people.length > 0 && (
+                  <div className="flex">
+                    <span className="text-blue-400 w-16 shrink-0">人物</span>
+                    <span className="text-[#4B3B2F]">{source.people.join('、')}</span>
+                  </div>
+                )}
+                {source.deviceType && (
+                  <div className="flex">
+                    <span className="text-blue-400 w-16 shrink-0">设备</span>
+                    <span className="text-[#4B3B2F]">{source.deviceType}</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* 事实层 */}
           <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
             <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-3">事实层</h2>

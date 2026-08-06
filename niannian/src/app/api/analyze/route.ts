@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPhotosByFamily, updatePhotoAnalysis, createStory, getFamily, getLatestStoryByFamily, upsertMemoryCard, saveTagsForPhoto } from '@/lib/db';
 import { analyzePhoto, buildPhotoRelations, generateFamilyStory, type PhotoAnalysis } from '@/lib/ai';
+import {
+  type PhotoSourceFacts,
+  buildSourceFactsPrompt,
+  sourceFactsToTags,
+} from '@/lib/google-photos-metadata';
 import { readFileSync } from 'fs';
 import path from 'path';
 
@@ -74,7 +79,7 @@ async function processAnalysis(
   familyId: string,
   familyName: string,
   familyMembers: string[],
-  photos: Array<{ id: string; url: string }>
+  photos: Array<{ id: string; url: string; source_metadata?: PhotoSourceFacts; source_type?: string }>
 ) {
   try {
     // Step 1: 逐张分析照片
@@ -93,17 +98,22 @@ async function processAnalysis(
         const fileBuffer = readFileSync(filePath);
         const base64 = fileBuffer.toString('base64');
 
-        const analysis = await analyzePhoto(base64);
+        const sourceFacts =
+          photo.source_type === 'google_photos' && photo.source_metadata
+            ? (photo.source_metadata as PhotoSourceFacts)
+            : undefined;
+
+        const analysis = await analyzePhoto(base64, sourceFacts);
 
         updatePhotoAnalysis(photo.id, {
-          people: analysis.people,
-          location: analysis.scene,
+          people: mergePeople(analysis.people, sourceFacts?.people),
+          location: sourceFacts?.location || analysis.scene,
           event: analysis.action,
           ai_tags: analysis.tags,
-          taken_at: analysis.time,
+          taken_at: sourceFacts?.takenAtFormatted || analysis.time,
         });
 
-        saveMemoryCardFromAnalysis(familyId, photo.id, analysis);
+        saveMemoryCardFromAnalysis(familyId, photo.id, analysis, sourceFacts);
 
         photoAnalyses.push({
           id: photo.id,
@@ -158,27 +168,49 @@ const LAYER_MAP: Record<string, number> = {
   family_value: 4,
 };
 
-function saveMemoryCardFromAnalysis(familyId: string, photoId: string, analysis: PhotoAnalysis) {
+function saveMemoryCardFromAnalysis(
+  familyId: string,
+  photoId: string,
+  analysis: PhotoAnalysis,
+  sourceFacts?: PhotoSourceFacts
+) {
   upsertMemoryCard({
     photo_id: photoId,
     family_id: familyId,
-    taken_at: analysis.time,
-    location: analysis.scene,
-    people: analysis.people,
+    taken_at: sourceFacts?.takenAtFormatted || analysis.time,
+    location: sourceFacts?.location || analysis.scene,
+    people: mergePeople(analysis.people, sourceFacts?.people),
     action: analysis.action,
     emotions: analysis.emotions,
     changes: analysis.changes,
-    significance: analysis.significance,
+    significance: sourceFacts?.description || analysis.significance,
+    user_notes: sourceFacts?.description || '',
     analysis_status: 'analyzed',
   });
 
   const tags: Array<{ photo_id: string; layer: number; key: string; value: string }> = [];
+
+  if (sourceFacts) {
+    for (const tag of sourceFactsToTags(sourceFacts)) {
+      tags.push({ photo_id: photoId, ...tag });
+    }
+  }
+
   for (const [layerName, items] of Object.entries(analysis.layeredTags)) {
     const layer = LAYER_MAP[layerName];
     if (!layer || !items) continue;
     for (const item of items) {
-      tags.push({ photo_id: photoId, layer, key: item.key, value: item.value });
+      // 避免与原始元数据标签重复
+      const dup = tags.some((t) => t.layer === layer && t.value === item.value);
+      if (!dup) {
+        tags.push({ photo_id: photoId, layer, key: item.key, value: item.value });
+      }
     }
   }
   saveTagsForPhoto(photoId, tags);
+}
+
+function mergePeople(aiPeople: string[], sourcePeople?: string[]): string[] {
+  const merged = new Set([...(sourcePeople || []), ...aiPeople]);
+  return Array.from(merged).filter(Boolean);
 }
