@@ -19,16 +19,21 @@ export default function PhotoLibraryPage() {
 
   const [photos, setPhotos] = useState<FilterablePhoto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filters, setFilters] = useState<MemoryCardFilters>(defaultFilters());
 
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch(`/api/photos?familyId=${familyId}`);
+        if (!res.ok) {
+          setLoadError('加载照片失败，请下拉刷新重试');
+          return;
+        }
         const data = await res.json();
         setPhotos(data.photos || []);
       } catch {
-        // ignore
+        setLoadError('网络错误，请稍后重试');
       } finally {
         setLoading(false);
       }
@@ -70,7 +75,11 @@ export default function PhotoLibraryPage() {
       ) : photos.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-4xl mb-4">🃏</p>
-          <p className="text-[#B8A898] mb-4">还没有照片</p>
+          {loadError ? (
+            <p className="text-red-500 text-sm mb-4">{loadError}</p>
+          ) : (
+            <p className="text-[#B8A898] mb-4">还没有照片</p>
+          )}
           <Link
             href={`/family/${familyId}/upload`}
             className="inline-block px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium"

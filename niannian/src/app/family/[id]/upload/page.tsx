@@ -8,8 +8,11 @@ export default function UploadPage() {
   const params = useParams();
   const familyId = params.id as string;
 
-  const handleUploadComplete = () => {
-    router.push(`/family/${familyId}/analyze`);
+  const handleUploadComplete = (result: {
+    photos: Array<{ id: string; url: string; name: string }>;
+    totalCount: number;
+  }) => {
+    router.push(`/family/${familyId}/photos?uploaded=${result.photos.length}`);
   };
 
   return (

@@ -91,6 +91,11 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
         return;
       }
 
+      const uploaded = Array.isArray(data.photos) ? data.photos.length : 0;
+      if (uploaded !== imageCount) {
+        setError(`上传完成 ${uploaded}/${imageCount} 张，部分照片可能未成功，请到记忆卡页查看`);
+      }
+
       setProgress(100);
       onUploadComplete(data);
     } catch {
