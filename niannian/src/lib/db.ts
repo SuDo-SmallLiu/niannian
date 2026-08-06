@@ -1,10 +1,9 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'niannian.db');
 
-// 确保 data 目录存在
-import fs from 'fs';
 const dataDir = path.join(process.cwd(), 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -67,9 +66,52 @@ function initializeDatabase() {
       FOREIGN KEY (story_id) REFERENCES stories(id)
     );
 
+    -- 用户系统
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL DEFAULT '',
+      avatar TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS verify_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT NOT NULL,
+      code TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS family_users (
+      family_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (family_id, user_id),
+      FOREIGN KEY (family_id) REFERENCES families(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS invitations (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT,
+      used_by TEXT,
+      used_at TEXT,
+      FOREIGN KEY (family_id) REFERENCES families(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_photos_family ON photos(family_id);
     CREATE INDEX IF NOT EXISTS idx_stories_family ON stories(family_id);
     CREATE INDEX IF NOT EXISTS idx_shares_code ON shares(share_code);
+    CREATE INDEX IF NOT EXISTS idx_family_users_user ON family_users(user_id);
+    CREATE INDEX IF NOT EXISTS idx_invitations_code ON invitations(code);
+    CREATE INDEX IF NOT EXISTS idx_verify_codes_phone ON verify_codes(phone);
   `);
 }
 
@@ -266,6 +308,113 @@ export function getShareByCode(shareCode: string) {
     story_photos: JSON.parse(row.story_photos || '[]'),
     story_timeline: JSON.parse(row.story_timeline || '[]'),
   };
+}
+
+// --- User 操作 ---
+
+export function findUserByPhone(phone: string) {
+  const database = getDb();
+  const row = database.prepare('SELECT * FROM users WHERE phone = ?').get(phone) as any;
+  return row || null;
+}
+
+export function createUser(phone: string, name?: string): string {
+  const id = generateId();
+  const database = getDb();
+  database.prepare(
+    'INSERT INTO users (id, phone, name) VALUES (?, ?, ?)'
+  ).run(id, phone, name || '');
+  return id;
+}
+
+export function saveVerifyCode(phone: string, code: string): void {
+  const database = getDb();
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  database.prepare(
+    'INSERT INTO verify_codes (phone, code, expires_at) VALUES (?, ?, ?)'
+  ).run(phone, code, expiresAt);
+}
+
+export function verifyCode(phone: string, code: string): boolean {
+  const database = getDb();
+  const row = database.prepare(
+    `SELECT * FROM verify_codes WHERE phone = ? AND code = ? AND used = 0
+     AND expires_at > datetime('now') ORDER BY id DESC LIMIT 1`
+  ).get(phone, code) as any;
+  if (!row) return false;
+
+  database.prepare('UPDATE verify_codes SET used = 1 WHERE id = ?').run(row.id);
+  return true;
+}
+
+// --- 家庭-用户关联 ---
+
+export function addFamilyMember(familyId: string, userId: string, role: string = 'member'): void {
+  const database = getDb();
+  database.prepare(
+    'INSERT OR IGNORE INTO family_users (family_id, user_id, role) VALUES (?, ?, ?)'
+  ).run(familyId, userId, role);
+}
+
+export function getUserFamilies(userId: string) {
+  const database = getDb();
+  return database.prepare(
+    `SELECT f.*, fu.role, 
+     COUNT(DISTINCT p.id) as photo_count, 
+     COUNT(DISTINCT s.id) as story_count
+     FROM family_users fu
+     JOIN families f ON fu.family_id = f.id
+     LEFT JOIN photos p ON f.id = p.family_id
+     LEFT JOIN stories s ON f.id = s.family_id
+     WHERE fu.user_id = ?
+     GROUP BY f.id
+     ORDER BY f.created_at DESC`
+  ).all(userId) as any[];
+}
+
+export function getFamilyMembers(familyId: string) {
+  const database = getDb();
+  return database.prepare(
+    `SELECT u.id, u.phone, u.name, u.avatar, fu.role, fu.joined_at
+     FROM family_users fu
+     JOIN users u ON fu.user_id = u.id
+     WHERE fu.family_id = ?
+     ORDER BY fu.joined_at ASC`
+  ).all(familyId) as any[];
+}
+
+export function isFamilyMember(familyId: string, userId: string): boolean {
+  const database = getDb();
+  const row = database.prepare(
+    'SELECT 1 FROM family_users WHERE family_id = ? AND user_id = ?'
+  ).get(familyId, userId);
+  return !!row;
+}
+
+// --- 邀请码 ---
+
+export function createInvitation(familyId: string, createdBy: string): { id: string; code: string } {
+  const id = generateId();
+  const code = generateShortCode().toUpperCase();
+  const database = getDb();
+  database.prepare(
+    'INSERT INTO invitations (id, family_id, code, created_by, expires_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, familyId, code, createdBy, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
+  return { id, code };
+}
+
+export function useInvitation(code: string, userId: string): { familyId: string; success: boolean } {
+  const database = getDb();
+  const inv = database.prepare(
+    `SELECT * FROM invitations WHERE code = ? AND used_by IS NULL
+     AND (expires_at IS NULL OR expires_at > datetime('now'))`
+  ).get(code) as any;
+  if (!inv) return { familyId: '', success: false };
+
+  database.prepare(
+    'UPDATE invitations SET used_by = ?, used_at = datetime(\'now\') WHERE id = ?'
+  ).run(userId, inv.id);
+  return { familyId: inv.family_id, success: true };
 }
 
 // --- 工具函数 ---
