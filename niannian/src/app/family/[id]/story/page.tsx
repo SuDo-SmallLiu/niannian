@@ -24,6 +24,7 @@ export default function StoryPage() {
 
   const [stories, setStories] = useState<StoryItem[]>([]);
   const [familyName, setFamilyName] = useState('');
+  const [photoUrlMap, setPhotoUrlMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [sharingStoryId, setSharingStoryId] = useState<string | null>(null);
@@ -41,17 +42,28 @@ export default function StoryPage() {
         if (res.ok && data.story) {
           setStories([data.story]);
           setFamilyName(data.family?.name || '');
+          const urls = (data.story.photos_detail || []) as Array<{ id: string; url: string }>;
+          const urlMap: Record<string, string> = {};
+          for (const p of urls) urlMap[p.id] = p.url;
+          setPhotoUrlMap(urlMap);
         }
       } else {
-        const [storyRes, familyRes] = await Promise.all([
+        const [storyRes, familyRes, photosRes] = await Promise.all([
           fetch(`/api/story?familyId=${familyId}`),
           fetch('/api/family'),
+          fetch(`/api/photos?familyId=${familyId}`),
         ]);
         const data = await storyRes.json();
         const familyData = await familyRes.json();
+        const photosData = await photosRes.json();
         if (storyRes.ok && data.stories) {
           setStories(data.stories);
         }
+        const urlMap: Record<string, string> = {};
+        for (const p of photosData.photos || []) {
+          urlMap[p.id] = p.url;
+        }
+        setPhotoUrlMap(urlMap);
         const family = (familyData.families || []).find(
           (f: { id: string }) => f.id === familyId
         );
@@ -158,7 +170,7 @@ export default function StoryPage() {
   }
 
   return (
-    <div className="min-h-screen px-6 pt-8 pb-32">
+    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-32">
       {shareModal}
 
       {confirmStory && (
@@ -220,7 +232,7 @@ export default function StoryPage() {
       </div>
 
       {/* 标题 */}
-      <div className="text-center mb-10 animate-fade-in-up">
+      <div className="text-center mb-8 animate-fade-in-up">
         <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3">
           家庭记忆
         </p>
@@ -228,7 +240,7 @@ export default function StoryPage() {
           {familyName ? `${familyName}的故事` : '我们的故事'}
         </h1>
         <p className="mt-3 text-sm text-[#B8A898]">
-          共 {stories.length} 个故事 · 基于最新记忆卡可重新生成
+          共 {stories.length} 个故事
         </p>
       </div>
 
@@ -248,9 +260,10 @@ export default function StoryPage() {
             chapter={index + 1}
             title={story.title}
             summary={story.description}
-            timeline={story.timeline || []}
-            connectionAction={story.connection_action || ''}
-            photoCount={story.photos?.length || 0}
+            familyName={familyName}
+            photoUrls={(story.photos || [])
+              .map((id) => photoUrlMap[id])
+              .filter(Boolean)}
             sharing={sharingStoryId === story.id}
             regenerating={regeneratingStoryId === story.id}
             onShare={() => handleSharePoster(story)}

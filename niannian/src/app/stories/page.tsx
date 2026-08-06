@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import SharePosterCard from '@/components/SharePosterCard';
 import { useSharePoster } from '@/hooks/useSharePoster';
 
 interface Story {
@@ -10,15 +11,16 @@ interface Story {
   family_id: string;
   title: string;
   description: string;
+  summary?: string;
   family_name?: string;
   created_at: string;
   photos?: string[];
-  connection_action?: string;
 }
 
 export default function StoriesPage() {
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
+  const [photoUrlsByStory, setPhotoUrlsByStory] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sharingId, setSharingId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
@@ -34,14 +36,28 @@ export default function StoriesPage() {
       const families = familyData.families || [];
 
       const allStories: Story[] = [];
+      const urlsMap: Record<string, string[]> = {};
+
       for (const family of families) {
-        const storyRes = await fetch(`/api/story?familyId=${family.id}`);
+        const [storyRes, photosRes] = await Promise.all([
+          fetch(`/api/story?familyId=${family.id}`),
+          fetch(`/api/photos?familyId=${family.id}`),
+        ]);
         const storyData = await storyRes.json();
+        const photosData = await photosRes.json();
+        const photoMap = new Map(
+          (photosData.photos || []).map((p: { id: string; url: string }) => [p.id, p.url])
+        );
+
         for (const s of storyData.stories || []) {
           allStories.push({ ...s, family_name: family.name });
+          urlsMap[s.id] = (s.photos || [])
+            .map((id: string) => photoMap.get(id))
+            .filter(Boolean) as string[];
         }
       }
       setStories(allStories);
+      setPhotoUrlsByStory(urlsMap);
     } catch {
       // 静默处理
     } finally {
@@ -49,58 +65,27 @@ export default function StoriesPage() {
     }
   };
 
-  const demoStories: Story[] = [
-    {
-      id: 'demo_s1',
-      family_id: 'demo_1',
-      title: '从牵着你的手，到看你独立成长',
-      description:
-        '这些照片记录的不只是公园，而是一家人陪伴彼此成长的过程。每一张照片背后，都是无法重来的珍贵时光。',
-      family_name: '李家的故事',
-      created_at: '2024-06-20',
-      connection_action:
-        '这些照片已经过去了很久，不妨分享给爷爷和孩子，一起重温那些温暖的时刻。',
-    },
-    {
-      id: 'demo_s2',
-      family_id: 'demo_1',
-      title: '我们一起走过的四季',
-      description:
-        '从春天教骑车，到夏天海边玩沙子，再到秋天公园散步、冬天春节团聚——一年四季都有家人的陪伴。',
-      family_name: '李家的故事',
-      created_at: '2024-06-18',
-      connection_action: '可以把这组"四季"照片发给全家人，看看大家还记得哪些细节。',
-    },
-  ];
-
-  const displayStories = stories.length > 0 ? stories : demoStories;
-  const isDemo = stories.length === 0;
-
   const handleShare = async (story: Story) => {
-    if (isDemo || story.id.startsWith('demo_')) {
-      alert('这是演示故事。请先上传照片并生成真实故事，再分享给家人。');
-      router.push('/');
-      return;
-    }
-
     setSharingId(story.id);
     try {
-      let photoUrls: string[] = [];
-      try {
-        const res = await fetch(`/api/story?storyId=${story.id}`);
-        const data = await res.json();
-        if (res.ok && data.story?.photos_detail) {
-          photoUrls = data.story.photos_detail.map((p: { url: string }) => p.url);
+      let photoUrls = photoUrlsByStory[story.id] || [];
+      if (photoUrls.length === 0) {
+        try {
+          const res = await fetch(`/api/story?storyId=${story.id}`);
+          const data = await res.json();
+          if (res.ok && data.story?.photos_detail) {
+            photoUrls = data.story.photos_detail.map((p: { url: string }) => p.url);
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
 
       await openSharePoster({
         type: 'story',
         storyId: story.id,
         title: story.title,
-        summary: story.description,
+        summary: story.summary || story.description,
         familyName: story.family_name || '',
         photoUrls,
       });
@@ -123,7 +108,7 @@ export default function StoriesPage() {
           <div className="flex justify-center py-20">
             <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
           </div>
-        ) : displayStories.length === 0 ? (
+        ) : stories.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-4">📖</p>
             <p className="text-[#B8A898] mb-2">还没有故事</p>
@@ -137,66 +122,37 @@ export default function StoriesPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {isDemo && (
-              <p className="text-xs text-center text-[#B8A898] bg-[#FFF8F0] rounded-xl py-2 px-3 border border-[#F0DCC8]">
-                以下为演示故事 · 上传照片后可生成并分享真实故事
-              </p>
-            )}
-            {displayStories.map((story) => (
-              <div
-                key={story.id}
-                className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8DCC8]"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <p className="text-xs text-[#D98A45] mb-1">{story.family_name}</p>
-                    <h3 className="text-lg font-serif text-[#4B3B2F] font-medium leading-snug">
-                      {story.title}
-                    </h3>
-                  </div>
-                </div>
-                <p className="text-sm text-[#8B7355] leading-relaxed mb-3">{story.description}</p>
-                {story.connection_action && (
-                  <div className="bg-[#FFF8F0] rounded-xl p-3 text-xs text-[#8B7355] mb-3">
-                    💡 {story.connection_action}
-                  </div>
-                )}
-                <div className="flex flex-wrap items-center gap-3">
+          <div className="space-y-8 max-w-md mx-auto">
+            {stories.map((story) => (
+              <div key={story.id}>
+                <SharePosterCard
+                  type="story"
+                  title={story.title}
+                  summary={story.summary || story.description}
+                  familyName={story.family_name || ''}
+                  photoUrls={photoUrlsByStory[story.id] || []}
+                />
+
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => handleShare(story)}
                     disabled={sharingId === story.id}
-                    className="px-4 py-2.5 rounded-xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98]"
+                    className="flex-1 min-w-[120px] py-3 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all"
                   >
                     {sharingId === story.id ? '生成中…' : '💬 分享给家人'}
                   </button>
-                  {!isDemo && story.family_id && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/stories/${story.id}`)}
-                        className="px-4 py-2.5 rounded-xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
-                      >
-                        章节详情
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(
-                            `/family/${story.family_id}/story?storyId=${story.id}`
-                          )
-                        }
-                        className="px-4 py-2.5 rounded-xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
-                      >
-                        家庭故事页
-                      </button>
-                    </>
-                  )}
-                  <span className="text-xs text-[#D8CCB8] ml-auto">
-                    {story.created_at?.slice(0, 10)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/stories/${story.id}`)}
+                    className="px-4 py-3 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
+                  >
+                    章节详情
+                  </button>
                 </div>
+                <p className="text-xs text-[#D8CCB8] text-center mt-2">
+                  {story.created_at?.slice(0, 10)}
+                </p>
               </div>
             ))}
           </div>

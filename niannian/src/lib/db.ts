@@ -692,7 +692,7 @@ export function getShareByCode(shareCode: string) {
   const storyRow = database
     .prepare(
       `SELECT s.*, st.title as story_title, st.description as story_description,
-              st.photos as story_photos, st.connection_action, st.timeline as story_timeline,
+              st.summary as story_summary, st.photos as story_photos, st.connection_action, st.timeline as story_timeline,
               st.family_id, f.name as family_name
        FROM shares s
        JOIN stories st ON s.story_id = st.id
@@ -715,6 +715,7 @@ export function getShareByCode(shareCode: string) {
   return {
     share_type: 'story' as const,
     ...storyRow,
+    summary: storyRow.story_summary || storyRow.story_description || '',
     story_photos: photoIds,
     photo_urls,
     story_timeline: JSON.parse(storyRow.story_timeline || '[]'),

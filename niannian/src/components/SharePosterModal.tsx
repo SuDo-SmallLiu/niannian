@@ -7,6 +7,7 @@ import {
   sharePosterNative,
   type PosterInput,
 } from '@/lib/share-poster';
+import { posterFilename, saveOrSharePoster } from '@/lib/share-poster-utils';
 
 interface SharePosterModalProps {
   open: boolean;
@@ -18,12 +19,39 @@ export default function SharePosterModal({ open, onClose, poster }: SharePosterM
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [saveHint, setSaveHint] = useState('');
+  const [autoHandled, setAutoHandled] = useState(false);
+
+  const filename = poster ? posterFilename(poster.type) : '';
+
+  const handleSave = useCallback(async () => {
+    if (!posterUrl || !poster) return;
+    const result = await saveOrSharePoster(posterUrl, poster.title, filename);
+    if (result === 'shared') {
+      setSaveHint('已打开分享，请选择微信发送');
+    } else if (result === 'downloaded') {
+      setSaveHint('海报已保存，可在相册或下载中找到');
+    } else {
+      setSaveHint('请长按海报图片保存到相册');
+    }
+  }, [posterUrl, poster, filename]);
+
+  const handleWeChatShare = async () => {
+    if (!posterUrl || !poster) return;
+    const ok = await sharePosterNative(posterUrl, poster.title);
+    if (ok) {
+      setSaveHint('已打开分享，请选择微信');
+    } else {
+      await handleSave();
+    }
+  };
 
   const buildPoster = useCallback(async () => {
     if (!poster) return;
     setGenerating(true);
     setError('');
+    setSaveHint('');
+    setAutoHandled(false);
     try {
       const url = await generateSharePoster(poster);
       setPosterUrl(url);
@@ -41,109 +69,94 @@ export default function SharePosterModal({ open, onClose, poster }: SharePosterM
     }
   }, [open, poster, buildPoster]);
 
+  useEffect(() => {
+    if (!posterUrl || !poster || autoHandled) return;
+    setAutoHandled(true);
+    void (async () => {
+      const result = await saveOrSharePoster(posterUrl, poster.title, filename);
+      if (result === 'shared') {
+        setSaveHint('已打开分享，请选择微信发送');
+      } else if (result === 'downloaded') {
+        setSaveHint('海报已自动保存');
+      } else {
+        setSaveHint('长按海报可保存到相册');
+      }
+    })();
+  }, [posterUrl, poster, filename, autoHandled]);
+
   if (!open || !poster) return null;
 
-  const filename =
-    poster.type === 'story'
-      ? `念念年年-故事-${Date.now()}.png`
-      : `念念年年-记忆-${Date.now()}.png`;
-
-  const handleSave = () => {
-    if (posterUrl) downloadPoster(posterUrl, filename);
-  };
-
-  const handleNativeShare = async () => {
-    if (!posterUrl) return;
-    const ok = await sharePosterNative(posterUrl, poster.title);
-    if (!ok) handleSave();
-  };
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(poster.shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError('复制失败');
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-
-      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-[#F8F4ED] rounded-t-3xl sm:rounded-3xl mx-auto animate-fade-in-up">
-        <div className="sticky top-0 bg-[#F8F4ED] px-5 pt-5 pb-3 border-b border-[#E8DCC8] flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-serif text-[#4B3B2F]">分享海报</h3>
-            <p className="text-xs text-[#B8A898] mt-0.5">保存后发送到微信</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white border border-[#E8DCC8] text-[#8B7355] text-sm"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-5">
-          {generating && (
-            <div className="flex flex-col items-center py-16">
-              <div className="w-10 h-10 border-2 border-[#E8DCC8] border-t-[#D98A45] rounded-full animate-spin mb-4" />
-              <p className="text-sm text-[#B8A898]">正在生成海报…</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="text-center py-8">
-              <p className="text-sm text-red-500 mb-4">{error}</p>
-              <button
-                onClick={buildPoster}
-                className="px-4 py-2 rounded-xl bg-[#D98A45] text-white text-sm"
-              >
-                重试
-              </button>
-            </div>
-          )}
-
-          {posterUrl && !generating && (
-            <>
-              <div className="rounded-2xl overflow-hidden shadow-lg border border-[#E8DCC8] mb-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={posterUrl} alt="分享海报" className="w-full block" />
-              </div>
-
-              <div className="bg-[#FFF8F0] rounded-xl p-3 mb-4 border border-[#F0DCC8]">
-                <p className="text-xs text-[#8B7355] leading-relaxed">
-                  💬 <strong>微信分享：</strong>保存海报 → 打开微信 → 选择好友或朋友圈 → 发送图片
-                </p>
-              </div>
-
-              <div className="flex gap-2 mb-3">
-                <button
-                  onClick={handleSave}
-                  className="flex-1 py-3.5 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-colors"
-                >
-                  📥 保存海报
-                </button>
-                <button
-                  onClick={handleNativeShare}
-                  className="flex-1 py-3.5 rounded-2xl border border-[#D98A45] text-[#D98A45] text-sm font-medium hover:bg-[#FFF8F0] transition-colors"
-                >
-                  📤 系统分享
-                </button>
-              </div>
-
-              <button
-                onClick={handleCopyLink}
-                className="w-full py-3 rounded-xl bg-white border border-[#E8DCC8] text-sm text-[#8B7355] hover:border-[#D98A45]/40 transition-colors"
-              >
-                {copied ? '✓ 链接已复制' : '🔗 复制查看链接'}
-              </button>
-            </>
-          )}
-        </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/90">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
+        <p className="text-white/80 text-sm">分享海报</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-9 h-9 rounded-full bg-white/10 text-white text-sm"
+        >
+          ✕
+        </button>
       </div>
+
+      <div className="flex-1 overflow-y-auto px-4 flex items-center justify-center min-h-0">
+        {generating && (
+          <div className="flex flex-col items-center py-16">
+            <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin mb-4" />
+            <p className="text-sm text-white/70">正在生成海报…</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-sm text-red-300 mb-4">{error}</p>
+            <button
+              type="button"
+              onClick={buildPoster}
+              className="px-4 py-2 rounded-xl bg-[#D98A45] text-white text-sm"
+            >
+              重试
+            </button>
+          </div>
+        )}
+
+        {posterUrl && !generating && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={posterUrl}
+            alt="分享海报"
+            className="w-full max-w-sm rounded-2xl shadow-2xl select-none touch-manipulation"
+            onContextMenu={(e) => e.preventDefault()}
+          />
+        )}
+      </div>
+
+      {posterUrl && !generating && (
+        <div className="shrink-0 px-4 pb-6 pt-3 safe-area-pb">
+          {saveHint && (
+            <p className="text-center text-xs text-white/60 mb-3">{saveHint}</p>
+          )}
+          <div className="flex gap-2 max-w-sm mx-auto">
+            <button
+              type="button"
+              onClick={handleWeChatShare}
+              className="flex-1 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium"
+            >
+              分享到微信
+            </button>
+            <button
+              type="button"
+              onClick={() => posterUrl && downloadPoster(posterUrl, filename)}
+              className="flex-1 py-3.5 rounded-2xl bg-[#D98A45] text-white text-sm font-medium"
+            >
+              保存到相册
+            </button>
+          </div>
+          <p className="text-center text-[11px] text-white/40 mt-3">
+            也可长按海报图片保存
+          </p>
+        </div>
+      )}
     </div>
   );
 }
