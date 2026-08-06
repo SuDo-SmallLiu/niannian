@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import { type PhotoSourceFacts, buildSourceFactsPrompt } from '@/lib/google-photos-metadata';
 import {
   type AffectUnderstanding,
@@ -7,24 +6,18 @@ import {
   normalizeUnderstanding,
   normalizeChangeDetail,
 } from '@/lib/affect-theory';
+import { AiServiceError, formatAiError } from '@/lib/ai-errors';
+import { chatWithKeyAndModelFallback, extractAssistantText, extractJsonBlob, getApiKeyChain, getTextModelChain, getVisionModelChain } from '@/lib/ai-model-fallback';
 
-// 创建 OpenAI 兼容客户端（火山引擎 Ark / 其他兼容 API）
-function getClient(): OpenAI | null {
-  const apiKey = process.env.ARK_API_KEY;
-  const baseURL = process.env.ARK_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3';
+export { AiServiceError } from '@/lib/ai-errors';
 
-  if (!apiKey) {
-    console.warn('⚠️ ARK_API_KEY 未配置，将使用演示模式');
-    return null;
-  }
-
-  console.log(`🔗 使用火山引擎 Ark API: ${baseURL}`);
-  return new OpenAI({ apiKey, baseURL });
+export function isAiConfigured(): boolean {
+  return getApiKeyChain().length > 0;
 }
 
-// 模型名称配置
-const VISION_MODEL = process.env.ARK_VISION_MODEL || 'doubao-vision-pro-32k';
-const TEXT_MODEL = process.env.ARK_TEXT_MODEL || 'doubao-pro-32k';
+// 模型链：主模型额度用尽时自动尝试备用（见 ARK_*_MODEL_FALLBACKS）
+const VISION_MODELS = getVisionModelChain();
+const TEXT_MODELS = getTextModelChain();
 
 // ============================================================
 // Step 1: 图片理解 — AI提取人物、场景、行为、时间
@@ -80,23 +73,36 @@ function buildSupplementPrompt(supplement: UserSupplementContext): string {
 export async function analyzePhoto(
   imageBase64: string,
   sourceFacts?: PhotoSourceFacts,
-  supplement?: UserSupplementContext
+  supplement?: UserSupplementContext,
+  options?: { allowDemo?: boolean; mimeType?: string; familyName?: string }
 ): Promise<PhotoAnalysis> {
-  const client = getClient();
-
-  if (!client) {
-    return getMockPhotoAnalysis(sourceFacts);
+  if (!isAiConfigured()) {
+    if (options?.allowDemo !== false) {
+      console.warn('⚠️ 演示模式：返回样例数据（未配置 ARK_API_KEY）');
+      return getMockPhotoAnalysis(sourceFacts);
+    }
+    throw new AiServiceError('未配置 ARK_API_KEY，无法调用 AI 解析');
   }
 
+  const mimeType = options?.mimeType || 'image/jpeg';
+
   const sourceContext = sourceFacts ? `\n\n${buildSourceFactsPrompt(sourceFacts)}\n` : '';
+  const familyContext = options?.familyName
+    ? `\n\n相册名称：${options.familyName}（可作为关系线索；画面与用户补充优先，勿编造亲属关系）`
+    : '';
 
   const affectPrompt = buildAffectTheoryPrompt();
 
   const supplementContext = supplement ? buildSupplementPrompt(supplement) : '';
+  const useCompactPrompt = (process.env.ARK_BASE_URL || '').includes('cucloud');
 
-  const prompt = `你是一位家庭记忆整理师，熟悉情动理论（DH2012 + Russell 环形模型）。
-请分析这张家庭照片，生成一张「记忆卡」。
-${sourceContext}${supplementContext}
+  const prompt = useCompactPrompt
+    ? `分析这张照片，生成记忆卡。${familyContext}${sourceContext}${supplementContext}
+只返回JSON（人物用简短中文，不确定关系时用外貌描述，不要编造爷爷/爸爸等）：
+{"people":[],"scene":"","action":"","time":"","tags":[],"understanding":{"archetype":"","valence":"positive","arousal":"medium","quadrant":"","indicators":[],"emotions":[],"confidence":"medium"},"changeDetail":{"transitions":[],"summary":""},"significance":"","layeredTags":{"objective":[],"behavior":[],"change":[],"family_value":[]}}`
+    : `你是一位家庭记忆整理师，熟悉情动理论（DH2012 + Russell 环形模型）。
+请分析这张照片，生成一张「记忆卡」。
+${familyContext}${sourceContext}${supplementContext}
 ${affectPrompt}
 
 请以JSON格式返回（只返回JSON，不要其他内容）：
@@ -142,43 +148,93 @@ ${affectPrompt}
 3. change（变化）：变化类型 + 人生阶段 + 情动位移（从 changeDetail 提取）
 4. family_value（主题价值）：爱与滋养、冒险成长、创造玩乐、传承根基
 
-注意：不确定的信息标注"未知"或"可能"，不要编造。`;
+注意：不确定的信息标注"未知"或"可能"，不要编造。
+人物识别规则：
+- 无法确认身份时，用外貌/年龄段描述（如「中年男性」「穿红裙的女孩」），不要臆测「爷爷/孙子/爸爸」等亲属关系
+- 只有画面或用户补充明确显示关系时，才使用具体称呼
+- 人物数量以画面实际为准，不要凑典型家庭组合`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: VISION_MODEL,
+    const { response } = await chatWithKeyAndModelFallback(VISION_MODELS, {
       messages: [
+        {
+          role: 'system',
+          content: '你是家庭记忆整理师。只输出合法 JSON，不要输出思考过程或 markdown。',
+        },
         {
           role: 'user',
           content: [
             { type: 'text', text: prompt },
             {
               type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
+              image_url: { url: `data:${mimeType};base64,${imageBase64}` },
             },
           ],
         },
       ],
-      max_tokens: 800,
-      temperature: 0.7,
-    });
+      max_tokens: 2000,
+      temperature: 0.3,
+    }, { kind: 'vision' });
 
-    const text = response.choices[0]?.message?.content?.trim() || '';
-    // 尝试提取JSON
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      return normalizePhotoAnalysis(result);
+    const text = extractAssistantText(response.choices[0]?.message || {});
+    const jsonBlob = extractJsonBlob(text) || text.match(/\{[\s\S]*\}/)?.[0];
+    if (jsonBlob) {
+      try {
+        const result = JSON.parse(jsonBlob);
+        return normalizePhotoAnalysis(result);
+      } catch (parseErr) {
+        console.error('JSON 解析失败，原始片段:', jsonBlob.slice(0, 300), parseErr);
+      }
     }
+    throw new AiServiceError('AI 返回格式无效，请重试');
   } catch (error) {
+    if (error instanceof AiServiceError) throw error;
     console.error('图片分析失败:', error);
+    throw formatAiError(error);
   }
+}
 
-  return getMockPhotoAnalysis(sourceFacts);
+function normalizeTagItems(items: unknown): Array<{ key: string; value: string }> {
+  if (!Array.isArray(items)) return [];
+  const normalized: Array<{ key: string; value: string }> = [];
+  for (const item of items) {
+    if (typeof item === 'string' && item.trim()) {
+      normalized.push({ key: '标签', value: item.trim() });
+      continue;
+    }
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const value = String(row.value || row.name || row.text || row.label || '').trim();
+    if (!value) continue;
+    const key = String(row.key || row.type || row.category || '标签').trim() || '标签';
+    normalized.push({ key, value });
+  }
+  return normalized;
+}
+
+function normalizePeople(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((p) => {
+    if (typeof p === 'string') return p;
+    if (p && typeof p === 'object') {
+      const o = p as Record<string, unknown>;
+      const parts = [o.name, o.role, o.appearance, o.description].filter(
+        (v) => typeof v === 'string' && v.trim()
+      ) as string[];
+      return parts[0] || parts.join('·') || '未知人物';
+    }
+    return String(p);
+  });
 }
 
 function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis {
-  const layered = (result.layeredTags || {}) as Record<string, Array<{ key: string; value: string }>>;
+  const layeredRaw = (result.layeredTags || {}) as Record<string, unknown>;
+  const layered = {
+    objective: normalizeTagItems(layeredRaw.objective),
+    behavior: normalizeTagItems(layeredRaw.behavior),
+    change: normalizeTagItems(layeredRaw.change),
+    family_value: normalizeTagItems(layeredRaw.family_value),
+  };
   const understanding = normalizeUnderstanding(
     (result.understanding as Record<string, unknown>) || {
       emotions: result.emotions,
@@ -211,7 +267,7 @@ function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis 
   }
 
   return {
-    people: (result.people as string[]) || [],
+    people: normalizePeople(result.people),
     scene: (result.scene as string) || '未知',
     action: (result.action as string) || '未知',
     time: (result.time as string) || '未知',
@@ -224,10 +280,10 @@ function normalizePhotoAnalysis(result: Record<string, unknown>): PhotoAnalysis 
     understanding,
     changeDetail,
     layeredTags: {
-      objective: layered.objective || [],
-      behavior: layered.behavior || [],
+      objective: layered.objective,
+      behavior: layered.behavior,
       change: changeTags,
-      family_value: layered.family_value || [],
+      family_value: layered.family_value,
     },
   };
 }
@@ -242,6 +298,7 @@ export interface PhotoQuestionContext {
   action: string;
   significance: string;
   archetype?: string;
+  userNotes?: string;
 }
 
 const DEFAULT_QUESTION_POOL = [
@@ -261,10 +318,9 @@ function pickRandomQuestions(count: number): string[] {
 export async function generatePhotoQuestions(
   context: PhotoQuestionContext
 ): Promise<Array<{ question: string }>> {
-  const client = getClient();
   const count = 2 + Math.floor(Math.random() * 2); // 2–3
 
-  if (!client) {
+  if (!isAiConfigured()) {
     return pickRandomQuestions(count).map((question) => ({ question }));
   }
 
@@ -277,6 +333,7 @@ export async function generatePhotoQuestions(
 - 动作：${context.action || '未知'}
 - 意义：${context.significance || '未知'}
 ${context.archetype ? `- 情动构型：${context.archetype}` : ''}
+${context.userNotes ? `- 用户已补充：${context.userNotes}` : ''}
 
 请以 JSON 数组返回（只返回 JSON）：
 [{"question": "问题1"}, {"question": "问题2"}]
@@ -284,17 +341,17 @@ ${context.archetype ? `- 情动构型：${context.archetype}` : ''}
 要求：
 - 每个问题一句话，口语化
 - 不要重复问同一件事
+- 不要问拍摄时间、地点、人物（页面已有固定引导）
 - 优先问「发生了什么」「为什么拍」「后来怎样」类问题`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: TEXT_MODEL,
+    const { response } = await chatWithKeyAndModelFallback(TEXT_MODELS, {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 400,
       temperature: 0.8,
-    });
+    }, { kind: 'text' });
 
-    const text = response.choices[0]?.message?.content?.trim() || '';
+    const text = extractAssistantText(response.choices[0]?.message || {});
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       const items = JSON.parse(jsonMatch[0]) as Array<{ question: string }>;
@@ -362,21 +419,27 @@ export async function generateFamilyStory(
     action: string;
     time: string;
     tags: string[];
+    significance?: string;
+    userNotes?: string;
   }>,
   relations: PhotoRelation[]
 ): Promise<StoryOutput> {
-  const client = getClient();
-
-  if (!client) {
+  if (!isAiConfigured()) {
     return getMockStory(familyName, members, photos, relations);
   }
 
   // 构建照片摘要
   const photoSummaries = photos
-    .map(
-      (p, i) =>
-        `照片${i + 1}：人物[${p.people.join('、')}]，场景"${p.scene}"，行为"${p.action}"，时间"${p.time}"，标签[${p.tags.join('、')}]`
-    )
+    .map((p, i) => {
+      const extras = [
+        p.significance ? `意义"${p.significance}"` : '',
+        p.userNotes ? `用户补充"${p.userNotes}"` : '',
+      ]
+        .filter(Boolean)
+        .join('，');
+      const suffix = extras ? `，${extras}` : '';
+      return `照片${i + 1}：人物[${p.people.join('、')}]，场景"${p.scene}"，行为"${p.action}"，时间"${p.time}"，标签[${p.tags.join('、')}]${suffix}`;
+    })
     .join('\n');
 
   // 构建人物关系摘要
@@ -416,14 +479,13 @@ ${relationSummary || '暂无明显的共同人物关系'}
 6. 不要夸张，不要煽情过度`;
 
   try {
-    const response = await client.chat.completions.create({
-      model: TEXT_MODEL,
+    const { response } = await chatWithKeyAndModelFallback(TEXT_MODELS, {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 1500,
       temperature: 0.8,
-    });
+    }, { kind: 'text' });
 
-    const text = response.choices[0]?.message?.content?.trim() || '';
+    const text = extractAssistantText(response.choices[0]?.message || {});
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);

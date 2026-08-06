@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { loadEnvConfig } from "@next/env";
+
+loadEnvConfig(process.cwd(), true);
 
 const nextConfig: NextConfig = {
   // 允许上传大文件 (最大 20MB)

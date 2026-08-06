@@ -43,8 +43,10 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - Node.js 20+（含 `npm`）
 - 能访问 GitHub 仓库（拉取代码）
 - 运行时需要以下环境变量（本地开发放 `.env.local`，服务器放同级环境变量）：
-  - `ARK_API_KEY`：火山引擎 Ark API Key（不填则进入演示模式，AI 返回模拟数据）
+  - `ARK_API_KEY`：火山引擎 Ark API Key（不填则进入演示模式）
+  - `ARK_API_KEY_FALLBACK`：备用 API Key，主 Key 无效或额度用尽时自动切换
   - `ARK_BASE_URL` / `ARK_VISION_MODEL` / `ARK_TEXT_MODEL`：可选，有默认值
+  - `ARK_VISION_MODEL_FALLBACKS` / `ARK_TEXT_MODEL_FALLBACKS`：逗号分隔的备用模型，主模型额度用尽时自动切换
   - `DATABASE_PATH`：可选，默认 `./data/niannian.db`
 - 上传目录 `public/uploads/` 与数据库 `data/` 需要可写权限
 

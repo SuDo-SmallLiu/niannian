@@ -1,17 +1,19 @@
-import { readFileSync } from 'fs';
 import path from 'path';
-import { analyzePhoto, type PhotoAnalysis } from '@/lib/ai';
+import { analyzePhoto, isAiConfigured, type PhotoAnalysis } from '@/lib/ai';
+import { prepareImageForVision } from '@/lib/prepare-image-for-ai';
 import {
   type PhotoSourceFacts,
   sourceFactsToTags,
 } from '@/lib/google-photos-metadata';
 import {
   getPhoto,
+  getFamily,
   getMemoryCardByPhoto,
   updatePhotoAnalysis,
   upsertMemoryCard,
   saveTagsForPhoto,
 } from '@/lib/db';
+import { regenerateMemoryCardQuestions } from '@/lib/memory-card-questions';
 
 const LAYER_MAP: Record<string, number> = {
   objective: 1,
@@ -46,7 +48,7 @@ export function saveMemoryCardFromAnalysis(
     significance: analysis.significance || sourceFacts?.description || '',
     understanding: analysis.understanding,
     change_detail: analysis.changeDetail,
-    user_notes: existing?.user_notes || sourceFacts?.description || undefined,
+    user_notes: existing?.user_notes?.trim() ? existing.user_notes : undefined,
     voice_transcript: existing?.voice_transcript || undefined,
     ai_questions: existing?.ai_questions || undefined,
     analysis_status: 'analyzed',
@@ -64,9 +66,11 @@ export function saveMemoryCardFromAnalysis(
     const layer = LAYER_MAP[layerName];
     if (!layer || !items) continue;
     for (const item of items) {
+      if (!item?.value) continue;
+      const key = item.key || '标签';
       const dup = tags.some((t) => t.layer === layer && t.value === item.value);
       if (!dup) {
-        tags.push({ photo_id: photoId, layer, key: item.key, value: item.value });
+        tags.push({ photo_id: photoId, layer, key, value: item.value });
       }
     }
   }
@@ -83,10 +87,10 @@ export async function analyzeAndSavePhoto(
   }
 
   const existingCard = getMemoryCardByPhoto(photoId);
+  const family = getFamily(photo.family_id);
 
   const filePath = path.join(process.cwd(), 'public', photo.url);
-  const fileBuffer = readFileSync(filePath);
-  const base64 = fileBuffer.toString('base64');
+  const { base64, mimeType } = await prepareImageForVision(filePath);
 
   const sourceFacts =
     photo.source_type === 'google_photos' && photo.source_metadata
@@ -110,7 +114,11 @@ export async function analyzeAndSavePhoto(
     }
   }
 
-  const analysis = await analyzePhoto(base64, sourceFacts, supplement);
+  const analysis = await analyzePhoto(base64, sourceFacts, supplement, {
+    allowDemo: !isAiConfigured(),
+    mimeType,
+    familyName: family?.name,
+  });
 
   updatePhotoAnalysis(photo.id, {
     people: mergePeople(analysis.people, sourceFacts?.people),
@@ -123,6 +131,8 @@ export async function analyzeAndSavePhoto(
   saveMemoryCardFromAnalysis(photo.family_id, photo.id, analysis, sourceFacts, {
     preserveUserNotes: true,
   });
+
+  await regenerateMemoryCardQuestions(photo.id);
 
   return analysis;
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { FIXED_SUPPLEMENT_QUESTIONS } from '@/lib/supplement-questions';
 
 export interface AiQuestion {
   id: string;
@@ -11,45 +12,72 @@ export interface AiQuestion {
 
 interface UserSupplementPanelProps {
   photoId: string;
-  initialNotes?: string;
-  initialVoice?: string;
-  initialQuestions?: AiQuestion[];
+  notes: string;
+  onNotesChange: (notes: string) => void;
+  questions: AiQuestion[];
+  onQuestionsChange: (questions: AiQuestion[]) => void;
+  integratedSummary?: {
+    people: string[];
+    location: string;
+    taken_at: string;
+    significance: string;
+  } | null;
   disabled?: boolean;
-  onUpdated: (data: {
+  onSaved: (data: {
     user_notes: string;
     voice_transcript: string;
     ai_questions: AiQuestion[];
   }) => void;
+  onReanalyzed: (data: {
+    photo: unknown;
+    memoryCard: unknown;
+    tags: unknown;
+    familyName?: string;
+  }) => void;
+}
+
+export async function saveMemoryCardSupplement(
+  photoId: string,
+  notes: string,
+  questions: AiQuestion[]
+): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> {
+  const res = await fetch('/api/memory-card', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      photoId,
+      user_notes: notes.trim(),
+      voice_transcript: '',
+      ai_questions: questions,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    return { ok: false, error: data.error || '保存失败' };
+  }
+  return { ok: true, data };
 }
 
 export default function UserSupplementPanel({
   photoId,
-  initialNotes = '',
-  initialVoice = '',
-  initialQuestions = [],
+  notes,
+  onNotesChange,
+  questions,
+  onQuestionsChange,
+  integratedSummary,
   disabled = false,
-  onUpdated,
+  onSaved,
+  onReanalyzed,
 }: UserSupplementPanelProps) {
-  const [userNotes, setUserNotes] = useState(initialNotes);
-  const [voiceTranscript, setVoiceTranscript] = useState(initialVoice);
-  const [questions, setQuestions] = useState<AiQuestion[]>(initialQuestions);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [message, setMessage] = useState('');
   const [dirty, setDirty] = useState(false);
 
-  const notesVoice = useSpeechRecognition();
-  const supplementVoice = useSpeechRecognition();
-
-  useEffect(() => {
-    setUserNotes(initialNotes);
-    setVoiceTranscript(initialVoice);
-    setQuestions(initialQuestions);
-  }, [initialNotes, initialVoice, initialQuestions]);
+  const speech = useSpeechRecognition();
 
   const loadQuestions = useCallback(async () => {
-    if (questions.length > 0) return;
     setLoadingQuestions(true);
     try {
       const res = await fetch('/api/memory-card/questions', {
@@ -59,55 +87,40 @@ export default function UserSupplementPanel({
       });
       const data = await res.json();
       if (res.ok && data.ai_questions) {
-        setQuestions(data.ai_questions);
+        onQuestionsChange(data.ai_questions);
       }
     } catch {
-      setMessage('加载提问失败');
+      setMessage('加载引导问题失败');
     } finally {
       setLoadingQuestions(false);
     }
-  }, [photoId, questions.length]);
+  }, [photoId, onQuestionsChange]);
 
   useEffect(() => {
     loadQuestions();
-  }, [loadQuestions]);
+  }, [photoId, loadQuestions]);
 
-  const markDirty = () => setDirty(true);
-
-  const appendVoice = (target: 'notes' | 'supplement', text: string) => {
-    if (target === 'notes') {
-      setUserNotes((prev) => (prev ? `${prev}\n${text}` : text));
-    } else {
-      setVoiceTranscript((prev) => (prev ? `${prev}\n${text}` : text));
-    }
-    markDirty();
-  };
+  useEffect(() => {
+    setDirty(false);
+    setMessage('');
+  }, [photoId]);
 
   const saveSupplement = async (): Promise<boolean> => {
     setSaving(true);
     setMessage('');
     try {
-      const res = await fetch('/api/memory-card', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          photoId,
-          user_notes: userNotes,
-          voice_transcript: voiceTranscript,
-          ai_questions: questions,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage(data.error || '保存失败');
+      const result = await saveMemoryCardSupplement(photoId, notes, questions);
+      if (!result.ok) {
+        setMessage(result.error || '保存失败');
         return false;
       }
+      const data = result.data!;
       setDirty(false);
-      setMessage('已保存补充信息');
-      onUpdated({
-        user_notes: data.memoryCard?.user_notes || userNotes,
-        voice_transcript: data.memoryCard?.voice_transcript || voiceTranscript,
-        ai_questions: data.memoryCard?.ai_questions || questions,
+      setMessage('已保存');
+      onSaved({
+        user_notes: (data.memoryCard as { user_notes?: string })?.user_notes || notes.trim(),
+        voice_transcript: '',
+        ai_questions: (data.memoryCard as { ai_questions?: AiQuestion[] })?.ai_questions || questions,
       });
       return true;
     } catch {
@@ -117,8 +130,6 @@ export default function UserSupplementPanel({
       setSaving(false);
     }
   };
-
-  const handleSave = () => saveSupplement();
 
   const handleReanalyzeWithSupplement = async () => {
     setReanalyzing(true);
@@ -137,14 +148,9 @@ export default function UserSupplementPanel({
         setMessage(data.error || '重新理解失败');
         return;
       }
-      setMessage('已结合补充重新理解');
-      onUpdated({
-        user_notes: data.memoryCard?.user_notes || userNotes,
-        voice_transcript: data.memoryCard?.voice_transcript || voiceTranscript,
-        ai_questions: data.memoryCard?.ai_questions || questions,
-      });
-      // 通知父组件刷新完整数据
-      window.dispatchEvent(new CustomEvent('memory-card-reanalyzed', { detail: data }));
+      setDirty(false);
+      setMessage('已结合补充更新记忆卡');
+      onReanalyzed(data);
     } catch {
       setMessage('重新理解失败，请重试');
     } finally {
@@ -152,117 +158,114 @@ export default function UserSupplementPanel({
     }
   };
 
-  const hasSupplement =
-    userNotes.trim() ||
-    voiceTranscript.trim() ||
-    questions.some((q) => q.answer.trim());
+  const hasSupplement = !!notes.trim();
 
   return (
     <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-      <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-1">用户层 · 补充记忆</h2>
-      <p className="text-xs text-[#B8A898] mb-4">写下或说出 AI 看不到的故事，让记忆更完整</p>
+      <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-2">用户层 · 补充记忆</h2>
 
-      {/* 文字补充 */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-xs text-[#B8A898]">文字补充</p>
-          {notesVoice.supported && (
-            <button
-              type="button"
-              onClick={() =>
-                notesVoice.start((text) => appendVoice('notes', text))
-              }
-              disabled={disabled || reanalyzing}
-              className={`text-xs px-2 py-1 rounded-lg transition-all ${
-                notesVoice.listening
-                  ? 'bg-[#D98A45] text-white animate-pulse'
-                  : 'bg-[#FFF8F0] text-[#D98A45] border border-[#F0DCC8]'
-              }`}
-            >
-              {notesVoice.listening ? '聆听中…' : '🎤 语音输入'}
-            </button>
-          )}
-        </div>
-        <textarea
-          value={userNotes}
-          onChange={(e) => {
-            setUserNotes(e.target.value);
-            markDirty();
-          }}
-          disabled={disabled || reanalyzing}
-          placeholder="例如：当时孩子非要抢爸爸的冰淇淋…"
-          rows={3}
-          className="w-full px-3 py-2.5 rounded-xl bg-[#FFF8F0] border border-[#F0DCC8] text-sm text-[#4B3B2F] placeholder:text-[#D8CCB8] focus:outline-none focus:border-[#D98A45]/50 resize-none"
-        />
-      </div>
-
-      {/* 语音转写 */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-xs text-[#B8A898]">语音转写</p>
-          {supplementVoice.supported && (
-            <button
-              type="button"
-              onClick={() =>
-                supplementVoice.start((text) => appendVoice('supplement', text))
-              }
-              disabled={disabled || reanalyzing}
-              className={`text-xs px-2 py-1 rounded-lg transition-all ${
-                supplementVoice.listening
-                  ? 'bg-[#D98A45] text-white animate-pulse'
-                  : 'bg-[#FFF8F0] text-[#D98A45] border border-[#F0DCC8]'
-              }`}
-            >
-              {supplementVoice.listening ? '聆听中…' : '🎤 说一段回忆'}
-            </button>
-          )}
-        </div>
-        <textarea
-          value={voiceTranscript}
-          onChange={(e) => {
-            setVoiceTranscript(e.target.value);
-            markDirty();
-          }}
-          disabled={disabled || reanalyzing}
-          placeholder="语音会自动转成文字，也可手动编辑"
-          rows={2}
-          className="w-full px-3 py-2.5 rounded-xl bg-[#FFF8F0] border border-[#F0DCC8] text-sm text-[#4B3B2F] placeholder:text-[#D8CCB8] focus:outline-none focus:border-[#D98A45]/50 resize-none"
-        />
-      </div>
-
-      {/* AI 提问 */}
-      <div className="mb-4">
-        <p className="text-xs text-[#B8A898] mb-2">AI 引导提问</p>
-        {loadingQuestions ? (
-          <p className="text-xs text-[#D98A45] animate-pulse">正在生成提问…</p>
-        ) : (
-          <div className="space-y-3">
-            {questions.map((q, i) => (
-              <div key={q.id} className="rounded-xl bg-[#FFF8F0] p-3 border border-[#F0DCC8]">
-                <p className="text-xs text-[#D98A45] font-medium mb-1.5">
-                  {i + 1}. {q.question}
-                </p>
-                <input
-                  type="text"
-                  value={q.answer}
-                  onChange={(e) => {
-                    const next = [...questions];
-                    next[i] = { ...q, answer: e.target.value };
-                    setQuestions(next);
-                    markDirty();
-                  }}
-                  disabled={disabled || reanalyzing}
-                  placeholder="你的回答…"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E8DCC8] text-sm text-[#4B3B2F] placeholder:text-[#D8CCB8] focus:outline-none focus:border-[#D98A45]/50"
-                />
-              </div>
-            ))}
+      {notes.trim() && integratedSummary && (
+        <div className="mb-4 rounded-xl bg-[#F5FFF8] border border-[#D4EDDA] px-4 py-3.5">
+          <p className="text-xs text-[#5A8F6B] mb-2 font-medium">已结合你的补充理解</p>
+          <div className="space-y-1 text-sm text-[#4B3B2F] leading-relaxed">
+            {integratedSummary.people.length > 0 && (
+              <p>
+                <span className="text-[#B8A898]">人物 · </span>
+                {integratedSummary.people.join('、')}
+              </p>
+            )}
+            {integratedSummary.location && (
+              <p>
+                <span className="text-[#B8A898]">地点 · </span>
+                {integratedSummary.location}
+              </p>
+            )}
+            {integratedSummary.taken_at && (
+              <p>
+                <span className="text-[#B8A898]">时间 · </span>
+                {integratedSummary.taken_at}
+              </p>
+            )}
+            {integratedSummary.significance && (
+              <p className="text-[#6B5A48] pt-1">{integratedSummary.significance}</p>
+            )}
           </div>
-        )}
+        </div>
+      )}
+
+      <div className="mb-5 rounded-xl bg-[#FFFBF5] border border-[#F0E6D8] px-4 py-3.5">
+        <p className="text-xs text-[#B8A898] mb-3 leading-relaxed">
+          写下 AI 看不到的故事。可以参考下面的问题：
+        </p>
+        <ul className="space-y-2.5">
+          {FIXED_SUPPLEMENT_QUESTIONS.map((question) => (
+            <li
+              key={question}
+              className="text-sm text-[#6B5A48] leading-relaxed pl-3 border-l-2 border-[#D98A45]/40"
+            >
+              <span className="text-[10px] text-[#D98A45] mr-1.5 align-middle">固定</span>
+              {question}
+            </li>
+          ))}
+          {loadingQuestions ? (
+            <li className="text-xs text-[#D98A45] animate-pulse leading-relaxed pl-3">
+              正在准备更多引导问题…
+            </li>
+          ) : (
+            questions.map((q) => (
+              <li
+                key={q.id}
+                className="text-sm text-[#6B5A48] leading-relaxed pl-3 border-l-2 border-[#E8DCC8]"
+              >
+                {q.question}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs text-[#B8A898]">你的补充</p>
+          {speech.supported && (
+            <button
+              type="button"
+              onClick={() =>
+                speech.start((text) => {
+                  onNotesChange(notes ? `${notes}\n${text}` : text);
+                  setDirty(true);
+                })
+              }
+              disabled={disabled || reanalyzing}
+              className={`text-xs px-2.5 py-1 rounded-lg transition-all ${
+                speech.listening
+                  ? 'bg-[#D98A45] text-white animate-pulse'
+                  : 'bg-[#FFF8F0] text-[#D98A45] border border-[#F0DCC8]'
+              }`}
+            >
+              {speech.listening ? '聆听中…' : '🎤 语音输入'}
+            </button>
+          )}
+        </div>
+        <textarea
+          value={notes}
+          onChange={(e) => {
+            onNotesChange(e.target.value);
+            setDirty(true);
+          }}
+          disabled={disabled || reanalyzing}
+          placeholder="请尽量补充：时间（某年某月某日）、地点（国家/城市/家中/学校）、人物及关系，再加上当时的故事…"
+          rows={5}
+          className="w-full px-3.5 py-3 rounded-xl bg-[#FFF8F0] border border-[#F0DCC8] text-sm text-[#4B3B2F] leading-relaxed placeholder:text-[#D8CCB8] focus:outline-none focus:border-[#D98A45]/50 resize-y min-h-[120px]"
+        />
       </div>
 
       {message && (
-        <p className={`text-xs mb-3 text-center ${message.includes('失败') ? 'text-red-500' : 'text-[#D98A45]'}`}>
+        <p
+          className={`text-xs mb-3 text-center leading-relaxed ${
+            message.includes('失败') ? 'text-red-500' : 'text-[#D98A45]'
+          }`}
+        >
           {message}
         </p>
       )}
@@ -270,11 +273,11 @@ export default function UserSupplementPanel({
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={handleSave}
+          onClick={() => saveSupplement()}
           disabled={disabled || saving || reanalyzing || !dirty}
           className="flex-1 py-3 rounded-xl border border-[#D98A45] text-[#D98A45] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#FFF8F0] transition-colors"
         >
-          {saving ? '保存中…' : '保存补充'}
+          {saving ? '保存中…' : '保存'}
         </button>
         <button
           type="button"

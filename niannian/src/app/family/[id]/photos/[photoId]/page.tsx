@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import UserSupplementPanel, { type AiQuestion } from '@/components/UserSupplementPanel';
+import UserSupplementPanel, {
+  type AiQuestion,
+  saveMemoryCardSupplement,
+} from '@/components/UserSupplementPanel';
 import { useSharePoster } from '@/hooks/useSharePoster';
 
 interface Tag {
@@ -92,14 +95,34 @@ export default function MemoryCardPage() {
   const [loading, setLoading] = useState(true);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [error, setError] = useState('');
+  const [userNotes, setUserNotes] = useState('');
+  const [aiQuestions, setAiQuestions] = useState<AiQuestion[]>([]);
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
+
+  function applyMemoryCardData(result: {
+    photo: MemoryCardDetail['photo'];
+    memoryCard: MemoryCardDetail['memoryCard'];
+    tags: Tag[];
+    familyName?: string;
+  }) {
+    setData((prev) => ({
+      photo: result.photo,
+      memoryCard: result.memoryCard,
+      tags: result.tags,
+      familyName: result.familyName ?? prev?.familyName,
+    }));
+    if (result.memoryCard) {
+      setUserNotes(result.memoryCard.user_notes || '');
+      setAiQuestions(result.memoryCard.ai_questions || []);
+    }
+  }
 
   async function loadData() {
     try {
       const res = await fetch(`/api/memory-card?photoId=${photoId}`);
       const result = await res.json();
       if (res.ok) {
-        setData(result);
+        applyMemoryCardData(result);
         setError('');
       }
     } catch {
@@ -113,43 +136,35 @@ export default function MemoryCardPage() {
     loadData();
   }, [photoId]);
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.photo?.id === photoId) {
-        setData((prev) => ({
-          photo: detail.photo,
-          memoryCard: detail.memoryCard,
-          tags: detail.tags,
-          familyName: detail.familyName ?? prev?.familyName,
-        }));
-        setReanalyzing(false);
-      }
-    };
-    window.addEventListener('memory-card-reanalyzed', handler);
-    return () => window.removeEventListener('memory-card-reanalyzed', handler);
-  }, [photoId]);
-
   async function handleReanalyze() {
     setReanalyzing(true);
     setError('');
     try {
+      if (userNotes.trim()) {
+        const saved = await saveMemoryCardSupplement(photoId, userNotes, aiQuestions);
+        if (!saved.ok) {
+          setError(saved.error || '保存用户补充失败');
+          setReanalyzing(false);
+          return;
+        }
+      }
+
+      const hasSupplement = !!(
+        userNotes.trim() ||
+        (aiQuestions || []).some((q) => q.answer?.trim())
+      );
       const res = await fetch('/api/analyze/photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId }),
+        body: JSON.stringify({ photoId, withSupplement: hasSupplement }),
       });
       const result = await res.json();
       if (!res.ok) {
         setError(result.error || '重新解析失败');
+        setReanalyzing(false);
         return;
       }
-      setData({
-        photo: result.photo,
-        memoryCard: result.memoryCard,
-        tags: result.tags,
-        familyName: result.familyName,
-      });
+      applyMemoryCardData(result);
     } catch {
       setError('重新解析失败，请重试');
     } finally {
@@ -429,11 +444,22 @@ export default function MemoryCardPage() {
           {/* 用户层 · 补充记忆 */}
           <UserSupplementPanel
             photoId={photoId}
-            initialNotes={memoryCard.user_notes || ''}
-            initialVoice={memoryCard.voice_transcript || ''}
-            initialQuestions={memoryCard.ai_questions || []}
+            notes={userNotes}
+            onNotesChange={setUserNotes}
+            questions={aiQuestions}
+            onQuestionsChange={setAiQuestions}
+            integratedSummary={
+              userNotes.trim() && memoryCard
+                ? {
+                    people: memoryCard.people,
+                    location: memoryCard.location,
+                    taken_at: memoryCard.taken_at,
+                    significance: memoryCard.significance,
+                  }
+                : null
+            }
             disabled={reanalyzing}
-            onUpdated={(supplement) => {
+            onSaved={(supplement) => {
               setData((prev) =>
                 prev && prev.memoryCard
                   ? {
@@ -445,6 +471,11 @@ export default function MemoryCardPage() {
                     }
                   : prev
               );
+              setUserNotes(supplement.user_notes);
+              setAiQuestions(supplement.ai_questions);
+            }}
+            onReanalyzed={(result) => {
+              applyMemoryCardData(result as Parameters<typeof applyMemoryCardData>[0]);
             }}
           />
         </div>

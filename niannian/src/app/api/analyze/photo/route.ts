@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMemoryCardWithPhoto } from '@/lib/db';
 import { analyzeAndSavePhoto } from '@/lib/analyze-photo';
+import { AiServiceError } from '@/lib/ai';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'done', ...data });
   } catch (error) {
     console.error('单张重新解析失败:', error);
+    if (error instanceof AiServiceError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 502 });
+    }
     const message = error instanceof Error ? error.message : '解析失败';
     return NextResponse.json({ error: message }, { status: 500 });
   }

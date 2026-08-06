@@ -369,6 +369,35 @@ export function getStory(id: string) {
   };
 }
 
+export function updateStory(
+  storyId: string,
+  data: {
+    title: string;
+    description: string;
+    connectionAction: string;
+    timeline: Array<{ year: string; event: string }>;
+  }
+): boolean {
+  const database = getDb();
+  const result = database
+    .prepare(
+      `UPDATE stories SET
+        title = ?,
+        description = ?,
+        connection_action = ?,
+        timeline = ?
+      WHERE id = ?`
+    )
+    .run(
+      data.title,
+      data.description,
+      data.connectionAction,
+      JSON.stringify(data.timeline),
+      storyId
+    );
+  return result.changes > 0;
+}
+
 // --- Share 操作 ---
 
 export function getOrCreateStoryShare(storyId: string): string {
@@ -795,7 +824,10 @@ export function saveTagsForPhoto(photoId: string, tags: TagData[]): void {
     'INSERT INTO tags (id, photo_id, layer, key, value, source) VALUES (?, ?, ?, ?, ?, ?)'
   );
   for (const tag of tags) {
-    insert.run(generateId(), photoId, tag.layer, tag.key, tag.value, tag.source || 'ai');
+    const key = tag.key?.trim() || '标签';
+    const value = tag.value?.trim();
+    if (!value) continue;
+    insert.run(generateId(), photoId, tag.layer, key, value, tag.source || 'ai');
   }
 }
 
