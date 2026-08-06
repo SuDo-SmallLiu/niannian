@@ -231,6 +231,30 @@ function migrateDatabase(database: Database.Database) {
       FOREIGN KEY (photo_id) REFERENCES photos(id)
     );
     CREATE INDEX IF NOT EXISTS idx_photo_shares_code ON photo_shares(share_code);
+
+    CREATE TABLE IF NOT EXISTS life_movies (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT DEFAULT '',
+      cover_story_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (family_id) REFERENCES families(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_life_movies_family ON life_movies(family_id);
+
+    CREATE TABLE IF NOT EXISTS movie_chapters (
+      id TEXT PRIMARY KEY,
+      movie_id TEXT NOT NULL,
+      story_id TEXT NOT NULL,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      title TEXT DEFAULT '',
+      theme TEXT DEFAULT '',
+      FOREIGN KEY (movie_id) REFERENCES life_movies(id) ON DELETE CASCADE,
+      FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_movie_chapters_movie ON movie_chapters(movie_id, order_index);
   `);
 
   migrateStoriesV1ToV2(database);
@@ -1087,6 +1111,79 @@ export function getTagsByFamily(familyId: string) {
     WHERE p.family_id = ?
     ORDER BY t.layer, t.key
   `).all(familyId) as any[];
+}
+
+// --- Life Movie（Sprint 4）---
+
+export interface LifeMovieRow {
+  id: string;
+  family_id: string;
+  title: string;
+  summary: string;
+  cover_story_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function createLifeMovie(input: {
+  familyId: string;
+  title: string;
+  summary: string;
+  coverStoryId?: string;
+}): string {
+  const id = generateId();
+  const database = getDb();
+  database.prepare(
+    `INSERT INTO life_movies (id, family_id, title, summary, cover_story_id)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(id, input.familyId, input.title, input.summary, input.coverStoryId || null);
+  return id;
+}
+
+export function deleteLifeMoviesByFamily(familyId: string): void {
+  const database = getDb();
+  database.prepare('DELETE FROM life_movies WHERE family_id = ?').run(familyId);
+}
+
+export function getLifeMovie(id: string): LifeMovieRow | null {
+  const database = getDb();
+  return database.prepare('SELECT * FROM life_movies WHERE id = ?').get(id) as LifeMovieRow | null;
+}
+
+export function getLifeMoviesByFamily(familyId: string): LifeMovieRow[] {
+  const database = getDb();
+  return database
+    .prepare('SELECT * FROM life_movies WHERE family_id = ? ORDER BY created_at DESC')
+    .all(familyId) as LifeMovieRow[];
+}
+
+export function setMovieChapters(
+  movieId: string,
+  chapters: Array<{ storyId: string; orderIndex: number; title: string; theme: string }>
+): void {
+  const database = getDb();
+  database.prepare('DELETE FROM movie_chapters WHERE movie_id = ?').run(movieId);
+  const insert = database.prepare(`
+    INSERT INTO movie_chapters (id, movie_id, story_id, order_index, title, theme)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const ch of chapters) {
+    insert.run(generateId(), movieId, ch.storyId, ch.orderIndex, ch.title, ch.theme);
+  }
+}
+
+export function getMovieChapters(movieId: string) {
+  const database = getDb();
+  return database
+    .prepare('SELECT * FROM movie_chapters WHERE movie_id = ? ORDER BY order_index ASC')
+    .all(movieId) as Array<{
+    id: string;
+    movie_id: string;
+    story_id: string;
+    order_index: number;
+    title: string;
+    theme: string;
+  }>;
 }
 
 // --- 工具函数 ---

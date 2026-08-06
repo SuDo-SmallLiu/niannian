@@ -117,21 +117,29 @@ export default function StoryDetailPage() {
     <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-28">
       {shareModal}
 
-      <div className="max-w-md mx-auto flex items-center justify-between mb-8">
+      <div className="max-w-md mx-auto flex items-center justify-between mb-6">
         <Link
           href="/stories"
           className="text-[#B8A898] hover:text-[#8B7355] text-sm transition-colors"
         >
           ← 故事库
         </Link>
-        <button
-          type="button"
-          onClick={handleShare}
-          disabled={sharing}
-          className="px-4 py-2 rounded-xl bg-[#07C160] text-white text-sm font-medium disabled:opacity-50"
-        >
-          {sharing ? '生成中…' : '💬 分享'}
-        </button>
+        <div className="flex gap-2">
+          <Link
+            href={`/stories/${storyId}/play`}
+            className="px-4 py-2 rounded-xl bg-[#D98A45] text-white text-sm font-medium"
+          >
+            ▶ 沉浸播放
+          </Link>
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={sharing}
+            className="px-4 py-2 rounded-xl bg-[#07C160] text-white text-sm font-medium disabled:opacity-50"
+          >
+            {sharing ? '…' : '💬 分享'}
+          </button>
+        </div>
       </div>
 
       <StoryChapterTimeline

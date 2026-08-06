@@ -136,11 +136,18 @@ export default function StoriesPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
+                    onClick={() => router.push(`/stories/${story.id}/play`)}
+                    className="flex-1 min-w-[140px] py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
+                  >
+                    ▶ 沉浸体验
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleShare(story)}
                     disabled={sharingId === story.id}
                     className="flex-1 min-w-[120px] py-3 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all"
                   >
-                    {sharingId === story.id ? '生成中…' : '💬 分享给家人'}
+                    {sharingId === story.id ? '生成中…' : '💬 分享'}
                   </button>
                   <button
                     type="button"

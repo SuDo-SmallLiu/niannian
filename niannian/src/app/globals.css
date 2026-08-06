@@ -156,6 +156,40 @@ body {
 .delay-1000 { animation-delay: 1.0s; }
 .delay-1500 { animation-delay: 1.5s; }
 
+/* H5 沉浸式故事 */
+@keyframes kenBurns {
+  from { transform: scale(1) translate(0, 0); }
+  to { transform: scale(1.12) translate(-2%, -1%); }
+}
+
+@keyframes h5SlideEnter {
+  from { opacity: 0; transform: scale(1.02); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes h5TextEnter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.h5-ken-burns {
+  animation: kenBurns 8s ease-out forwards;
+}
+
+.h5-slide-enter {
+  animation: h5SlideEnter 0.6s ease-out forwards;
+}
+
+.h5-text-enter {
+  opacity: 0;
+  animation: h5TextEnter 0.8s ease-out forwards;
+}
+
+.h5-delay-1 { animation-delay: 0.15s; }
+.h5-delay-2 { animation-delay: 0.3s; }
+.h5-delay-3 { animation-delay: 0.45s; }
+.h5-delay-4 { animation-delay: 0.6s; }
+
 /* 照片淡入 */
 @keyframes photoFadeIn {
   from {

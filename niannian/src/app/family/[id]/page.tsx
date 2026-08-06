@@ -22,7 +22,8 @@ export default function FamilyDetailPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState('');
-  const { confirm, showLoading, hideLoading } = useAppDialog();
+  const [generatingMovie, setGeneratingMovie] = useState(false);
+  const { confirm, showLoading, hideLoading, alert } = useAppDialog();
 
   useEffect(() => {
     async function load() {
@@ -70,6 +71,38 @@ export default function FamilyDetailPage() {
     } finally {
       hideLoading();
       setGenerating(false);
+    }
+  };
+
+  const handleGenerateMovie = async () => {
+    if (!family || generatingMovie) return;
+    const ok = await confirm({
+      title: '生成人生电影？',
+      description: '将把家庭下所有故事按主题串联成一部可播放的 H5 人生电影。',
+      confirmText: '开始生成',
+      cancelText: '取消',
+    });
+    if (!ok) return;
+
+    setGeneratingMovie(true);
+    showLoading('正在编排人生电影', '串联故事章节中…');
+    try {
+      const res = await fetch('/api/movie/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '生成失败');
+      router.push(`/movies/${data.movieId}/play`);
+    } catch (err) {
+      await alert({
+        title: '生成失败',
+        description: err instanceof Error ? err.message : '请稍后重试',
+      });
+    } finally {
+      hideLoading();
+      setGeneratingMovie(false);
     }
   };
 
@@ -166,6 +199,22 @@ export default function FamilyDetailPage() {
           {generateError && (
             <p className="text-xs text-center text-red-500 mt-2">{generateError}</p>
           )}
+        </div>
+      )}
+
+      {(family.story_count || 0) > 0 && (
+        <div className="mb-6 animate-fade-in-up delay-75">
+          <button
+            type="button"
+            onClick={handleGenerateMovie}
+            disabled={generatingMovie}
+            className="w-full rounded-2xl py-4 px-5 bg-[#4B3B2F] text-white font-medium shadow-sm hover:bg-[#3B2F25] disabled:opacity-60 transition-all active:scale-[0.99]"
+          >
+            {generatingMovie ? '正在生成…' : '🎬 生成人生电影（H5 播放）'}
+          </button>
+          <p className="text-xs text-center text-[#B8A898] mt-2">
+            将 {family.story_count} 个故事串联为沉浸式人生电影
+          </p>
         </div>
       )}
 

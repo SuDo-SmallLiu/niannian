@@ -11,6 +11,7 @@ export default function BottomNav() {
       <div className="flex items-center justify-around h-16 px-2">
         <NavItem icon="🏠" label="首页" href="/" pathname={pathname} />
         <NavItem icon="📖" label="故事" href="/stories" pathname={pathname} />
+        <NavItem icon="🎬" label="电影" href="/movies" pathname={pathname} />
         <NavItem icon="👨‍👩‍👧" label="家庭" href="/family" pathname={pathname} />
         <NavItem icon="👤" label="我的" href="/profile" pathname={pathname} />
       </div>
