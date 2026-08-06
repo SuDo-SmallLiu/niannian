@@ -152,19 +152,52 @@ export default function StoryPage() {
     );
   }
 
-  if (error || stories.length === 0) {
+  if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center">
-        <div className="text-5xl mb-4">📭</div>
-        <p className="text-[#8B7355] mb-6">
-          {error || '还没有故事，先上传一些照片吧'}
-        </p>
-        <Link
-          href={`/family/${familyId}/upload`}
-          className="px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm hover:bg-[#C47A3A] transition-colors"
-        >
-          上传照片
+      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center bg-[#F8F4ED]">
+        <p className="text-[#8B7355] mb-6">{error}</p>
+        <Link href={`/family/${familyId}`} className="text-sm text-[#D98A45] underline">
+          返回家庭
         </Link>
+      </div>
+    );
+  }
+
+  if (stories.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-24">
+        <Link href={`/family/${familyId}`} className="text-[#B8A898] text-sm mb-8 inline-block">
+          ← 返回
+        </Link>
+        <div className="text-center mb-10">
+          <div className="text-5xl mb-4">📖</div>
+          <h1 className="text-xl font-serif text-[#4B3B2F] mb-2">
+            {familyName ? `${familyName}的故事` : '家庭故事'}
+          </h1>
+          <p className="text-sm text-[#B8A898]">还没有故事，选择一种方式开始</p>
+        </div>
+        <div className="max-w-sm mx-auto space-y-3">
+          <Link
+            href={`/family/${familyId}/story/compose`}
+            className="block w-full py-4 px-5 rounded-2xl bg-white border-2 border-[#D98A45] text-center shadow-sm"
+          >
+            <p className="text-[#D98A45] font-medium mb-1">🧩 人工组合排列</p>
+            <p className="text-xs text-[#B8A898]">自选照片、调整顺序，生成一个故事</p>
+          </Link>
+          <Link
+            href={`/family/${familyId}`}
+            className="block w-full py-4 px-5 rounded-2xl bg-[#D98A45] text-white text-center shadow-sm"
+          >
+            <p className="font-medium mb-1">✨ AI 自动发现故事</p>
+            <p className="text-xs text-white/80">从全部记忆卡聚类生成 3–5 个主题故事</p>
+          </Link>
+          <Link
+            href={`/family/${familyId}/upload`}
+            className="block w-full py-3 text-center text-sm text-[#B8A898] underline underline-offset-2"
+          >
+            先去上传照片
+          </Link>
+        </div>
       </div>
     );
   }
@@ -251,6 +284,19 @@ export default function StoryPage() {
       {regenerateSuccess && (
         <p className="text-sm text-[#D98A45] text-center mb-4 px-4 py-2 bg-[#FFF8F0] rounded-xl">{regenerateSuccess}</p>
       )}
+
+      <div className="max-w-md mx-auto mb-8">
+        <Link
+          href={`/family/${familyId}/story/compose`}
+          className="flex items-center justify-between w-full py-4 px-5 rounded-2xl bg-white border border-[#E8DCC8] hover:border-[#D98A45]/40 transition-all shadow-sm"
+        >
+          <div className="text-left">
+            <p className="text-sm font-medium text-[#4B3B2F]">🧩 人工组合排列</p>
+            <p className="text-xs text-[#B8A898] mt-0.5">自选照片顺序，生成新故事</p>
+          </div>
+          <span className="text-[#D98A45] text-lg">→</span>
+        </Link>
+      </div>
 
       {/* 章节列表 */}
       <div>

@@ -40,7 +40,6 @@ function toSnapshot(
 }
 
 export interface RunStoryEngineOptions {
-  /** 为 true 时先删除该家庭已有故事再生成 */
   replaceExisting?: boolean;
   maxStories?: number;
 }
@@ -90,37 +89,87 @@ export async function runStoryEngine(
   }
 
   for (const story of composedStories) {
-    const storyId = createStoryV2({
-      familyId,
-      title: story.title,
-      summary: story.summary,
-      theme: story.theme,
-      coverPhotoId: story.coverPhotoId,
-      photoIds: story.memoryCardIds,
-      connectionAction: story.connectionAction,
-      timeline: story.timeline,
-    });
-
-    setStoryMemoryCards(
-      storyId,
-      story.memoryCardIds.map((photoId, orderIndex) => ({
-        photoId,
-        orderIndex,
-      }))
-    );
-
-    createStoryVersion({
-      storyId,
-      version: 1,
-      theme: story.theme,
-      title: story.title,
-      summary: story.summary,
-      content: story.segments,
-      regenMode: 'full',
-    });
+    await saveComposedStory(familyId, story, 'full');
   }
 
   return { stories: composedStories, scenes: selectedScenes };
+}
+
+async function saveComposedStory(
+  familyId: string,
+  story: ComposedStory,
+  regenMode: string
+): Promise<string> {
+  const storyId = createStoryV2({
+    familyId,
+    title: story.title,
+    summary: story.summary,
+    theme: story.theme,
+    coverPhotoId: story.coverPhotoId,
+    photoIds: story.memoryCardIds,
+    connectionAction: story.connectionAction,
+    timeline: story.timeline,
+  });
+
+  setStoryMemoryCards(
+    storyId,
+    story.memoryCardIds.map((photoId, orderIndex) => ({
+      photoId,
+      orderIndex,
+    }))
+  );
+
+  createStoryVersion({
+    storyId,
+    version: 1,
+    theme: story.theme,
+    title: story.title,
+    summary: story.summary,
+    content: story.segments,
+    regenMode,
+  });
+
+  return storyId;
+}
+
+/** 人工选片 + 排序 → 生成一个故事（追加，不覆盖已有） */
+export async function runManualStoryCompose(
+  familyId: string,
+  photoIds: string[]
+): Promise<{ storyId: string; story: ComposedStory }> {
+  if (photoIds.length === 0) {
+    throw new Error('请至少选择一张已解析的照片');
+  }
+
+  const family = getFamily(familyId);
+  if (!family) {
+    throw new Error('家庭不存在');
+  }
+
+  const rows = getAnalyzedMemoryCardsForEngine(familyId);
+  const rowMap = new Map(rows.map((r) => [r.photo_id, r]));
+
+  const cards: MemoryCardSnapshot[] = [];
+  for (const photoId of photoIds) {
+    const row = rowMap.get(photoId);
+    if (!row) {
+      throw new Error('所选照片中包含未解析项，请先完成 AI 解析');
+    }
+    cards.push(toSnapshot(row));
+  }
+
+  const themeResult = deriveTheme(cards);
+  const draft = await composeStory(family.name, themeResult, cards);
+  const coverPhotoId = pickCoverPhoto(cards);
+
+  const composed: ComposedStory = {
+    ...draft,
+    coverPhotoId,
+    memoryCardIds: photoIds,
+  };
+
+  const storyId = await saveComposedStory(familyId, composed, 'reorder');
+  return { storyId, story: composed };
 }
 
 export { clusterMemoryCards } from './cluster';
