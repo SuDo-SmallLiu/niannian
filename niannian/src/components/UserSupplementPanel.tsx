@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { FIXED_SUPPLEMENT_QUESTIONS } from '@/lib/supplement-questions';
 import {
   AccessibleChatPanel,
@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/accessible-chat';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Mic, Square, Loader2 } from 'lucide-react';
 
 export interface AiQuestion {
   id: string;
@@ -45,7 +46,8 @@ interface UserSupplementPanelProps {
 export async function saveMemoryCardSupplement(
   photoId: string,
   notes: string,
-  questions: AiQuestion[]
+  questions: AiQuestion[],
+  voiceTranscript = ''
 ): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> {
   const res = await fetch('/api/memory-card', {
     method: 'PATCH',
@@ -53,7 +55,7 @@ export async function saveMemoryCardSupplement(
     body: JSON.stringify({
       photoId,
       user_notes: notes.trim(),
-      voice_transcript: '',
+      voice_transcript: voiceTranscript.trim(),
       ai_questions: questions,
     }),
   });
@@ -80,8 +82,25 @@ export default function UserSupplementPanel({
   const [reanalyzing, setReanalyzing] = useState(false);
   const [message, setMessage] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const notesRef = useRef(notes);
 
-  const speech = useSpeechRecognition();
+  const voice = useVoiceInput();
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+
+  const appendVoiceText = useCallback(
+    (text: string) => {
+      const current = notesRef.current.trim();
+      onNotesChange(current ? `${current}\n${text}` : text);
+      setVoiceTranscript((prev) => (prev ? `${prev}\n${text}` : text));
+      setDirty(true);
+      setMessage('语音已转为文字');
+    },
+    [onNotesChange]
+  );
 
   const chatMessages = useMemo((): ChatMessage[] => {
     const msgs: ChatMessage[] = [
@@ -89,7 +108,7 @@ export default function UserSupplementPanel({
         id: 'welcome',
         role: 'assistant',
         content:
-          '你好，我是念念助手。AI 看不到照片背后的故事，请告诉我：时间、地点、人物关系，以及当时发生了什么。',
+          '你好，我是念念助手。AI 看不到照片背后的故事，请告诉我：时间、地点、人物关系，以及当时发生了什么。也可以点击下方「点击说话」用语音回答。',
         label: '念念助手',
       },
     ];
@@ -157,13 +176,14 @@ export default function UserSupplementPanel({
   useEffect(() => {
     setDirty(false);
     setMessage('');
+    setVoiceTranscript('');
   }, [photoId]);
 
   const saveSupplement = async (): Promise<boolean> => {
     setSaving(true);
     setMessage('');
     try {
-      const result = await saveMemoryCardSupplement(photoId, notes, questions);
+      const result = await saveMemoryCardSupplement(photoId, notes, questions, voiceTranscript);
       if (!result.ok) {
         setMessage(result.error || '保存失败');
         return false;
@@ -173,7 +193,8 @@ export default function UserSupplementPanel({
       setMessage('已保存');
       onSaved({
         user_notes: (data.memoryCard as { user_notes?: string })?.user_notes || notes.trim(),
-        voice_transcript: '',
+        voice_transcript:
+          (data.memoryCard as { voice_transcript?: string })?.voice_transcript || voiceTranscript.trim(),
         ai_questions: (data.memoryCard as { ai_questions?: AiQuestion[] })?.ai_questions || questions,
       });
       return true;
@@ -213,7 +234,14 @@ export default function UserSupplementPanel({
   };
 
   const hasSupplement = !!notes.trim();
-  const busy = disabled || saving || reanalyzing;
+  const voiceBusy = voice.isRecording || voice.isTranscribing;
+  const busy = disabled || saving || reanalyzing || voiceBusy;
+
+  const voiceLabel = voice.isTranscribing
+    ? '正在识别语音…'
+    : voice.isRecording
+      ? '说完了，点击结束'
+      : '点击说话';
 
   return (
     <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
@@ -249,29 +277,10 @@ export default function UserSupplementPanel({
         </div>
       )}
 
-      <AccessibleChatPanel messages={chatMessages} className="mb-4 h-[320px]" />
+      <AccessibleChatPanel messages={chatMessages} className="mb-4 h-[280px]" />
 
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-muted-foreground">写下你的回答</p>
-          {speech.supported && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                speech.start((text) => {
-                  onNotesChange(notes ? `${notes}\n${text}` : text);
-                  setDirty(true);
-                })
-              }
-              disabled={busy}
-              className={speech.listening ? 'bg-primary text-white animate-pulse' : ''}
-            >
-              {speech.listening ? '聆听中…' : '🎤 语音输入'}
-            </Button>
-          )}
-        </div>
+      <div className="mb-3">
+        <p className="text-sm text-muted-foreground mb-2">写下或说出你的回答</p>
         <Textarea
           value={notes}
           onChange={(e) => {
@@ -280,9 +289,50 @@ export default function UserSupplementPanel({
           }}
           disabled={busy}
           placeholder="请补充：时间、地点、人物及关系，再加上当时的故事…"
-          rows={5}
-          className="min-h-[140px] text-base"
+          rows={4}
+          className="min-h-[120px] text-base"
         />
+      </div>
+
+      {/* 语音输入 — 大按钮，放在输入框下方 */}
+      <div className="mb-4">
+        <Button
+          type="button"
+          variant={voice.isRecording ? 'default' : 'outline'}
+          size="lg"
+          className={`w-full h-14 text-lg gap-3 ${
+            voice.isRecording ? 'animate-pulse bg-[#C04040] hover:bg-[#A03030] border-none' : ''
+          }`}
+          onClick={() => voice.start(appendVoiceText)}
+          disabled={disabled || saving || reanalyzing || voice.isTranscribing || !voice.supported}
+        >
+          {voice.isTranscribing ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : voice.isRecording ? (
+            <Square className="w-6 h-6 fill-current" />
+          ) : (
+            <Mic className="w-6 h-6" />
+          )}
+          {voiceLabel}
+        </Button>
+
+        {voice.isRecording && (
+          <p className="text-sm text-[#D98A45] text-center mt-2 animate-pulse">
+            正在录音，说完后点「说完了，点击结束」
+          </p>
+        )}
+
+        {!voice.supported && (
+          <p className="text-sm text-muted-foreground text-center mt-2">
+            {typeof window !== 'undefined' && !window.isSecureContext
+              ? '语音输入需要 HTTPS 安全连接，请改用文字输入'
+              : '当前浏览器不支持语音，请改用文字输入'}
+          </p>
+        )}
+
+        {voice.error && (
+          <p className="text-sm text-destructive text-center mt-2 leading-relaxed">{voice.error}</p>
+        )}
       </div>
 
       {message && (
