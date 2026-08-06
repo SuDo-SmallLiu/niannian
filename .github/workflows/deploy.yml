@@ -24,35 +24,29 @@ jobs:
       - run: npm run build
 
   deploy:
-    name: Deploy to server (SSH)
+    name: Deploy on server
     needs: ci
-    runs-on: ubuntu-latest
+    # 内网服务器：使用本机 self-hosted runner，无需 SSH
+    runs-on: self-hosted
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: 通过 SSH 部署
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            set -e
-            REPO_ROOT="${{ secrets.DEPLOY_PATH }}"
-            APP_DIR="$REPO_ROOT/niannian"
+      - name: 拉取并部署
+        env:
+          REPO_ROOT: /home/clawdbot/niannian
+        run: |
+          set -e
+          APP_DIR="$REPO_ROOT/niannian"
 
-            if [ ! -d "$REPO_ROOT/.git" ]; then
-              echo "错误: DEPLOY_PATH 应指向 git 仓库根目录（含 .git），当前: $REPO_ROOT"
-              exit 1
-            fi
-            if [ ! -f "$APP_DIR/package.json" ]; then
-              echo "错误: 未找到 $APP_DIR/package.json"
-              exit 1
-            fi
+          if [ ! -d "$REPO_ROOT/.git" ]; then
+            echo "错误: 未找到 git 仓库 $REPO_ROOT"
+            exit 1
+          fi
 
-            cd "$REPO_ROOT"
-            git pull origin main
+          cd "$REPO_ROOT"
+          git fetch origin main
+          git reset --hard origin/main
 
-            cd "$APP_DIR"
-            npm ci --omit=dev
-            npm run build
-            pm2 restart niannian || pm2 start npm --name niannian -- run start
+          cd "$APP_DIR"
+          npm ci --omit=dev
+          npm run build
+          pm2 restart niannian || pm2 start npm --name niannian --cwd "$APP_DIR" -- run start
