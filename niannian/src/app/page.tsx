@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PRESET_MEMBERS } from '@/lib/family-members';
 
 export default function HomePage() {
   const router = useRouter();
@@ -11,8 +12,6 @@ export default function HomePage() {
   const [customMember, setCustomMember] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
-
-  const PRESET_MEMBERS = ['爸爸', '妈妈', '孩子', '爷爷', '奶奶'];
 
   const allMembers = [
     ...selectedMembers,

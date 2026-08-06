@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-
-const PRESET_MEMBERS = ['爸爸', '妈妈', '孩子', '爷爷', '奶奶', '外公', '外婆'];
+import { PRESET_MEMBERS } from '@/lib/family-members';
 
 export default function CreateFamilyPage() {
   const router = useRouter();

@@ -26,7 +26,8 @@ export default function StoryPage() {
   const [familyName, setFamilyName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
+  const [sharingStoryId, setSharingStoryId] = useState<string | null>(null);
+  const { openSharePoster, modal: shareModal } = useSharePoster();
 
   const fetchData = useCallback(async () => {
     try {
@@ -38,11 +39,19 @@ export default function StoryPage() {
           setFamilyName(data.family?.name || '');
         }
       } else {
-        const res = await fetch(`/api/story?familyId=${familyId}`);
-        const data = await res.json();
-        if (res.ok && data.stories) {
+        const [storyRes, familyRes] = await Promise.all([
+          fetch(`/api/story?familyId=${familyId}`),
+          fetch('/api/family'),
+        ]);
+        const data = await storyRes.json();
+        const familyData = await familyRes.json();
+        if (storyRes.ok && data.stories) {
           setStories(data.stories);
         }
+        const family = (familyData.families || []).find(
+          (f: { id: string }) => f.id === familyId
+        );
+        if (family) setFamilyName(family.name);
       }
     } catch {
       setError('加载失败');
@@ -56,25 +65,30 @@ export default function StoryPage() {
   }, [fetchData]);
 
   const handleSharePoster = async (story: StoryItem) => {
-    let photoUrls: string[] = [];
+    setSharingStoryId(story.id);
     try {
-      const res = await fetch(`/api/story?storyId=${story.id}`);
-      const data = await res.json();
-      if (res.ok && data.story?.photos_detail) {
-        photoUrls = data.story.photos_detail.map((p: { url: string }) => p.url);
+      let photoUrls: string[] = [];
+      try {
+        const res = await fetch(`/api/story?storyId=${story.id}`);
+        const data = await res.json();
+        if (res.ok && data.story?.photos_detail) {
+          photoUrls = data.story.photos_detail.map((p: { url: string }) => p.url);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
 
-    await openSharePoster({
-      type: 'story',
-      storyId: story.id,
-      title: story.title,
-      summary: story.description,
-      familyName: familyName || '',
-      photoUrls,
-    });
+      await openSharePoster({
+        type: 'story',
+        storyId: story.id,
+        title: story.title,
+        summary: story.description,
+        familyName: familyName || '',
+        photoUrls,
+      });
+    } finally {
+      setSharingStoryId(null);
+    }
   };
 
   if (loading) {
@@ -140,7 +154,7 @@ export default function StoryPage() {
             timeline={story.timeline || []}
             connectionAction={story.connection_action || ''}
             photoCount={story.photos?.length || 0}
-            sharing={shareLoading}
+            sharing={sharingStoryId === story.id}
             onShare={() => handleSharePoster(story)}
           />
         ))}

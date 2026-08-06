@@ -80,11 +80,12 @@ export default function ChapterCard({
         </p>
 
         <button
+          type="button"
           onClick={onShare}
           disabled={sharing}
-          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98] shadow-sm"
+          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98] shadow-sm cursor-pointer"
         >
-          {sharing ? '生成中…' : '💬 生成分享海报 · 发微信'}
+          {sharing ? '生成中…' : '💬 分享给家人'}
         </button>
         <p className="text-[10px] text-[#B8A898] mt-2 text-center">
           保存海报后，打开微信发送给好友或朋友圈
