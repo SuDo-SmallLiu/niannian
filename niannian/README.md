@@ -55,11 +55,16 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 4. 反向代理（Nginx 等）把 80/443 转到 `localhost:3000`
 
 ### 方式二：GitHub Actions 自动部署
-仓库已包含 `.github/workflows/deploy.yml`：每次 push 到 `main` 会先跑 CI（lint + build），通过后再 SSH 到服务器部署。首次在服务器搭建环境，可直接运行仓库里的 `scripts/setup-server.sh`（Ubuntu/Debian），一键完成系统依赖、Node 20、pm2、代码拉取、构建与启动。
+仓库根目录已包含 `.github/workflows/deploy.yml`（**不是** `niannian/.github/` 下）：每次 push 到 `main` 会先跑 CI（build），通过后再 SSH 到服务器部署。
+
+**仓库结构说明：** git 根目录下的 Next.js 应用在 `niannian/` 子目录（`package.json` 所在位置）。
+
+首次在服务器搭建环境，进入克隆后的 `niannian/` 子目录运行 `bash scripts/setup-server.sh`（Ubuntu/Debian）。
+
 使用前请在 **仓库 Settings → Secrets and variables → Actions** 中配置：
 - `SSH_HOST`：服务器 IP 或域名
 - `SSH_USERNAME`：SSH 用户名
 - `SSH_KEY`：私钥内容（整体粘贴）
-- `DEPLOY_PATH`：服务器上的项目目录，例如 `/var/www/niannian`
+- `DEPLOY_PATH`：**git 仓库根目录**（含 `.git` 的目录），例如 `/home/clawdbot/niannian` 或 `/var/www/niannian`（不是 `niannian/niannian` 应用子目录）
 
-> 服务器需预先装好 Node 20+、git、pm2，且能通过 git 拉取本仓库（公开仓库可直接 pull；私有仓库请配置 deploy key 或使用带 token 的 HTTPS 地址）。首次部署建议先在服务器手动跑通一次 `npm ci && npm run build && npm run start`。
+> 部署脚本会在 `$DEPLOY_PATH` 执行 `git pull`，再在 `$DEPLOY_PATH/niannian` 里 `npm ci && npm run build && pm2 restart niannian`。

@@ -46,17 +46,24 @@ if [ -d "$DEPLOY_PATH/.git" ]; then
 else
   sudo mkdir -p "$(dirname "$DEPLOY_PATH")"
   sudo git clone "$REPO_URL" "$DEPLOY_PATH"
+  sudo chown -R "$(whoami):$(whoami)" "$DEPLOY_PATH"
+fi
+
+APP_DIR="$DEPLOY_PATH/niannian"
+if [ ! -f "$APP_DIR/package.json" ]; then
+  echo "错误: 未找到 $APP_DIR/package.json，请确认 DEPLOY_PATH 指向仓库根目录"
+  exit 1
 fi
 
 # 5. 安装依赖并构建
 echo ">>> [5/6] 安装依赖并构建..."
-cd "$DEPLOY_PATH"
+cd "$APP_DIR"
 npm ci --omit=dev
 npm run build
 
 # 6. 环境变量与启动
 echo ">>> [6/6] 配置环境变量并启动..."
-ENV_FILE="$DEPLOY_PATH/.env.local"
+ENV_FILE="$APP_DIR/.env.local"
 if [ ! -f "$ENV_FILE" ]; then
   echo "    未检测到 .env.local，请根据提示填写（直接回车 = 演示模式）："
   read -r -p "    ARK_API_KEY (留空=演示模式): " ARK_API_KEY
@@ -77,7 +84,7 @@ else
   echo "    已存在 .env.local，跳过。"
 fi
 
-pm2 start npm --name "$APP_NAME" -- run start
+pm2 start npm --name "$APP_NAME" --cwd "$APP_DIR" -- run start
 pm2 save
 echo ">>> 完成！应用已在 pm2 中以 '$APP_NAME' 运行（默认端口 3000）。"
 echo ">>> 建议继续："
