@@ -3,17 +3,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import InteractiveStoryPlayer from '@/components/h5/InteractiveStoryPlayer';
+import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { buildStorySlides, type StoryH5Input } from '@/lib/h5-story-slides';
 
 export default function StoryPlayPage() {
   const params = useParams();
   const router = useRouter();
   const storyId = params.id as string;
+  const appreciate = useAppreciateMode();
 
   const [story, setStory] = useState<StoryH5Input | null>(null);
   const [familyName, setFamilyName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/story/view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId }),
+    }).catch(() => {});
+  }, [storyId]);
 
   useEffect(() => {
     async function load() {
@@ -75,10 +85,14 @@ export default function StoryPlayPage() {
   return (
     <InteractiveStoryPlayer
       slides={slides}
-      onClose={() => router.push(`/stories/${storyId}`)}
+      onClose={() =>
+        router.push(appreciate ? `/stories/${storyId}?appreciate=1` : `/stories/${storyId}`)
+      }
       autoPlayMs={7000}
       enableMusic
       enableNarration
+      appreciateMode={appreciate}
+      autoStart
     />
   );
 }

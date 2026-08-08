@@ -1,0 +1,5 @@
+melotts @ git+https://github.com/myshell-ai/MeloTTS.git
+unidic-lite
+mecab-python3
+soundfile
+librosa

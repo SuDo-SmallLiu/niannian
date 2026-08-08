@@ -1,6 +1,8 @@
-import path from 'path';
 import { analyzePhoto, isAiConfigured, type PhotoAnalysis } from '@/lib/ai';
-import { prepareImageForVision } from '@/lib/prepare-image-for-ai';
+import {
+  preprocessImageForAnalysis,
+  resolvePhotoFilePath,
+} from '@/services/image-preprocess.service';
 import {
   type PhotoSourceFacts,
   sourceFactsToTags,
@@ -117,8 +119,8 @@ export async function analyzeAndSavePhoto(
   const existingCard = getMemoryCardByPhoto(photoId);
   const family = getFamily(photo.family_id);
 
-  const filePath = path.join(process.cwd(), 'public', photo.url);
-  const { base64, mimeType } = await prepareImageForVision(filePath);
+  const filePath = resolvePhotoFilePath(photo.url);
+  const { base64, mimeType } = await preprocessImageForAnalysis(filePath);
 
   const sourceFacts =
     photo.source_type === 'google_photos' && photo.source_metadata

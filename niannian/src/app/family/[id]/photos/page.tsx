@@ -4,6 +4,14 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import MemoryCardFilter from '@/components/MemoryCardFilter';
+import MemoryCardStatusBadge from '@/components/MemoryCardStatusBadge';
+import MemoryCardCompletionBar from '@/components/MemoryCardCompletionBar';
+import PipelineSteps from '@/components/PipelineSteps';
+import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
+import {
+  aggregateCompletion,
+  countReadyForStory,
+} from '@/lib/memory-card-completion';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import {
   type FilterablePhoto,
@@ -12,6 +20,7 @@ import {
   collectFilterOptions,
   defaultFilters,
 } from '@/lib/memory-card-filter';
+import { useAutoGenerateFamilyStory } from '@/hooks/useAutoGenerateFamilyStory';
 
 export default function PhotoLibraryPage() {
   const router = useRouter();
@@ -20,22 +29,34 @@ export default function PhotoLibraryPage() {
   const { confirm, showLoading, hideLoading, alert } = useAppDialog();
 
   const [photos, setPhotos] = useState<FilterablePhoto[]>([]);
+  const [storyCount, setStoryCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingSlow, setLoadingSlow] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [filters, setFilters] = useState<MemoryCardFilters>(defaultFilters());
   const [selectMode, setSelectMode] = useState(false);
+  const [storyPickMode, setStoryPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const { generateStories, generating: generatingStory, error: generateStoryError } =
+    useAutoGenerateFamilyStory(familyId);
 
   const loadPhotos = useCallback(async () => {
     try {
-      const res = await fetch(`/api/photos?familyId=${familyId}`);
-      if (!res.ok) {
+      const [photosRes, storiesRes] = await Promise.all([
+        fetch(`/api/photos?familyId=${familyId}`),
+        fetch(`/api/story?familyId=${familyId}`),
+      ]);
+      if (!photosRes.ok) {
         setLoadError('加载照片失败，请下拉刷新重试');
         return;
       }
-      const data = await res.json();
+      const data = await photosRes.json();
       setPhotos(data.photos || []);
+      if (storiesRes.ok) {
+        const storiesData = await storiesRes.json();
+        setStoryCount((storiesData.stories || []).length);
+      }
       setLoadError('');
     } catch {
       setLoadError('网络错误，请稍后重试');
@@ -48,6 +69,15 @@ export default function PhotoLibraryPage() {
     loadPhotos();
   }, [loadPhotos]);
 
+  useEffect(() => {
+    if (!loading) {
+      setLoadingSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingSlow(true), 8000);
+    return () => clearTimeout(timer);
+  }, [loading, familyId]);
+
   const filteredPhotos = useMemo(
     () => filterMemoryCards(photos, filters),
     [photos, filters]
@@ -56,12 +86,30 @@ export default function PhotoLibraryPage() {
   const filterOptions = useMemo(() => collectFilterOptions(photos), [photos]);
 
   const analyzedCount = photos.filter((p) => p.memoryCard?.analysis_status === 'analyzed').length;
+  const pendingCount = photos.length - analyzedCount;
+  const completionAvg = aggregateCompletion(photos.map((p) => p.memoryCard));
+
+  useNianNianAgentOverride({
+    completionAvg,
+    pendingCount,
+    analyzedCount,
+    photoCount: photos.length,
+  });
+
+  const readyForStory = countReadyForStory(photos.map((p) => p.memoryCard));
+  const canGenerateStory = readyForStory >= 3 || completionAvg >= 70;
   const selectedCount = selectedIds.size;
   const allFilteredSelected =
     filteredPhotos.length > 0 && filteredPhotos.every((p) => selectedIds.has(p.id));
 
   const exitSelectMode = () => {
     setSelectMode(false);
+    setStoryPickMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const exitStoryPickMode = () => {
+    setStoryPickMode(false);
     setSelectedIds(new Set());
   };
 
@@ -91,7 +139,8 @@ export default function PhotoLibraryPage() {
   };
 
   const handleCardClick = (photo: FilterablePhoto) => {
-    if (selectMode) {
+    if (selectMode || storyPickMode) {
+      if (storyPickMode && photo.memoryCard?.analysis_status !== 'analyzed') return;
       toggleSelect(photo.id);
       return;
     }
@@ -103,7 +152,7 @@ export default function PhotoLibraryPage() {
 
     const ok = await confirm({
       title: `删除 ${selectedCount} 张记忆卡？`,
-      description: '将同时删除照片文件、AI 解析结果和标签，且无法恢复。关联故事中的该照片也会被移除。',
+      description: '将同时删除照片文件、念念解析结果和标签，且无法恢复。关联故事中的该照片也会被移除。',
       confirmText: '确认删除',
       cancelText: '取消',
       destructive: true,
@@ -154,39 +203,74 @@ export default function PhotoLibraryPage() {
         </button>
 
         {photos.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              if (selectMode) exitSelectMode();
-              else setSelectMode(true);
-            }}
-            className={`text-sm px-3 py-1.5 rounded-full transition-all ${
-              selectMode
-                ? 'bg-[#4B3B2F] text-white'
-                : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
-            }`}
-          >
-            {selectMode ? '退出整理' : '整理'}
-          </button>
+          <div className="flex gap-2">
+            {analyzedCount > 0 && !selectMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStoryPickMode((v) => !v);
+                  setSelectMode(false);
+                  setSelectedIds(new Set());
+                }}
+                className={`text-sm px-3 py-1.5 rounded-full transition-all ${
+                  storyPickMode
+                    ? 'bg-[#D98A45] text-white'
+                    : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
+                }`}
+              >
+                {storyPickMode ? '取消选片' : '选片生成故事'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (selectMode) exitSelectMode();
+                else {
+                  setSelectMode(true);
+                  setStoryPickMode(false);
+                }
+              }}
+              className={`text-sm px-3 py-1.5 rounded-full transition-all ${
+                selectMode
+                  ? 'bg-[#4B3B2F] text-white'
+                  : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
+              }`}
+            >
+              {selectMode ? '退出整理' : '整理'}
+            </button>
+          </div>
         )}
       </div>
 
       <div className="text-center mb-6 animate-fade-in-up">
         <h1 className="text-2xl font-serif text-[#4B3B2F] mb-1">记忆卡</h1>
-        <p className="text-sm text-[#B8A898]">
+        <p className="text-sm text-[#B8A898] mb-3">
           {selectMode
             ? selectedCount > 0
               ? `已选 ${selectedCount} 张`
               : '点击卡片选择，可多选'
+            : storyPickMode
+              ? selectedCount > 0
+                ? `已选 ${selectedCount} 张用于生成故事`
+                : '点选已解析的照片，生成故事'
             : photos.length > 0
-              ? `${analyzedCount}/${photos.length} 张已解析`
-              : '上传照片后 AI 会生成记忆卡'}
+              ? `${analyzedCount}/${photos.length} 已解析 · 平均完成度 ${completionAvg}%`
+              : '上传照片后念念会生成记忆卡'}
         </p>
+        {!selectMode && photos.length > 0 && <PipelineSteps active={1} compact />}
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+          <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin mb-4" />
+          <p className="text-sm text-[#8B7355]">正在加载记忆卡…</p>
+          {loadingSlow && (
+            <p className="text-xs text-[#B8A898] mt-3 leading-relaxed">
+              照片较多时需要一点时间，请稍候。
+              <br />
+              若长时间无响应，请返回后重试。
+            </p>
+          )}
         </div>
       ) : photos.length === 0 ? (
         <div className="text-center py-16">
@@ -257,7 +341,7 @@ export default function PhotoLibraryPage() {
                         alt={photo.original_name}
                         className="w-full h-full object-cover"
                       />
-                      {selectMode && (
+                      {selectMode || storyPickMode ? (
                         <span
                           className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs ${
                             selected
@@ -267,11 +351,12 @@ export default function PhotoLibraryPage() {
                         >
                           ✓
                         </span>
-                      )}
-                      {photo.memoryCard?.analysis_status === 'analyzed' ? (
-                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#D98A45] text-white text-[10px]">
-                          已解析
-                        </span>
+                      ) : null}
+                      {photo.memoryCard ? (
+                        <MemoryCardStatusBadge
+                          card={photo.memoryCard}
+                          className="absolute top-2 right-2"
+                        />
                       ) : (
                         <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/40 text-white text-[10px]">
                           待解析
@@ -299,9 +384,12 @@ export default function PhotoLibraryPage() {
                               ))}
                             </div>
                           )}
+                          <div className="mt-2">
+                            <MemoryCardCompletionBar compact card={photo.memoryCard} />
+                          </div>
                         </>
                       ) : (
-                        <p className="text-xs text-[#B8A898]">等待 AI 解析</p>
+                        <p className="text-xs text-[#B8A898]">等待念念解析</p>
                       )}
                     </div>
                   </button>
@@ -310,6 +398,19 @@ export default function PhotoLibraryPage() {
             </div>
           )}
         </>
+      )}
+
+      {storyPickMode && selectedCount > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 px-6 z-40">
+          <div className="max-w-md mx-auto">
+            <Link
+              href={`/family/${familyId}/story/compose?photos=${Array.from(selectedIds).join(',')}`}
+              className="block w-full py-4 rounded-2xl bg-[#D98A45] text-white font-medium text-center shadow-lg shadow-[#D98A45]/20"
+            >
+              去生成故事（{selectedCount} 张）
+            </Link>
+          </div>
+        </div>
       )}
 
       {selectMode && selectedCount > 0 && (
@@ -327,18 +428,62 @@ export default function PhotoLibraryPage() {
         </div>
       )}
 
-      {!selectMode && photos.length > 0 && analyzedCount < photos.length && (
+      {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount < photos.length && (
         <div className="fixed bottom-20 left-0 right-0 px-6 z-40">
           <div className="max-w-md mx-auto">
             <Link
               href={`/family/${familyId}/analyze`}
               className="block w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg text-center hover:bg-[#C47A3A] transition-all shadow-lg shadow-[#D98A45]/20"
             >
-              开始 AI 解析
+              开始念念解析（{pendingCount} 张待解析）
             </Link>
           </div>
         </div>
       )}
+
+      {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount === photos.length && (
+        <div className="fixed bottom-20 left-0 right-0 px-6 z-40">
+          <div className="max-w-md mx-auto space-y-2">
+            <button
+              type="button"
+              onClick={() => generateStories({ existingCount: storyCount })}
+              disabled={generatingStory || !canGenerateStory}
+              className="block w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg text-center shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
+            >
+              {generatingStory ? '念念撰写中…' : '✨ 念念自动生成故事'}
+            </button>
+            <Link
+              href={`/family/${familyId}/story/compose`}
+              className="block w-full py-4 rounded-2xl bg-white border-2 border-[#D98A45] text-[#D98A45] font-serif text-lg text-center hover:bg-[#FFF8F0] transition-all"
+            >
+              🧩 人工组合故事
+            </Link>
+            {storyCount > 0 && (
+              <Link
+                href={`/family/${familyId}/story`}
+                className="block w-full py-3 rounded-2xl bg-white border border-[#E8DCC8] text-[#8B7355] text-sm text-center hover:border-[#D98A45]/30 transition-all"
+              >
+                📖 查看故事草稿箱（{storyCount}）
+              </Link>
+            )}
+            <Link
+              href={`/family/${familyId}`}
+              className="block w-full py-3 rounded-2xl bg-white border border-[#E8DCC8] text-[#8B7355] text-sm text-center hover:border-[#D98A45]/30 transition-all"
+            >
+              主题管理 · 家庭故事
+            </Link>
+            {!canGenerateStory && (
+              <p className="text-[10px] text-center text-[#B8A898] px-2">
+                建议至少完善 3 张记忆卡或整体完成度达 70% 后再自动生成
+              </p>
+            )}
+            {generateStoryError && (
+              <p className="text-xs text-center text-red-500 px-2">{generateStoryError}</p>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

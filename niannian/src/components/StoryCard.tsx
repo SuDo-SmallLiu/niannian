@@ -29,7 +29,7 @@ export default function StoryCard({
       <div className="p-8 pb-6 border-b border-[#f0ebe4]">
         <div className="flex items-center gap-2 text-xs text-[#d4786e] font-medium tracking-wider mb-3">
           <span>📖</span>
-          <span>AI 生成的家庭记忆</span>
+          <span>念念生成的家庭记忆</span>
           <span className="text-[#b8afa6]">· 基于 {photoCount} 张照片</span>
         </div>
 

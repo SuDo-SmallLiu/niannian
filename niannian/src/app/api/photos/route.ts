@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { deletePhotoById, getPhotosByFamily, getMemoryCardsByFamily, getTagsByPhoto } from '@/lib/db';
+import { deletePhotoById, getPhotosByFamily, getMemoryCardsByFamily, getTagsByFamily } from '@/lib/db';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -49,10 +49,18 @@ export async function GET(request: NextRequest) {
     const memoryCards = getMemoryCardsByFamily(familyId);
     const cardMap = new Map(memoryCards.map((c) => [c.photo_id, c]));
 
+    const allTags = getTagsByFamily(familyId);
+    const tagsByPhoto = new Map<string, typeof allTags>();
+    for (const tag of allTags) {
+      const list = tagsByPhoto.get(tag.photo_id) || [];
+      list.push(tag);
+      tagsByPhoto.set(tag.photo_id, list);
+    }
+
     const result = photos.map((photo) => ({
       ...photo,
       memoryCard: cardMap.get(photo.id) || null,
-      tags: getTagsByPhoto(photo.id),
+      tags: tagsByPhoto.get(photo.id) || [],
     }));
 
     return NextResponse.json({ photos: result, total: result.length });

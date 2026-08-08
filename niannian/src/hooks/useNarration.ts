@@ -7,10 +7,21 @@ interface UseNarrationOptions {
   text: string | null;
   enabled: boolean;
   unlocked: boolean;
-  /** 变化时重新朗读（切页、重开自动播放等） */
   speakKey?: number | string;
+  slideId?: string;
+  movieId?: string;
+  audioUrl?: string | null;
   onEnd?: () => void;
+  onDurationKnown?: (ms: number) => void;
 }
+
+function configureMobileAudio(audio: HTMLAudioElement) {
+  audio.setAttribute('playsinline', 'true');
+  audio.setAttribute('webkit-playsinline', 'true');
+  audio.preload = 'auto';
+}
+
+const MIN_NARRATION_MS = 3500;
 
 function pickChineseVoice(): SpeechSynthesisVoice | null {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null;
@@ -23,93 +34,194 @@ function pickChineseVoice(): SpeechSynthesisVoice | null {
   );
 }
 
-export function useNarration({ text, enabled, unlocked, speakKey = 0, onEnd }: UseNarrationOptions) {
+function speakWithBrowserTts(
+  text: string,
+  onEnd: () => void,
+  onDurationKnown?: (ms: number) => void
+): () => void {
+  const estimated = Math.max(estimateNarrationMs(text), MIN_NARRATION_MS);
+  onDurationKnown?.(estimated);
+
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    const timer = setTimeout(onEnd, estimated);
+    return () => clearTimeout(timer);
+  }
+
+  let cancelled = false;
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  let startedAt = Date.now();
+
+  const finish = () => {
+    if (cancelled) return;
+    const elapsed = Date.now() - startedAt;
+    const remain = Math.max(0, MIN_NARRATION_MS - elapsed);
+    if (remain > 0) {
+      setTimeout(onEnd, remain);
+      return;
+    }
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    onEnd();
+  };
+
+  const speak = () => {
+    if (cancelled) return;
+    startedAt = Date.now();
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'zh-CN';
+    utterance.rate = 0.88;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    const voice = pickChineseVoice();
+    if (voice) utterance.voice = voice;
+    utterance.onend = finish;
+    utterance.onerror = () => {
+      if (cancelled) return;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fallbackTimer = setTimeout(finish, estimated);
+    };
+
+    fallbackTimer = setTimeout(finish, estimated + 2000);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const voices = window.speechSynthesis.getVoices();
+  if (voices.length === 0) {
+    const onVoicesChanged = () => {
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+      speak();
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+    return () => {
+      cancelled = true;
+      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      window.speechSynthesis.cancel();
+    };
+  }
+
+  speak();
+  return () => {
+    cancelled = true;
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    window.speechSynthesis.cancel();
+  };
+}
+
+export function useNarration({
+  text,
+  enabled,
+  unlocked,
+  speakKey = 0,
+  slideId,
+  movieId,
+  audioUrl,
+  onEnd,
+  onDurationKnown,
+}: UseNarrationOptions) {
   const onEndRef = useRef(onEnd);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const onDurationRef = useRef(onDurationKnown);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     onEndRef.current = onEnd;
   }, [onEnd]);
 
+  useEffect(() => {
+    onDurationRef.current = onDurationKnown;
+  }, [onDurationKnown]);
+
   const cancel = useCallback(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    utteranceRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      audioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
     cancel();
 
-    if (!enabled || !unlocked || !text) {
-      return;
-    }
+    if (!enabled || !unlocked || !text) return;
 
     let cancelled = false;
-    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let cleanupBrowser: (() => void) | undefined;
+    let startedAt = Date.now();
 
-    const speak = () => {
+    const finish = () => {
       if (cancelled) return;
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'zh-CN';
-      utterance.rate = 0.92;
-      utterance.pitch = 1;
-      utterance.volume = 1;
-
-      const voice = pickChineseVoice();
-      if (voice) utterance.voice = voice;
-
-      utterance.onend = () => {
-        if (cancelled) return;
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-        utteranceRef.current = null;
-        onEndRef.current?.();
-      };
-
-      utterance.onerror = () => {
-        if (cancelled) return;
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-        utteranceRef.current = null;
-        onEndRef.current?.();
-      };
-
-      utteranceRef.current = utterance;
-
-      fallbackTimer = setTimeout(() => {
-        if (cancelled) return;
-        window.speechSynthesis.cancel();
-        utteranceRef.current = null;
-        onEndRef.current?.();
-      }, estimateNarrationMs(text) + 1500);
-
-      window.speechSynthesis.speak(utterance);
+      const elapsed = Date.now() - startedAt;
+      const remain = Math.max(0, MIN_NARRATION_MS - elapsed);
+      if (remain > 0) {
+        setTimeout(() => onEndRef.current?.(), remain);
+        return;
+      }
+      onEndRef.current?.();
     };
 
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length === 0) {
-      const onVoicesChanged = () => {
-        window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
-        speak();
-      };
-      window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
-      return () => {
-        cancelled = true;
-        window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
-        if (fallbackTimer) clearTimeout(fallbackTimer);
-        cancel();
-      };
-    }
+    const playUrl = (url: string) => {
+      startedAt = Date.now();
+      const audio = new Audio(url);
+      configureMobileAudio(audio);
+      audioRef.current = audio;
 
-    speak();
+      audio.onloadedmetadata = () => {
+        if (cancelled) return;
+        const ms = Math.max(
+          Math.round((audio.duration || 0) * 1000),
+          MIN_NARRATION_MS
+        );
+        if (audio.duration && Number.isFinite(audio.duration)) {
+          onDurationRef.current?.(ms);
+        }
+      };
+
+      audio.onended = finish;
+      audio.onerror = () => {
+        if (cancelled) return;
+        cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
+      };
+
+      audio.play().catch(() => {
+        if (cancelled) return;
+        cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
+      });
+    };
+
+    if (audioUrl) {
+      playUrl(audioUrl);
+    } else {
+      // 全平台优先 MeloTTS 预生成/按需音频，失败再降级浏览器朗读
+      void fetch('/api/speech/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, slideId, movieId }),
+      })
+        .then(async (res) => {
+          if (cancelled) return;
+          const data = await res.json();
+          if (res.ok && data.url) {
+            playUrl(data.url);
+          } else {
+            cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
+        });
+    }
 
     return () => {
       cancelled = true;
-      if (fallbackTimer) clearTimeout(fallbackTimer);
+      cleanupBrowser?.();
       cancel();
     };
-  }, [text, enabled, unlocked, speakKey, cancel]);
+  }, [text, enabled, unlocked, speakKey, slideId, movieId, audioUrl, cancel]);
 
   useEffect(() => cancel, [cancel]);
 

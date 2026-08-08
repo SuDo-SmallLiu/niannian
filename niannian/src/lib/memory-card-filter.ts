@@ -29,6 +29,9 @@ export interface FilterablePhoto {
     emotions: string[];
     changes: string[];
     significance?: string;
+    user_notes?: string;
+    voice_transcript?: string;
+    ai_questions?: unknown;
   } | null;
   tags?: MemoryCardTag[];
 }
@@ -40,6 +43,12 @@ export interface MemoryCardFilters {
   analysisStatus: AnalysisFilter;
   tagValues: string[];
   layer: number | null;
+  /** 人物标签 */
+  personTag: string | null;
+  /** 地点标签 */
+  locationTag: string | null;
+  /** 时间标签（年份） */
+  timeTag: string | null;
 }
 
 export const LAYER_LABELS: Record<number, string> = {
@@ -51,7 +60,15 @@ export const LAYER_LABELS: Record<number, string> = {
 };
 
 export function defaultFilters(): MemoryCardFilters {
-  return { query: '', analysisStatus: 'all', tagValues: [], layer: null };
+  return {
+    query: '',
+    analysisStatus: 'all',
+    tagValues: [],
+    layer: null,
+    personTag: null,
+    locationTag: null,
+    timeTag: null,
+  };
 }
 
 function searchableText(photo: FilterablePhoto): string {
@@ -104,6 +121,21 @@ export function filterMemoryCards(
       if (!hasLayer) return false;
     }
 
+    if (filters.personTag) {
+      const people = [...photo.people, ...(photo.memoryCard?.people || [])];
+      if (!people.includes(filters.personTag)) return false;
+    }
+
+    if (filters.locationTag) {
+      const loc = photo.location || photo.memoryCard?.location || '';
+      if (loc !== filters.locationTag) return false;
+    }
+
+    if (filters.timeTag) {
+      const timeStr = photo.memoryCard?.taken_at || photo.taken_at || '';
+      if (!timeStr.includes(filters.timeTag)) return false;
+    }
+
     if (!q) return true;
 
     return searchableText(photo).includes(q);
@@ -114,11 +146,19 @@ export function collectFilterOptions(photos: FilterablePhoto[]) {
   const tagMap = new Map<string, { value: string; layer: number; count: number }>();
   const people = new Map<string, number>();
   const emotions = new Map<string, number>();
+  const locations = new Map<string, number>();
+  const times = new Map<string, number>();
 
   for (const photo of photos) {
-    for (const person of photo.people) {
-      people.set(person, (people.get(person) || 0) + 1);
+    for (const person of [...photo.people, ...(photo.memoryCard?.people || [])]) {
+      if (person) people.set(person, (people.get(person) || 0) + 1);
     }
+    const loc = photo.location || photo.memoryCard?.location;
+    if (loc) locations.set(loc, (locations.get(loc) || 0) + 1);
+    const timeStr = photo.memoryCard?.taken_at || photo.taken_at || '';
+    const yearMatch = timeStr.match(/\d{4}/);
+    if (yearMatch) times.set(yearMatch[0], (times.get(yearMatch[0]) || 0) + 1);
+
     for (const e of photo.memoryCard?.emotions || []) {
       emotions.set(e, (emotions.get(e) || 0) + 1);
     }
@@ -137,5 +177,7 @@ export function collectFilterOptions(photos: FilterablePhoto[]) {
     tags: Array.from(tagMap.values()).sort((a, b) => a.layer - b.layer || b.count - a.count),
     people: Array.from(people.entries()).sort((a, b) => b[1] - a[1]),
     emotions: Array.from(emotions.entries()).sort((a, b) => b[1] - a[1]),
+    locations: Array.from(locations.entries()).sort((a, b) => b[1] - a[1]),
+    times: Array.from(times.entries()).sort((a, b) => b[0].localeCompare(a[0])),
   };
 }

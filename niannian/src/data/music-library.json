@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "licenseNote": "MVP 使用项目内占位曲；正式环境请从 SoundSafari/CC0-1.0-Music 人工精选并替换 source/license 字段",
+  "tracks": [
+    {
+      "id": "warm-01",
+      "title": "温暖相依",
+      "file": "/audio/music/warm/01.mp3",
+      "mood": ["温暖", "陪伴", "家庭"],
+      "category": "warm",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "warm-02",
+      "title": "家的温度",
+      "file": "/audio/music/warm/02.mp3",
+      "mood": ["温暖", "团圆", "爱"],
+      "category": "warm",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "nostalgic-01",
+      "title": "岁月回响",
+      "file": "/audio/music/nostalgic/01.mp3",
+      "mood": ["怀旧", "思念", "告别"],
+      "category": "nostalgic",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "nostalgic-02",
+      "title": "旧日时光",
+      "file": "/audio/music/nostalgic/02.mp3",
+      "mood": ["怀旧", "传承"],
+      "category": "nostalgic",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "happy-01",
+      "title": "欢聚时刻",
+      "file": "/audio/music/happy/01.mp3",
+      "mood": ["欢庆", "庆祝", "喜悦"],
+      "category": "happy",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "happy-02",
+      "title": "探索新奇",
+      "file": "/audio/music/happy/02.mp3",
+      "mood": ["探索", "梦想", "尝试"],
+      "category": "happy",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "emotional-01",
+      "title": "成长见证",
+      "file": "/audio/music/emotional/01.mp3",
+      "mood": ["成长", "勇气", "第一次"],
+      "category": "emotional",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "emotional-02",
+      "title": "仪式传承",
+      "file": "/audio/music/emotional/02.mp3",
+      "mood": ["传承", "责任", "heritage"],
+      "category": "emotional",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    },
+    {
+      "id": "calm-01",
+      "title": "日常烟火",
+      "file": "/audio/music/calm/01.mp3",
+      "mood": ["日常", "平静", "default"],
+      "category": "calm",
+      "source": "niannian-mvp-placeholder",
+      "license": "internal-mvp"
+    }
+  ]
+}

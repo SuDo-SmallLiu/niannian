@@ -1,21 +1,31 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import AnalysisProgress from '@/components/memory/AnalysisProgress';
+import MemoryCardStatus, {
+  type MemoryCardAnalysisStatus,
+} from '@/components/memory/MemoryCardStatus';
+import RetryAnalysisButton from '@/components/memory/RetryAnalysisButton';
+import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
 
 const LOADING_PHRASES = [
   '正在翻阅相册……',
   '正在寻找那些一起走过的日子……',
   '正在辨认每一张熟悉的脸……',
   '正在发现那些悄悄发生的变化……',
-  '正在寻找陪伴的痕迹……',
-  '正在记录成长的模样……',
   '正在整理属于家的故事……',
-  '正在寻找那些没有说出口的话……',
 ];
 
-const POLL_INTERVAL = 3000; // 3秒轮询一次
-const POLL_TIMEOUT = 120000; // 总共等待最多2分钟
+const POLL_INTERVAL = 2000;
+const POLL_TIMEOUT = 300000;
+
+interface PhotoTask {
+  id: string;
+  status: MemoryCardAnalysisStatus;
+  error?: string;
+  url?: string;
+}
 
 export default function AnalyzePage() {
   const router = useRouter();
@@ -23,12 +33,23 @@ export default function AnalyzePage() {
   const familyId = params.id as string;
 
   const [phraseIndex, setPhraseIndex] = useState(0);
-  const [dots, setDots] = useState('');
   const [error, setError] = useState('');
-  const [progress, setProgress] = useState(0);
+  const [photos, setPhotos] = useState<PhotoTask[]>([]);
+  const [summary, setSummary] = useState({
+    total: 0,
+    completed: 0,
+    failed: 0,
+    active: 0,
+    progress: 0,
+  });
   const hasRun = useRef(false);
 
-  // 循环切换短语
+  useNianNianAgentOverride({
+    pendingCount: Math.max(0, summary.total - summary.completed),
+    analyzedCount: summary.completed,
+    photoCount: summary.total,
+  });
+
   useEffect(() => {
     const phraseTimer = setInterval(() => {
       setPhraseIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
@@ -36,138 +57,165 @@ export default function AnalyzePage() {
     return () => clearInterval(phraseTimer);
   }, []);
 
-  // 点点动画
-  useEffect(() => {
-    const dotTimer = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
-    }, 600);
-    return () => clearInterval(dotTimer);
+  const pollStatus = useCallback(async () => {
+    const pollRes = await fetch(`/api/analyze?familyId=${familyId}`);
+    return pollRes.json();
+  }, [familyId]);
+
+  const applyPollData = useCallback((pollData: Record<string, unknown>) => {
+    if (typeof pollData.total === 'number') {
+      setSummary({
+        total: pollData.total as number,
+        completed: (pollData.completed as number) || 0,
+        failed: (pollData.failed as number) || 0,
+        active: (pollData.active as number) || 0,
+        progress: (pollData.progress as number) || 0,
+      });
+    }
+    if (Array.isArray(pollData.photos)) {
+      setPhotos(pollData.photos as PhotoTask[]);
+    }
   }, []);
 
-  // 触发 AI 分析 + 轮询状态
-  useEffect(() => {
-    if (hasRun.current) return;
+  const startAnalysis = useCallback(async () => {
+    setError('');
     hasRun.current = true;
 
-    async function startAndPoll() {
-      try {
-        // Step 1: 启动分析
-        const startRes = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ familyId }),
-        });
-        const startData = await startRes.json();
+    try {
+      const startRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ familyId }),
+      });
+      const startData = await startRes.json();
 
-        if (!startRes.ok) {
-          setError(startData.error || '启动分析失败');
+      if (!startRes.ok) {
+        setError(startData.error || '启动分析失败');
+        hasRun.current = false;
+        return;
+      }
+
+      if (typeof startData.total === 'number') {
+        setSummary((prev) => ({ ...prev, total: startData.total }));
+      }
+
+      const startTime = Date.now();
+
+      while (Date.now() - startTime < POLL_TIMEOUT) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        const pollData = await pollStatus();
+        applyPollData(pollData);
+
+        if (pollData.status === 'done') {
+          const redirectTo = pollData.redirectTo || `/family/${familyId}/photos`;
+          setTimeout(() => router.push(redirectTo), 800);
           return;
         }
 
-        // Step 2: 轮询等待结果
-        const startTime = Date.now();
-
-        while (Date.now() - startTime < POLL_TIMEOUT) {
-          await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-
-          // 更新进度条
-          setProgress((prev) => Math.min(prev + 8, 90));
-
-          const pollRes = await fetch(`/api/analyze?familyId=${familyId}`);
-          const pollData = await pollRes.json();
-
-          if (pollData.status === 'done') {
-            setProgress(100);
-            const redirectTo = pollData.redirectTo || `/family/${familyId}/photos`;
-            setTimeout(() => router.push(redirectTo), 500);
-            return;
-          }
-
-          if (pollData.status === 'error') {
-            setError(pollData.message || '分析失败，请重试');
-            return;
-          }
-          // status === 'processing' 继续轮询
+        if (pollData.status === 'error') {
+          setError((pollData.message as string) || '解析失败，请重试');
+          hasRun.current = false;
+          return;
         }
-
-        // 超时
-        setError('分析超时，但可能仍在后台处理中。请稍后查看故事页面。');
-      } catch {
-        setError('网络错误，分析中断');
       }
-    }
 
-    startAndPoll();
-  }, [familyId, router]);
+      setError('解析时间较长，可先去照片库查看已完成的结果。');
+      hasRun.current = false;
+    } catch {
+      setError('网络不太稳定，解析可能中断了。你可以重试。');
+      hasRun.current = false;
+    }
+  }, [familyId, pollStatus, applyPollData, router]);
+
+  useEffect(() => {
+    if (hasRun.current) return;
+    startAnalysis();
+  }, [startAnalysis]);
+
+  const handleRetryAll = () => {
+    hasRun.current = false;
+    startAnalysis();
+  };
+
+  const handlePhotoRetried = async () => {
+    const pollData = await pollStatus();
+    applyPollData(pollData);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8">
-      <div className="w-full max-w-[280px] text-center">
-        {/* 电影放映机图标 */}
-        <div className="mb-12">
-          <div className="w-20 h-20 mx-auto rounded-full bg-[#D98A45]/10 flex items-center justify-center animate-soft-pulse">
-            <span className="text-3xl">🎞️</span>
-          </div>
-        </div>
+    <div className="min-h-screen flex flex-col px-6 pt-10 pb-28 bg-[#F8F4ED]">
+      <div className="w-full max-w-md mx-auto">
+        <h1 className="text-xl font-serif text-[#4B3B2F] text-center mb-2">念念正在读懂照片</h1>
+        <p className="text-sm text-[#B8A898] text-center mb-6">
+          并发解析中，完成一张保存一张
+        </p>
 
-        {/* 进度条 */}
-        <div className="mb-6">
-          <div className="w-full h-1.5 bg-[#F0E8D8] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#D98A45] rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="text-xs text-[#B8A898] mt-2">{progress > 0 ? 'AI 正在分析中…' : '正在连接 AI…'}</p>
-        </div>
+        <AnalysisProgress
+          completed={summary.completed}
+          total={summary.total}
+          failed={summary.failed}
+          active={summary.active}
+          className="mb-6"
+        />
 
-        {/* 动态短语 */}
-        <div className="h-16 flex items-center justify-center mb-4">
-          <p
-            key={phraseIndex}
-            className="text-[#8B7355] text-base font-serif animate-fade-in leading-relaxed"
-          >
+        {!error && (
+          <p className="text-sm text-[#8B7355] font-serif text-center mb-6 animate-fade-in">
             {LOADING_PHRASES[phraseIndex]}
-            <span className="inline-block w-5 text-left text-[#D98A45]">{dots}</span>
           </p>
-        </div>
+        )}
 
-        {/* 进度点 */}
-        <div className="flex items-center justify-center gap-2 mt-8">
-          {LOADING_PHRASES.map((_, i) => (
-            <div
-              key={i}
-              className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
-                i <= phraseIndex ? 'bg-[#D98A45]' : 'bg-[#E8DCC8]'
-              }`}
-            />
-          ))}
-        </div>
+        {photos.length > 0 && (
+          <div className="space-y-2 mb-6">
+            {photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="flex items-center gap-3 p-3 rounded-xl bg-white border border-[#F0E8D8]"
+              >
+                {photo.url && (
+                  <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F0E8D8] shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <MemoryCardStatus status={photo.status} />
+                  {photo.error && (
+                    <p className="text-[10px] text-[#C04040] mt-1 truncate">{photo.error}</p>
+                  )}
+                </div>
+                {photo.status === 'failed' && (
+                  <RetryAnalysisButton
+                    familyId={familyId}
+                    photoId={photo.id}
+                    onRetried={handlePhotoRetried}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {error && (
-          <div className="mt-8 p-4 rounded-xl bg-[#FFF8F0] text-[#C04040] text-sm">
-            <p>{error}</p>
-            <div className="flex gap-3 justify-center">
+          <div className="p-5 rounded-2xl bg-[#FFF8F0] text-left">
+            <p className="text-[#C04040] text-sm leading-relaxed mb-4">{error}</p>
+            <div className="flex flex-col gap-2">
               <button
-                onClick={() => router.push(`/family/${familyId}/upload`)}
-                className="mt-3 text-[#D98A45] underline underline-offset-2"
+                type="button"
+                onClick={handleRetryAll}
+                className="w-full py-3 rounded-xl bg-[#D98A45] text-white text-sm font-medium"
               >
-                返回重新上传
+                重新解析
               </button>
               <button
-                onClick={() => router.push(`/family/${familyId}`)}
-                className="mt-3 text-[#D98A45] underline underline-offset-2"
+                type="button"
+                onClick={() => router.push(`/family/${familyId}/photos`)}
+                className="w-full py-3 rounded-xl bg-white border border-[#E8DCC8] text-[#8B7355] text-sm"
               >
-                查看家庭主页
+                先去照片库查看
               </button>
             </div>
           </div>
         )}
-
-        {/* 底部 */}
-        <p className="mt-16 text-xs text-[#D8CCB8] animate-fade-in-up delay-1000">
-          每张照片都是时间的书签
-        </p>
       </div>
     </div>
   );

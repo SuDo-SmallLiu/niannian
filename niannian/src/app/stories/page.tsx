@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import SharePosterCard from '@/components/SharePosterCard';
+import PipelineSteps from '@/components/PipelineSteps';
+import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useSharePoster } from '@/hooks/useSharePoster';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 
@@ -14,19 +16,29 @@ interface Story {
   description: string;
   summary?: string;
   family_name?: string;
+  theme?: string;
   created_at: string;
   photos?: string[];
+  read_count?: number;
+}
+
+interface FamilyOption {
+  id: string;
+  name: string;
 }
 
 export default function StoriesPage() {
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
+  const [families, setFamilies] = useState<FamilyOption[]>([]);
+  const [themeFilter, setThemeFilter] = useState<string>('all');
   const [photoUrlsByStory, setPhotoUrlsByStory] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
   const { confirm, alert } = useAppDialog();
+  const appreciate = useAppreciateMode();
 
   useEffect(() => {
     fetchStories();
@@ -36,14 +48,15 @@ export default function StoriesPage() {
     try {
       const familyRes = await fetch('/api/family');
       const familyData = await familyRes.json();
-      const families = familyData.families || [];
+      const familyList: FamilyOption[] = familyData.families || [];
+      setFamilies(familyList);
 
       const allStories: Story[] = [];
       const urlsMap: Record<string, string[]> = {};
 
-      for (const family of families) {
+      for (const family of familyList) {
         const [storyRes, photosRes] = await Promise.all([
-          fetch(`/api/story?familyId=${family.id}`),
+          fetch(`/api/story?familyId=${family.id}&publishedOnly=1`),
           fetch(`/api/photos?familyId=${family.id}`),
         ]);
         const storyData = await storyRes.json();
@@ -67,6 +80,11 @@ export default function StoriesPage() {
       setLoading(false);
     }
   };
+
+  const filteredStories =
+    themeFilter === 'all'
+      ? stories
+      : stories.filter((s) => s.family_id === themeFilter);
 
   const handleShare = async (story: Story) => {
     setSharingId(story.id);
@@ -124,36 +142,72 @@ export default function StoriesPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
+    <div className={`min-h-screen flex flex-col bg-[#F8F4ED] ${appreciate ? 'text-lg' : ''}`}>
       {shareModal}
       <Header />
       <main className="flex-1 px-6 py-8 pb-24">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">家庭故事</h1>
-          <p className="text-sm text-[#B8A898]">AI 为你整理的家庭记忆</p>
+          <h1 className={`font-serif text-[#4B3B2F] mb-2 ${appreciate ? 'text-3xl' : 'text-2xl'}`}>
+            家庭故事
+          </h1>
+          <p className="text-sm text-[#B8A898] mb-3">来自记忆卡，不是你的相册流水账</p>
+          <PipelineSteps active={2} compact />
         </div>
+
+        {families.length > 1 && (
+          <div className="max-w-md mx-auto mb-6">
+            <p className="text-xs text-[#B8A898] mb-2">按主题筛选</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                onClick={() => setThemeFilter('all')}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs ${
+                  themeFilter === 'all'
+                    ? 'bg-[#D98A45] text-white'
+                    : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
+                }`}
+              >
+                全部主题
+              </button>
+              {families.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setThemeFilter(f.id)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs ${
+                    themeFilter === f.id
+                      ? 'bg-[#D98A45] text-white'
+                      : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
+                  }`}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
           </div>
-        ) : stories.length === 0 ? (
+        ) : filteredStories.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-4">📖</p>
-            <p className="text-[#B8A898] mb-2">还没有故事</p>
-            <p className="text-sm text-[#D8CCB8]">上传照片后，AI 会帮你整理家庭故事</p>
+            <p className="text-[#B8A898] mb-2">还没有已发布的故事</p>
+            <p className="text-sm text-[#D8CCB8]">在主题管理的草稿箱里编辑并发布后，会出现在这里</p>
             <button
               type="button"
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/family')}
               className="mt-6 px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
             >
-              去上传照片
+              去我的主题
             </button>
           </div>
         ) : (
           <div className="space-y-8 max-w-md mx-auto">
-            {stories.map((story) => (
-              <div key={story.id}>
+            {filteredStories.map((story) => (
+              <div key={story.id} className="relative">
                 <SharePosterCard
                   type="story"
                   title={story.title}
@@ -163,40 +217,62 @@ export default function StoriesPage() {
                 />
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/stories/${story.id}/play`)}
-                    className="flex-1 min-w-[140px] py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
-                  >
-                    ▶ 沉浸体验
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleShare(story)}
-                    disabled={sharingId === story.id}
-                    className="flex-1 min-w-[120px] py-3 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all"
-                  >
-                    {sharingId === story.id ? '生成中…' : '💬 分享'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/stories/${story.id}`)}
-                    className="px-4 py-3 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:border-[#D98A45]/40 transition-all"
-                  >
-                    章节详情
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(story)}
-                    disabled={deletingId === story.id || sharingId === story.id}
-                    className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
-                  >
-                    {deletingId === story.id ? '删除中…' : '🗑 删除故事'}
-                  </button>
+                  {appreciate ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/stories/${story.id}/play?appreciate=1`)}
+                        className="flex-1 min-w-[140px] py-3 rounded-2xl bg-[#D98A45] text-white text-base font-medium hover:bg-[#C47A3A] transition-all"
+                      >
+                        ▶ 自动播放
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/stories/${story.id}?appreciate=1`)}
+                        className="flex-1 min-w-[120px] py-3 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-base"
+                      >
+                        阅读全文
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/stories/${story.id}`)}
+                        className="flex-1 min-w-[140px] py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
+                      >
+                        章节详情
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleShare(story)}
+                        disabled={sharingId === story.id}
+                        className="flex-1 min-w-[120px] py-3 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all"
+                      >
+                        {sharingId === story.id ? '生成中…' : '💬 分享'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(story)}
+                        disabled={deletingId === story.id || sharingId === story.id}
+                        className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
+                      >
+                        {deletingId === story.id ? '删除中…' : '🗑 删除故事'}
+                      </button>
+                    </>
+                  )}
                 </div>
-                <p className="text-xs text-[#D8CCB8] text-center mt-2">
-                  {story.created_at?.slice(0, 10)}
-                </p>
+                <div className="flex items-center justify-between mt-2 text-xs text-[#D8CCB8]">
+                  <span>
+                    {story.family_name && `${story.family_name} · `}
+                    {story.created_at?.slice(0, 10)}
+                  </span>
+                  <span className="text-[#B8A898]">
+                    {(story.read_count ?? 0) > 0
+                      ? `${story.read_count} 人读过你的故事`
+                      : '还没有人读过'}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

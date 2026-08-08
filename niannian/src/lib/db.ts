@@ -197,6 +197,12 @@ function migrateDatabase(database: Database.Database) {
   if (!storyColNames.has('updated_at')) {
     database.exec(`ALTER TABLE stories ADD COLUMN updated_at TEXT`);
   }
+  if (!storyColNames.has('read_count')) {
+    database.exec(`ALTER TABLE stories ADD COLUMN read_count INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!storyColNames.has('published')) {
+    database.exec(`ALTER TABLE stories ADD COLUMN published INTEGER NOT NULL DEFAULT 0`);
+  }
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS story_memory_cards (
@@ -485,7 +491,33 @@ function parseStoryRow(row: any) {
     summary: row.summary || row.description || '',
     theme: row.theme || '',
     cover_photo_id: row.cover_photo_id || null,
+    read_count: row.read_count ?? 0,
+    published: Boolean(row.published),
   };
+}
+
+export function publishStory(storyId: string): boolean {
+  const database = getDb();
+  const result = database
+    .prepare(`UPDATE stories SET published = 1, updated_at = datetime('now') WHERE id = ?`)
+    .run(storyId);
+  return result.changes > 0;
+}
+
+export function getPublishedStoriesByFamily(familyId: string) {
+  const database = getDb();
+  const rows = database
+    .prepare('SELECT * FROM stories WHERE family_id = ? AND published = 1 ORDER BY created_at DESC')
+    .all(familyId) as any[];
+  return rows.map(parseStoryRow);
+}
+
+export function getAllPublishedStories() {
+  const database = getDb();
+  const rows = database
+    .prepare('SELECT * FROM stories WHERE published = 1 ORDER BY created_at DESC')
+    .all() as any[];
+  return rows.map(parseStoryRow);
 }
 
 export function createStory(
@@ -732,6 +764,80 @@ export function updateStory(
       storyId
     );
   return result.changes > 0;
+}
+
+export function updateStoryFields(
+  storyId: string,
+  data: {
+    title?: string;
+    summary?: string;
+    theme?: string;
+    connectionAction?: string;
+    timeline?: Array<{ year: string; event: string }>;
+    photoIds?: string[];
+    coverPhotoId?: string | null;
+  }
+): boolean {
+  const database = getDb();
+  const current = getStory(storyId);
+  if (!current) return false;
+
+  const title = data.title ?? current.title;
+  const summary = data.summary ?? current.summary ?? current.description;
+  const theme = data.theme ?? current.theme ?? '';
+  const connectionAction = data.connectionAction ?? current.connection_action;
+  const timeline = data.timeline ?? (current.timeline as Array<{ year: string; event: string }>);
+  const photoIds = data.photoIds ?? (current.photos as string[]);
+  const coverPhotoId =
+    data.coverPhotoId !== undefined ? data.coverPhotoId : current.cover_photo_id;
+
+  const result = database
+    .prepare(
+      `UPDATE stories SET
+        title = ?,
+        description = ?,
+        summary = ?,
+        theme = ?,
+        connection_action = ?,
+        timeline = ?,
+        photos = ?,
+        cover_photo_id = ?,
+        updated_at = datetime('now')
+      WHERE id = ?`
+    )
+    .run(
+      title,
+      summary,
+      summary,
+      theme,
+      connectionAction,
+      JSON.stringify(timeline),
+      JSON.stringify(photoIds),
+      coverPhotoId,
+      storyId
+    );
+  return result.changes > 0;
+}
+
+export function incrementStoryReadCount(storyId: string): number {
+  const database = getDb();
+  database
+    .prepare(
+      `UPDATE stories SET read_count = COALESCE(read_count, 0) + 1 WHERE id = ?`
+    )
+    .run(storyId);
+  const row = database
+    .prepare('SELECT read_count FROM stories WHERE id = ?')
+    .get(storyId) as { read_count: number } | undefined;
+  return row?.read_count ?? 0;
+}
+
+export function getNextStoryVersionNumber(storyId: string): number {
+  const database = getDb();
+  const row = database
+    .prepare('SELECT MAX(version) as maxV FROM story_versions WHERE story_id = ?')
+    .get(storyId) as { maxV: number | null };
+  return (row?.maxV ?? 0) + 1;
 }
 
 // --- Share 操作 ---
@@ -1310,6 +1416,17 @@ export function createLifeMovie(input: {
 export function deleteLifeMoviesByFamily(familyId: string): void {
   const database = getDb();
   database.prepare('DELETE FROM life_movies WHERE family_id = ?').run(familyId);
+}
+
+export function deleteLifeMovieById(movieId: string): boolean {
+  const database = getDb();
+  const movie = getLifeMovie(movieId);
+  if (!movie) return false;
+
+  database.prepare('DELETE FROM movie_shares WHERE movie_id = ?').run(movieId);
+  database.prepare('DELETE FROM movie_chapters WHERE movie_id = ?').run(movieId);
+  const result = database.prepare('DELETE FROM life_movies WHERE id = ?').run(movieId);
+  return result.changes > 0;
 }
 
 export function getLifeMovie(id: string): LifeMovieRow | null {

@@ -108,7 +108,9 @@ export async function analyzePhoto(
   const affectPrompt = buildAffectTheoryPrompt();
 
   const supplementContext = supplement ? buildSupplementPrompt(supplement) : '';
-  const useCompactPrompt = (process.env.ARK_BASE_URL || '').includes('cucloud');
+  const visionBase =
+    process.env.ARK_VISION_BASE_URL?.trim() || process.env.ARK_BASE_URL || '';
+  const useCompactPrompt = visionBase.includes('cucloud');
 
   const prompt = useCompactPrompt
     ? `分析这张照片，生成记忆卡。${familyContext}${sourceContext}${supplementContext}

@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const TABS = [
-  { label: '我的主题', href: '/family' },
   { label: '全部记忆', href: '/family/memories' },
+  { label: '我的主题', href: '/family' },
 ] as const;
 
 export default function FamilySectionTabs() {
@@ -23,7 +23,8 @@ export default function FamilySectionTabs() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`flex-1 py-2.5 rounded-xl text-sm text-center transition-all ${
+            prefetch
+            className={`relative z-10 flex-1 py-2.5 rounded-xl text-sm text-center transition-all ${
               active
                 ? 'bg-[#D98A45] text-white font-medium shadow-sm'
                 : 'text-[#8B7355] hover:bg-[#FFF8F0]'

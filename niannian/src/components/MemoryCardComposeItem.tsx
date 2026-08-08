@@ -22,7 +22,7 @@ export function MemoryCardComposeHintsView({
   if (!hints.aiHint && !hints.action && hints.tags.length === 0) {
     return (
       <p className={`text-[#B8A898] ${compact ? 'text-[10px]' : 'text-xs'}`}>
-        暂无 AI 提示，建议先重新解析
+        暂无念念提示，建议先重新解析
       </p>
     );
   }

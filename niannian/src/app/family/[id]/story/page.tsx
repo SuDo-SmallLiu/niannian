@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ChapterCard from '@/components/ChapterCard';
+import StoryInlineEditor from '@/components/StoryInlineEditor';
 import { useSharePoster } from '@/hooks/useSharePoster';
+import { useAutoGenerateFamilyStory } from '@/hooks/useAutoGenerateFamilyStory';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import {
   AlertDialog,
@@ -21,15 +23,31 @@ interface StoryItem {
   id: string;
   title: string;
   description: string;
+  summary?: string;
   connection_action: string;
   timeline: Array<{ year: string; event: string }>;
   photos: string[];
   created_at: string;
+  published?: boolean;
+}
+
+interface StoryEditDetail {
+  id: string;
+  title: string;
+  description: string;
+  summary: string;
+  segments: Array<{
+    photoId: string;
+    memorySnippet: string;
+    narrative: string;
+  }>;
+  photos_detail: Array<{ id: string; url: string }>;
 }
 
 export default function StoryPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const familyId = params.id as string;
   const storyId = searchParams.get('storyId');
 
@@ -45,8 +63,14 @@ export default function StoryPage() {
   const [confirmStory, setConfirmStory] = useState<StoryItem | null>(null);
   const [deleteStoryTarget, setDeleteStoryTarget] = useState<StoryItem | null>(null);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
+  const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
+  const [editDetail, setEditDetail] = useState<StoryEditDetail | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  const [publishingStoryId, setPublishingStoryId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
   const { showLoading, hideLoading } = useAppDialog();
+  const { generateStories, generating: autoGenerating, error: autoGenerateError } =
+    useAutoGenerateFamilyStory(familyId);
 
   const fetchData = useCallback(async () => {
     try {
@@ -98,13 +122,13 @@ export default function StoryPage() {
     setRegeneratingStoryId(story.id);
     setRegenerateError('');
     setRegenerateSuccess('');
-    showLoading('AI 正在重新生成故事', '读取最新记忆卡并撰写中，请保持页面打开…');
+    showLoading('念念正在重新生成故事', '读取最新记忆卡并撰写中，请保持页面打开…');
     const startedAt = Date.now();
     try {
       const res = await fetch('/api/story/regenerate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id }),
+        body: JSON.stringify({ storyId: story.id, mode: 'full' }),
       });
       const data = await res.json();
       const minLoadingMs = 1200;
@@ -160,6 +184,31 @@ export default function StoryPage() {
     }
   };
 
+  const handlePublishStory = async (story: StoryItem) => {
+    setPublishingStoryId(story.id);
+    setRegenerateError('');
+    try {
+      const res = await fetch('/api/story', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: story.id, publish: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '发布失败');
+      setStories((prev) =>
+        prev.map((item) =>
+          item.id === story.id ? { ...item, published: true } : item
+        )
+      );
+      setRegenerateSuccess('已发布到「故事」页签，家人现在可以看到啦');
+      window.setTimeout(() => setRegenerateSuccess(''), 4000);
+    } catch (err) {
+      setRegenerateError(err instanceof Error ? err.message : '发布失败');
+    } finally {
+      setPublishingStoryId(null);
+    }
+  };
+
   const handleDeleteStory = async (story: StoryItem) => {
     setDeletingStoryId(story.id);
     try {
@@ -176,6 +225,38 @@ export default function StoryPage() {
       setDeletingStoryId(null);
       setDeleteStoryTarget(null);
     }
+  };
+
+  const startEditStory = async (story: StoryItem) => {
+    setEditingStoryId(story.id);
+    setEditDetail(null);
+    setLoadingEdit(true);
+    try {
+      const res = await fetch(`/api/story?storyId=${story.id}`);
+      const data = await res.json();
+      if (!res.ok || !data.story) {
+        setRegenerateError(data.error || '加载故事详情失败');
+        setEditingStoryId(null);
+        return;
+      }
+      setEditDetail(data.story);
+    } catch {
+      setRegenerateError('加载故事详情失败');
+      setEditingStoryId(null);
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
+
+  const cancelEditStory = () => {
+    setEditingStoryId(null);
+    setEditDetail(null);
+  };
+
+  const handleEditSaved = async () => {
+    setEditingStoryId(null);
+    setEditDetail(null);
+    await fetchData();
   };
 
   if (loading) {
@@ -222,7 +303,7 @@ export default function StoryPage() {
             href={`/family/${familyId}`}
             className="block w-full py-4 px-5 rounded-2xl bg-[#D98A45] text-white text-center shadow-sm"
           >
-            <p className="font-medium mb-1">✨ AI 自动发现故事</p>
+            <p className="font-medium mb-1">✨ 念念自动发现故事</p>
             <p className="text-xs text-white/80">从全部记忆卡聚类生成 3–5 个主题故事</p>
           </Link>
           <Link
@@ -293,8 +374,11 @@ export default function StoryPage() {
 
       {/* 顶部 */}
       <div className="flex items-center justify-between mb-8">
-        <Link href="/" className="text-[#B8A898] hover:text-[#8B7355] text-sm transition-colors">
-          ← 返回
+        <Link
+          href={`/family/${familyId}`}
+          className="text-[#B8A898] hover:text-[#8B7355] text-sm transition-colors"
+        >
+          ← 主题管理
         </Link>
         {familyName && (
           <p className="text-xs text-[#D8CCB8]">{familyName}</p>
@@ -305,13 +389,13 @@ export default function StoryPage() {
       {/* 标题 */}
       <div className="text-center mb-8 animate-fade-in-up">
         <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3">
-          家庭记忆
+          故事草稿箱
         </p>
         <h1 className="text-2xl font-serif font-bold text-[#4B3B2F] leading-snug">
-          {familyName ? `${familyName}的故事` : '我们的故事'}
+          {familyName ? `${familyName}的故事草稿` : '我们的故事草稿'}
         </h1>
         <p className="mt-3 text-sm text-[#B8A898]">
-          共 {stories.length} 个故事
+          共 {stories.length} 个草稿 · 发布后才会出现在「故事」页签
         </p>
       </div>
 
@@ -323,38 +407,82 @@ export default function StoryPage() {
         <p className="text-sm text-[#D98A45] text-center mb-4 px-4 py-2 bg-[#FFF8F0] rounded-xl">{regenerateSuccess}</p>
       )}
 
-      <div className="max-w-md mx-auto mb-8">
+      <div className="max-w-md mx-auto mb-8 space-y-3">
+        <button
+          type="button"
+          onClick={async () => {
+            const ok = await generateStories({ existingCount: stories.length });
+            if (ok) await fetchData();
+          }}
+          disabled={autoGenerating}
+          className="w-full py-4 px-5 rounded-2xl bg-[#D98A45] text-white font-medium shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
+        >
+          {autoGenerating ? '念念撰写中…' : '✨ 念念自动生成故事'}
+        </button>
         <Link
           href={`/family/${familyId}/story/compose`}
           className="flex items-center justify-between w-full py-4 px-5 rounded-2xl bg-white border border-[#E8DCC8] hover:border-[#D98A45]/40 transition-all shadow-sm"
         >
           <div className="text-left">
             <p className="text-sm font-medium text-[#4B3B2F]">🧩 人工组合排列</p>
-            <p className="text-xs text-[#B8A898] mt-0.5">自选照片顺序，生成新故事</p>
+            <p className="text-xs text-[#B8A898] mt-0.5">自选照片顺序，手动编排后生成故事</p>
           </div>
           <span className="text-[#D98A45] text-lg">→</span>
         </Link>
+        {autoGenerateError && (
+          <p className="text-xs text-red-500 text-center px-2">{autoGenerateError}</p>
+        )}
       </div>
 
       {/* 章节列表 */}
       <div>
         {stories.map((story, index) => (
-          <ChapterCard
-            key={story.id}
-            chapter={index + 1}
-            title={story.title}
-            summary={story.description}
-            familyName={familyName}
-            photoUrls={(story.photos || [])
-              .map((id) => photoUrlMap[id])
-              .filter(Boolean)}
-            sharing={sharingStoryId === story.id}
-            regenerating={regeneratingStoryId === story.id}
-            onShare={() => handleSharePoster(story)}
-            onRegenerate={() => setConfirmStory(story)}
-            onDelete={() => setDeleteStoryTarget(story)}
-            deleting={deletingStoryId === story.id}
-          />
+          <div key={story.id} id={`story-${story.id}`}>
+            {editingStoryId === story.id ? (
+              <section className="mb-10">
+                <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3 text-center">
+                  Chapter {String(index + 1).padStart(2, '0')} · 编辑中
+                </p>
+                {loadingEdit || !editDetail ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-[#E8DCC8] border-t-[#D98A45] rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <StoryInlineEditor
+                    storyId={story.id}
+                    initialTitle={editDetail.title}
+                    initialSummary={editDetail.summary || editDetail.description}
+                    initialSegments={(editDetail.segments || []).map((seg) => ({
+                      ...seg,
+                      photoUrl: editDetail.photos_detail?.find((p) => p.id === seg.photoId)?.url,
+                    }))}
+                    onSaved={handleEditSaved}
+                    onCancel={cancelEditStory}
+                  />
+                )}
+              </section>
+            ) : (
+              <ChapterCard
+                chapter={index + 1}
+                title={story.title}
+                summary={story.summary || story.description}
+                familyName={familyName}
+                photoUrls={(story.photos || [])
+                  .map((id) => photoUrlMap[id])
+                  .filter(Boolean)}
+                published={story.published}
+                sharing={sharingStoryId === story.id}
+                publishing={publishingStoryId === story.id}
+                editing={editingStoryId === story.id}
+                onEdit={() => startEditStory(story)}
+                onViewDetail={() => router.push(`/stories/${story.id}`)}
+                onPublish={() => handlePublishStory(story)}
+                onShare={() => handleSharePoster(story)}
+                onDelete={() => setDeleteStoryTarget(story)}
+                deleting={deletingStoryId === story.id}
+              />
+            )}
+          </div>
         ))}
       </div>
 

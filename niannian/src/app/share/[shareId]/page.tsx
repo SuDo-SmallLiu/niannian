@@ -20,6 +20,7 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [posterType, setPosterType] = useState<'story' | 'memory' | 'movie'>('story');
+  const [readCount, setReadCount] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -58,6 +59,9 @@ export default function SharePage() {
               });
 
         setPosterType(input.type);
+        if (result.share.share_type === 'story' && result.share.read_count != null) {
+          setReadCount(result.share.read_count);
+        }
         const url = await generateSharePoster(input);
         setPosterUrl(url);
       } catch {
@@ -112,6 +116,11 @@ export default function SharePage() {
       </div>
 
       <div className="shrink-0 px-4 pb-6 pt-2">
+        {readCount != null && readCount > 0 && (
+          <p className="text-center text-white/50 text-xs mb-2">
+            已有 {readCount} 人次阅读过这个故事
+          </p>
+        )}
         <div className="flex gap-2 max-w-[420px] mx-auto">
           <button
             type="button"

@@ -246,7 +246,7 @@ export default function UserSupplementPanel({
   return (
     <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
       <h2 className="text-base text-[#D98A45] font-medium mb-1">用户层 · 补充记忆</h2>
-      <p className="text-sm text-muted-foreground mb-4">与念念助手对话，补充 AI 看不到的故事</p>
+      <p className="text-sm text-muted-foreground mb-4">与念念助手对话，补充念念看不到的故事</p>
 
       {notes.trim() && integratedSummary && (
         <div className="mb-4 rounded-xl bg-[#F5FFF8] border border-[#D4EDDA] px-4 py-3.5">

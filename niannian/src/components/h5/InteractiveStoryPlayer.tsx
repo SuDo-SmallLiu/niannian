@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { H5Slide } from '@/lib/h5-story-slides';
-import { getThemeFromSlide } from '@/lib/theme-music';
+import { getMusicFromSlide } from '@/lib/theme-music';
 import { estimateNarrationMs, getSlideNarrationText } from '@/lib/slide-narration';
 import { useThemeMusic } from '@/hooks/useThemeMusic';
 import { useNarration } from '@/hooks/useNarration';
@@ -16,6 +16,11 @@ interface InteractiveStoryPlayerProps {
   showClose?: boolean;
   enableMusic?: boolean;
   enableNarration?: boolean;
+  appreciateMode?: boolean;
+  /** 用户点击开始后自动播放（电影/故事播放页） */
+  autoStart?: boolean;
+  /** 人生电影 ID，用于 MeloTTS 旁白缓存 */
+  movieId?: string;
 }
 
 export default function InteractiveStoryPlayer({
@@ -26,8 +31,12 @@ export default function InteractiveStoryPlayer({
   showClose = true,
   enableMusic = true,
   enableNarration = false,
+  appreciateMode = false,
+  autoStart = false,
+  movieId,
 }: InteractiveStoryPlayerProps) {
   const [index, setIndex] = useState(0);
+  /** 必须用户点击「开始播放」后才自动翻页，避免无声快闪 */
   const [autoPlay, setAutoPlay] = useState(false);
   const [musicOn, setMusicOn] = useState(true);
   const [narrationOn, setNarrationOn] = useState(true);
@@ -35,6 +44,7 @@ export default function InteractiveStoryPlayer({
   const [animKey, setAnimKey] = useState(0);
   const [progressKey, setProgressKey] = useState(0);
   const [narrationKey, setNarrationKey] = useState(0);
+  const [narrationDurationMs, setNarrationDurationMs] = useState<number | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const total = slides.length;
@@ -47,22 +57,31 @@ export default function InteractiveStoryPlayer({
 
   const slideDurationMs = useMemo(() => {
     if (enableNarration && narrationOn && narrationText) {
-      return estimateNarrationMs(narrationText);
+      const ms =
+        slide?.narrationDurationMs ||
+        narrationDurationMs ||
+        estimateNarrationMs(narrationText);
+      return Math.max(ms, 3500);
     }
     return autoPlayMs;
-  }, [enableNarration, narrationOn, narrationText, autoPlayMs]);
+  }, [
+    enableNarration,
+    narrationOn,
+    narrationText,
+    autoPlayMs,
+    slide?.narrationDurationMs,
+    narrationDurationMs,
+  ]);
 
-  const activeTheme = useMemo(() => {
-    let lastTheme: string | undefined;
-    for (let i = 0; i <= index; i++) {
-      const t = getThemeFromSlide(slides[i]);
-      if (t) lastTheme = t;
-    }
-    return lastTheme;
-  }, [index, slides]);
+  useEffect(() => {
+    setNarrationDurationMs(null);
+  }, [index, narrationKey]);
 
-  useThemeMusic({
-    theme: activeTheme,
+  const activeMusic = useMemo(() => getMusicFromSlide(slide), [slide]);
+
+  const { prime: primeMusic } = useThemeMusic({
+    src: activeMusic.file,
+    volume: activeMusic.volume,
     enabled: enableMusic && musicOn,
     unlocked: audioUnlocked,
     duck: enableNarration && narrationOn && Boolean(narrationText),
@@ -70,10 +89,27 @@ export default function InteractiveStoryPlayer({
 
   const unlockAudio = useCallback(() => {
     setAudioUnlocked(true);
+    if (typeof window !== 'undefined') {
+      window.speechSynthesis?.getVoices();
+      const probe = new Audio(
+        'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=='
+      );
+      probe.volume = 0.01;
+      void probe.play().then(() => probe.pause()).catch(() => {});
+    }
   }, []);
+
+  const handleStartPlayback = useCallback(() => {
+    unlockAudio();
+    primeMusic();
+    setAutoPlay(true);
+    setProgressKey((k) => k + 1);
+    setNarrationKey((k) => k + 1);
+  }, [unlockAudio, primeMusic]);
 
   const goNext = useCallback(() => {
     unlockAudio();
+    primeMusic();
     setIndex((i) => {
       if (i >= total - 1) return i;
       setAnimKey((k) => k + 1);
@@ -81,10 +117,11 @@ export default function InteractiveStoryPlayer({
       setNarrationKey((k) => k + 1);
       return i + 1;
     });
-  }, [total, unlockAudio]);
+  }, [total, unlockAudio, primeMusic]);
 
   const goPrev = useCallback(() => {
     unlockAudio();
+    primeMusic();
     setIndex((i) => {
       if (i <= 0) return i;
       setAnimKey((k) => k + 1);
@@ -105,7 +142,11 @@ export default function InteractiveStoryPlayer({
     enabled: enableNarration && narrationOn,
     unlocked: audioUnlocked,
     speakKey: `${index}-${narrationKey}`,
+    slideId: slide?.id,
+    movieId,
+    audioUrl: slide?.narrationUrl,
     onEnd: handleNarrationEnd,
+    onDurationKnown: setNarrationDurationMs,
   });
 
   const toggleAutoPlay = useCallback((e: React.MouseEvent) => {
@@ -118,13 +159,19 @@ export default function InteractiveStoryPlayer({
       }
       return !v;
     });
-  }, [unlockAudio]);
+  }, [unlockAudio, primeMusic]);
 
   const toggleMusic = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     unlockAudio();
-    setMusicOn((v) => !v);
-  }, [unlockAudio]);
+    setMusicOn((v) => {
+      const next = !v;
+      if (next) {
+        primeMusic(true);
+      }
+      return next;
+    });
+  }, [unlockAudio, primeMusic]);
 
   const toggleNarration = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -137,11 +184,24 @@ export default function InteractiveStoryPlayer({
 
   useEffect(() => {
     if (!autoPlay || index >= total - 1) return;
+    if (!audioUnlocked) return;
+    // 旁白模式下由旁白结束驱动翻页，不用定时器
     if (enableNarration && narrationOn && narrationText) return;
 
     const timer = setTimeout(goNext, slideDurationMs);
     return () => clearTimeout(timer);
-  }, [autoPlay, index, total, slideDurationMs, goNext, progressKey, enableNarration, narrationOn, narrationText]);
+  }, [
+    autoPlay,
+    index,
+    total,
+    slideDurationMs,
+    goNext,
+    progressKey,
+    enableNarration,
+    narrationOn,
+    narrationText,
+    audioUnlocked,
+  ]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -164,11 +224,33 @@ export default function InteractiveStoryPlayer({
 
   if (!slide) return null;
 
+  const waitingForStart = !audioUnlocked && (autoStart || appreciateMode || enableMusic || enableNarration);
+
   return (
     <div
       className="fixed inset-0 z-[200] bg-black text-white select-none overflow-hidden"
       onTouchStart={handleTouchStart}
     >
+      {waitingForStart && (
+        <button
+          type="button"
+          onClick={handleStartPlayback}
+          className="absolute inset-0 z-[250] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm touch-manipulation"
+          aria-label="开始播放"
+        >
+          <span className="w-20 h-20 rounded-full bg-[#D98A45] flex items-center justify-center mb-6 shadow-lg shadow-[#D98A45]/40 animate-soft-pulse">
+            <Play className="w-10 h-10 ml-1" />
+          </span>
+          <p className="text-xl font-serif font-medium mb-2">点击开始播放</p>
+          <p className="text-sm text-white/60">
+            {enableMusic && enableNarration
+              ? '配乐 · 旁白 · 自动翻页'
+              : enableNarration
+                ? '旁白 · 自动翻页'
+                : '自动翻页'}
+          </p>
+        </button>
+      )}
       {/* 进度条 */}
       <div className="absolute top-0 left-0 right-0 z-40 flex gap-1 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pointer-events-none">
         {slides.map((s, i) => (
@@ -209,53 +291,57 @@ export default function InteractiveStoryPlayer({
           <ChevronLeft className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2 pointer-events-auto">
-          {enableNarration && (
-            <button
-              type="button"
-              onClick={toggleNarration}
-              className={`w-11 h-11 rounded-full flex items-center justify-center touch-manipulation ${
-                narrationOn ? 'bg-[#D98A45]/80 text-white' : 'bg-black/40 text-white/60'
-              }`}
-              aria-label={narrationOn ? '关闭旁白' : '开启旁白'}
-            >
-              {narrationOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </button>
-          )}
-          {enableMusic && (
-            <button
-              type="button"
-              onClick={toggleMusic}
-              className={`w-11 h-11 rounded-full flex items-center justify-center touch-manipulation ${
-                musicOn ? 'bg-[#D98A45]/80 text-white' : 'bg-black/40 text-white/60'
-              }`}
-              aria-label={musicOn ? '关闭音乐' : '开启音乐'}
-            >
-              {musicOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={toggleAutoPlay}
-            className={`h-11 px-4 rounded-full flex items-center gap-1.5 text-sm touch-manipulation ${
-              autoPlay ? 'bg-[#D98A45] text-white' : 'bg-black/40 text-white'
-            }`}
-          >
-            {autoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            {autoPlay ? '暂停' : '自动播放'}
-          </button>
-          {onShare && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                unlockAudio();
-                onShare();
-              }}
-              className="w-11 h-11 rounded-full bg-black/40 flex items-center justify-center touch-manipulation"
-              aria-label="分享"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
+          {!appreciateMode && (
+            <>
+              {enableNarration && (
+                <button
+                  type="button"
+                  onClick={toggleNarration}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center touch-manipulation ${
+                    narrationOn ? 'bg-[#D98A45]/80 text-white' : 'bg-black/40 text-white/60'
+                  }`}
+                  aria-label={narrationOn ? '关闭旁白' : '开启旁白'}
+                >
+                  {narrationOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                </button>
+              )}
+              {enableMusic && (
+                <button
+                  type="button"
+                  onClick={toggleMusic}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center touch-manipulation ${
+                    musicOn ? 'bg-[#D98A45]/80 text-white' : 'bg-black/40 text-white/60'
+                  }`}
+                  aria-label={musicOn ? '关闭音乐' : '开启音乐'}
+                >
+                  {musicOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={toggleAutoPlay}
+                className={`h-11 px-4 rounded-full flex items-center gap-1.5 text-sm touch-manipulation ${
+                  autoPlay ? 'bg-[#D98A45] text-white' : 'bg-black/40 text-white'
+                }`}
+              >
+                {autoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                {autoPlay ? '暂停' : '自动播放'}
+              </button>
+              {onShare && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    unlockAudio();
+                    onShare();
+                  }}
+                  className="w-11 h-11 rounded-full bg-black/40 flex items-center justify-center touch-manipulation"
+                  aria-label="分享"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+              )}
+            </>
           )}
           {showClose && onClose && (
             <button
@@ -301,7 +387,7 @@ export default function InteractiveStoryPlayer({
       </div>
 
       {/* 底部提示 */}
-      {index < total - 1 && !autoPlay && (
+      {index < total - 1 && !autoPlay && !appreciateMode && (
         <div className="absolute bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-0 right-0 z-40 text-center pointer-events-none">
           <p className="text-white/60 text-sm animate-soft-pulse">
             {index === 0 ? '点击或左滑继续 →' : '← 点击左右切换 →'}

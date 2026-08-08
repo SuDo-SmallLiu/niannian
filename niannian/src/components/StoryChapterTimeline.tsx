@@ -31,6 +31,7 @@ interface StoryChapterTimelineProps {
   segments: StorySegment[];
   photosDetail: PhotoDetail[];
   connectionAction?: string;
+  largeText?: boolean;
 }
 
 export default function StoryChapterTimeline({
@@ -42,6 +43,7 @@ export default function StoryChapterTimeline({
   segments,
   photosDetail,
   connectionAction,
+  largeText = false,
 }: StoryChapterTimelineProps) {
   const photoMap = new Map(photosDetail.map((p) => [p.id, p]));
 
@@ -73,11 +75,11 @@ export default function StoryChapterTimeline({
             {theme}
           </span>
         )}
-        <h1 className="text-2xl font-serif font-bold text-[#4B3B2F] leading-snug mb-3">
+        <h1 className={`font-serif font-bold text-[#4B3B2F] leading-snug mb-3 ${largeText ? 'text-3xl' : 'text-2xl'}`}>
           {title}
         </h1>
         {summary && (
-          <p className="text-[15px] text-[#8B7355] leading-relaxed font-serif px-2">
+          <p className={`text-[#8B7355] leading-relaxed font-serif px-2 ${largeText ? 'text-lg' : 'text-[15px]'}`}>
             {summary}
           </p>
         )}

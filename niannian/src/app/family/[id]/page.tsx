@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
+import { useAutoGenerateFamilyStory } from '@/hooks/useAutoGenerateFamilyStory';
 
 interface FamilyDetail {
   id: string;
@@ -16,14 +17,18 @@ interface FamilyDetail {
 export default function FamilyDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const familyId = params.id as string;
+  const actionGenerate = searchParams.get('action') === 'generate';
 
   const [family, setFamily] = useState<FamilyDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState('');
   const [generatingMovie, setGeneratingMovie] = useState(false);
+  const [storyBannerDismissed, setStoryBannerDismissed] = useState(false);
+  const generateSectionRef = useRef<HTMLDivElement>(null);
   const { confirm, showLoading, hideLoading, alert } = useAppDialog();
+  const { generateStories, generating, error: generateError } =
+    useAutoGenerateFamilyStory(familyId);
 
   useEffect(() => {
     async function load() {
@@ -41,72 +46,11 @@ export default function FamilyDetailPage() {
     load();
   }, [familyId]);
 
-  const handleGenerateStories = async () => {
-    if (!family || generating) return;
-    const ok = await confirm({
-      title: '自动发现故事？',
-      description:
-        '将根据已解析的记忆卡自动发现 3–5 个主题故事，并替换当前家庭下的旧故事。此操作不可撤销。',
-      confirmText: '开始发现',
-      cancelText: '再想想',
-    });
-    if (!ok) return;
-
-    setGenerating(true);
-    setGenerateError('');
-    showLoading('正在发现故事', 'AI 正在聚类并撰写，请稍候…');
-
-    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-    try {
-      const res = await fetch('/api/story/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId, replaceExisting: true }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || '生成失败');
-      }
-
-      const jobId = data.jobId as string;
-      if (!jobId) {
-        throw new Error('未收到任务 ID');
-      }
-
-      for (let i = 0; i < 180; i++) {
-        await sleep(2000);
-        const pollRes = await fetch(`/api/story/generate?jobId=${encodeURIComponent(jobId)}`);
-        const poll = await pollRes.json();
-        if (!pollRes.ok) {
-          throw new Error(poll.error || '查询进度失败');
-        }
-        if (poll.progress) {
-          showLoading('正在发现故事', poll.progress);
-        }
-        if (poll.status === 'done') {
-          router.push(`/family/${familyId}/story`);
-          return;
-        }
-        if (poll.status === 'error') {
-          throw new Error(poll.error || '生成失败');
-        }
-      }
-
-      throw new Error('生成超时，请稍后在故事页查看是否已完成');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : '生成失败';
-      const lower = msg.toLowerCase();
-      if (lower.includes('failed to fetch') || lower.includes('networkerror')) {
-        setGenerateError('网络连接中断，故事可能仍在后台生成，请稍后刷新故事页查看');
-      } else {
-        setGenerateError(msg);
-      }
-    } finally {
-      hideLoading();
-      setGenerating(false);
+  useEffect(() => {
+    if (!loading && actionGenerate && generateSectionRef.current) {
+      generateSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  };
+  }, [loading, actionGenerate]);
 
   const handleGenerateMovie = async () => {
     if (!family || generatingMovie) return;
@@ -119,7 +63,7 @@ export default function FamilyDetailPage() {
     if (!ok) return;
 
     setGeneratingMovie(true);
-    showLoading('正在编排人生电影', '串联故事章节中…');
+    showLoading('正在编排人生电影', '串联故事章节，完成后即可播放…');
     try {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
@@ -169,8 +113,8 @@ export default function FamilyDetailPage() {
     },
     {
       icon: '🧠',
-      title: 'AI 解析',
-      desc: '让 AI 理解每张照片',
+      title: '念念解析',
+      desc: '让念念理解每张照片',
       href: `/family/${familyId}/analyze`,
       color: 'bg-[#FFF8F0] border-[#F0DCC8]',
     },
@@ -183,10 +127,16 @@ export default function FamilyDetailPage() {
     },
     {
       icon: '📖',
-      title: '家庭故事',
-      desc: 'AI 生成的家庭故事',
+      title: '故事草稿箱',
+      desc:
+        (family?.story_count || 0) > 0
+          ? `已生成 ${family?.story_count} 个草稿，点击管理`
+          : '补充记忆后，生成完整家庭故事',
       href: `/family/${familyId}/story`,
-      color: 'bg-white border-[#E8DCC8]',
+      color:
+        (family?.story_count || 0) > 0
+          ? 'bg-[#FFF8F0] border-[#D98A45]/40 ring-1 ring-[#D98A45]/20'
+          : 'bg-white border-[#E8DCC8]',
     },
   ];
 
@@ -217,18 +167,51 @@ export default function FamilyDetailPage() {
         </div>
       </div>
 
-      {(family.photo_count || 0) > 0 && (
-        <div className="mb-6 animate-fade-in-up delay-75">
+      {(family.story_count || 0) > 0 && !storyBannerDismissed && (
+        <div className="mb-6 animate-fade-in-up delay-75 rounded-2xl border border-[#D98A45]/30 bg-[#FFF8F0] p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl shrink-0">📖</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[#4B3B2F]">
+                已为您生成{family.story_count === 1 ? '一个故事' : ` ${family.story_count} 个故事`}
+              </p>
+              <p className="text-xs text-[#B8A898] mt-1">
+                在「家庭故事」里可以阅读、编辑和分享
+              </p>
+              <Link
+                href={`/family/${familyId}/story`}
+                className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-[#D98A45] hover:text-[#C47A3A] transition-colors"
+              >
+                要不要去看看 →
+              </Link>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStoryBannerDismissed(true)}
+              className="text-[#D8CCB8] hover:text-[#B8A898] text-lg leading-none shrink-0"
+              aria-label="关闭提示"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(family.photo_count || 0) > 0 && (family.story_count || 0) === 0 && (
+        <div
+          ref={generateSectionRef}
+          className={`mb-6 animate-fade-in-up delay-75 ${actionGenerate ? 'ring-2 ring-[#D98A45]/40 rounded-2xl p-1' : ''}`}
+        >
           <button
             type="button"
-            onClick={handleGenerateStories}
+            onClick={() => generateStories({ existingCount: family.story_count || 0 })}
             disabled={generating}
-            className="w-full rounded-2xl py-4 px-5 bg-[#D98A45] text-white font-medium shadow-sm hover:bg-[#C47A3A] disabled:opacity-60 transition-all active:scale-[0.99]"
+            className="block w-full rounded-2xl py-4 px-5 bg-[#D98A45] text-white font-medium text-center shadow-sm hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.99]"
           >
-            {generating ? '正在发现故事…' : '✨ 发现故事（Life Story Engine）'}
+            {generating ? '念念撰写中…' : '✨ 念念自动生成故事'}
           </button>
           <p className="text-xs text-center text-[#B8A898] mt-2">
-            从已解析记忆卡中聚类生成 3–5 个主题故事
+            或到记忆卡页面选择「人工组合故事」
           </p>
           {generateError && (
             <p className="text-xs text-center text-red-500 mt-2">{generateError}</p>

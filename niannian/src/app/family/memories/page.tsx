@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import FamilySectionTabs from '@/components/FamilySectionTabs';
+import MemoryCardStatusBadge from '@/components/MemoryCardStatusBadge';
+import MemoryCardCompletionBar from '@/components/MemoryCardCompletionBar';
+import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
+import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
+import PipelineSteps from '@/components/PipelineSteps';
+import { aggregateCompletion } from '@/lib/memory-card-completion';
 
 interface SearchResult {
   photo_id: string;
@@ -34,6 +40,7 @@ function defaultFilters(): SearchFilters {
 }
 
 export default function AllMemoriesPage() {
+  const appreciate = useAppreciateMode();
   const [filters, setFilters] = useState<SearchFilters>(defaultFilters);
   const [draft, setDraft] = useState<SearchFilters>(defaultFilters);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -123,13 +130,44 @@ export default function AllMemoriesPage() {
   const hasActiveFilters =
     filters.q || filters.location || filters.people || filters.analysisStatus !== 'all';
 
+  const pendingCount = useMemo(
+    () => results.filter((r) => r.analysis_status !== 'analyzed').length,
+    [results]
+  );
+  const analyzedCount = useMemo(
+    () => results.filter((r) => r.analysis_status === 'analyzed').length,
+    [results]
+  );
+  const completionAvg = useMemo(
+    () =>
+      aggregateCompletion(
+        results.map((r) => ({
+          analysis_status: r.analysis_status,
+          significance: r.significance,
+        }))
+      ),
+    [results]
+  );
+
+  useNianNianAgentOverride({
+    pendingCount,
+    analyzedCount,
+    completionAvg,
+    photoCount: total,
+  });
+
   return (
-    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-6 pb-24">
-      <FamilySectionTabs />
+    <div className={`min-h-screen bg-[#F8F4ED] px-6 pt-6 pb-24 ${appreciate ? 'text-lg' : ''}`}>
+      {!appreciate && <FamilySectionTabs />}
 
       <div className="text-center mb-6 animate-fade-in-up">
-        <h1 className="text-2xl font-serif text-[#4B3B2F] mb-1">全部记忆</h1>
-        <p className="text-sm text-[#B8A898]">以照片为单位，跨主题检索你的记忆</p>
+        <h1 className={`font-serif text-[#4B3B2F] mb-1 ${appreciate ? 'text-3xl' : 'text-2xl'}`}>
+          {appreciate ? '家庭照片' : '家庭记忆'}
+        </h1>
+        <p className="text-sm text-[#B8A898] mb-3">
+          {appreciate ? '翻阅珍贵瞬间' : '照片变记忆卡，念念理解 + 你补充'}
+        </p>
+        {!appreciate && <PipelineSteps active={1} compact />}
       </div>
 
       <div className="mb-6 space-y-3 animate-fade-in-up delay-100">
@@ -265,7 +303,11 @@ export default function AllMemoriesPage() {
             {results.map((item) => (
               <Link
                 key={item.photo_id}
-                href={`/family/${item.family_id}/photos/${item.photo_id}`}
+                href={
+                  appreciate
+                    ? `/family/${item.family_id}/photos/${item.photo_id}?appreciate=1`
+                    : `/family/${item.family_id}/photos/${item.photo_id}`
+                }
                 className="bg-white rounded-2xl overflow-hidden border border-[#E8DCC8] shadow-sm hover:shadow-md hover:border-[#D98A45]/30 transition-all active:scale-[0.98]"
               >
                 <div className="aspect-square relative bg-[#F0E8D8]">
@@ -275,9 +317,13 @@ export default function AllMemoriesPage() {
                     className="w-full h-full object-cover"
                   />
                   {item.analysis_status === 'analyzed' ? (
-                    <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#D98A45] text-white text-[10px]">
-                      已解析
-                    </span>
+                    <MemoryCardStatusBadge
+                      card={{
+                        analysis_status: item.analysis_status,
+                        significance: item.significance,
+                      }}
+                      className="absolute top-2 right-2"
+                    />
                   ) : (
                     <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/40 text-white text-[10px]">
                       待解析
@@ -295,6 +341,17 @@ export default function AllMemoriesPage() {
                     {[item.taken_at, item.location, item.action].filter(Boolean).join(' · ') ||
                       '点击查看记忆卡'}
                   </p>
+                  {item.analysis_status === 'analyzed' && (
+                    <div className="mt-2">
+                      <MemoryCardCompletionBar
+                        compact
+                        card={{
+                          analysis_status: item.analysis_status,
+                          significance: item.significance,
+                        }}
+                      />
+                    </div>
+                  )}
                   {item.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {item.tags.slice(0, 2).map((tag) => (
@@ -326,6 +383,24 @@ export default function AllMemoriesPage() {
           )}
         </>
       )}
+
+      {!appreciate && (
+        <div className="mt-8 flex gap-3 max-w-md mx-auto">
+          <Link
+            href="/stories"
+            className="flex-1 py-3 rounded-2xl bg-white border border-[#E8DCC8] text-center text-sm text-[#8B7355]"
+          >
+            查看故事 →
+          </Link>
+          <Link
+            href="/family"
+            className="flex-1 py-3 rounded-2xl bg-[#D98A45] text-center text-sm text-white"
+          >
+            按主题管理
+          </Link>
+        </div>
+      )}
+
     </div>
   );
 }

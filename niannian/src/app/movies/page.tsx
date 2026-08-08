@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import PipelineSteps from '@/components/PipelineSteps';
+import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import { useSharePoster } from '@/hooks/useSharePoster';
-import { Film, Play, Share2 } from 'lucide-react';
+import { Film, Play } from 'lucide-react';
 
 interface LifeMovie {
   id: string;
@@ -20,11 +22,13 @@ interface LifeMovie {
 
 export default function MoviesPage() {
   const router = useRouter();
-  const { showLoading, hideLoading, alert } = useAppDialog();
+  const { showLoading, hideLoading, alert, confirm } = useAppDialog();
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
   const [movies, setMovies] = useState<LifeMovie[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingFamilyId, setGeneratingFamilyId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const appreciate = useAppreciateMode();
 
   useEffect(() => {
     loadMovies();
@@ -66,7 +70,7 @@ export default function MoviesPage() {
 
   async function handleGenerate(familyId: string) {
     setGeneratingFamilyId(familyId);
-    showLoading('正在编排人生电影', '将家庭故事按主题串联成章节…');
+    showLoading('正在编排人生电影', '串联故事章节，完成后即可播放…');
     try {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
@@ -88,6 +92,33 @@ export default function MoviesPage() {
     }
   }
 
+  async function handleDelete(movie: LifeMovie, e: React.MouseEvent) {
+    e.stopPropagation();
+    const ok = await confirm({
+      title: `删除「${movie.title}」？`,
+      description: '删除后无法恢复。',
+      confirmText: '确认删除',
+      cancelText: '取消',
+      destructive: true,
+    });
+    if (!ok) return;
+
+    setDeletingId(movie.id);
+    try {
+      const res = await fetch(`/api/movie?movieId=${movie.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '删除失败');
+      setMovies((prev) => prev.filter((m) => m.id !== movie.id));
+    } catch (err) {
+      await alert({
+        title: '删除失败',
+        description: err instanceof Error ? err.message : '请稍后重试',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function handleShare(movie: LifeMovie, e: React.MouseEvent) {
     e.stopPropagation();
     await openSharePoster({
@@ -102,7 +133,7 @@ export default function MoviesPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#1a1612] text-white">
+    <div className={`min-h-screen flex flex-col bg-[#1a1612] text-white ${appreciate ? 'text-lg' : ''}`}>
       {shareModal}
       <Header />
       <main className="flex-1 px-6 py-8 pb-24">
@@ -110,8 +141,11 @@ export default function MoviesPage() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#D98A45]/20 mb-4">
             <Film className="w-7 h-7 text-[#D98A45]" />
           </div>
-          <h1 className="text-2xl font-serif mb-2">人生电影</h1>
-          <p className="text-sm text-white/50">多个故事串联 · 沉浸式 H5 播放</p>
+          <h1 className={`font-serif mb-2 ${appreciate ? 'text-3xl' : 'text-2xl'}`}>人生电影</h1>
+          <p className="text-sm text-white/50 mb-3">
+            {appreciate ? '自动播放 · 配乐旁白' : 'Story → Movie · 配乐旁白自动播放'}
+          </p>
+          {!appreciate && <PipelineSteps active={3} compact dark />}
         </div>
 
         {loading ? (
@@ -125,47 +159,78 @@ export default function MoviesPage() {
             <GenerateFromFamilies onGenerate={handleGenerate} loadingId={generatingFamilyId} />
           </div>
         ) : (
-          <div className="space-y-4 max-w-md mx-auto">
-            {movies.map((movie) => (
-              <div
-                key={movie.id}
-                className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
-              >
-                <button
-                  type="button"
-                  onClick={() => router.push(`/movies/${movie.id}/play`)}
-                  className="w-full text-left p-5 active:scale-[0.99] transition-transform"
-                >
-                  <p className="text-xs text-[#D98A45] mb-1">{movie.family_name}</p>
-                  <h2 className="text-lg font-serif font-semibold mb-2">{movie.title}</h2>
-                  <p className="text-sm text-white/50 line-clamp-2">{movie.summary}</p>
-                  <div className="flex items-center justify-between mt-4">
-                    <span className="text-xs text-white/30">
-                      {movie.chapter_count || 0} 个章节 · {movie.created_at?.slice(0, 10)}
-                    </span>
-                    <span className="flex items-center gap-1 text-sm text-[#D98A45]">
-                      <Play className="w-4 h-4" /> 播放
-                    </span>
-                  </div>
-                </button>
-                <div className="px-5 pb-4">
-                  <button
-                    type="button"
-                    disabled={shareLoading}
-                    onClick={(e) => handleShare(movie, e)}
-                    className="w-full py-2.5 rounded-xl border border-white/15 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50 flex items-center justify-center gap-1.5"
+          <div className="max-w-md mx-auto">
+            <div className="columns-2 gap-3 space-y-3">
+              {movies.map((movie, idx) => {
+                const cover = movie.photo_urls?.[0];
+                const tall = idx % 3 === 0;
+                return (
+                  <div
+                    key={movie.id}
+                    className="break-inside-avoid mb-3 rounded-2xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 transition-all"
                   >
-                    <Share2 className="w-4 h-4" />
-                    {shareLoading ? '生成中…' : '💬 分享人生电影'}
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            <div className="pt-4 border-t border-white/10">
-              <p className="text-xs text-white/40 mb-3 text-center">重新生成</p>
-              <GenerateFromFamilies onGenerate={handleGenerate} loadingId={generatingFamilyId} compact />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          appreciate
+                            ? `/movies/${movie.id}/play?appreciate=1`
+                            : `/movies/${movie.id}/play`
+                        )
+                      }
+                      className="w-full text-left active:scale-[0.99] transition-transform"
+                    >
+                      {cover && (
+                        <div className={`relative w-full ${tall ? 'aspect-[3/4]' : 'aspect-square'} bg-black/30`}>
+                          <img src={cover} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                          <span className="absolute bottom-2 left-2 flex items-center gap-1 text-xs text-[#D98A45]">
+                            <Play className="w-3 h-3" /> 播放
+                          </span>
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <p className="text-[10px] text-[#D98A45] mb-0.5">{movie.family_name}</p>
+                        <h2 className={`font-serif font-semibold mb-1 leading-snug ${appreciate ? 'text-lg' : 'text-base'}`}>
+                          {movie.title}
+                        </h2>
+                        <p className="text-xs text-white/50 line-clamp-2">{movie.summary}</p>
+                        <p className="text-[10px] text-white/30 mt-2">
+                          {movie.chapter_count || 0} 章 · {movie.created_at?.slice(0, 10)}
+                        </p>
+                      </div>
+                    </button>
+                    {!appreciate && (
+                      <div className="px-3 pb-3 flex gap-2">
+                        <button
+                          type="button"
+                          disabled={shareLoading}
+                          onClick={(e) => handleShare(movie, e)}
+                          className="flex-1 py-2 rounded-xl border border-white/15 text-xs text-white/80 hover:bg-white/10 disabled:opacity-50"
+                        >
+                          分享
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === movie.id}
+                          onClick={(e) => handleDelete(movie, e)}
+                          className="px-3 py-2 rounded-xl border border-red-400/30 text-xs text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                          {deletingId === movie.id ? '…' : '删除'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
+
+            {!appreciate && (
+              <div className="pt-6 mt-4 border-t border-white/10">
+                <p className="text-xs text-white/40 mb-3 text-center">重新生成</p>
+                <GenerateFromFamilies onGenerate={handleGenerate} loadingId={generatingFamilyId} compact />
+              </div>
+            )}
           </div>
         )}
       </main>

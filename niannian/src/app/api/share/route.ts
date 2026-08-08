@@ -7,6 +7,7 @@ import {
   getStory,
   getLifeMovie,
   getShareByCode,
+  incrementStoryReadCount,
 } from '@/lib/db';
 
 function buildShareUrl(request: NextRequest, shareCode: string) {
@@ -79,6 +80,11 @@ export async function GET(request: NextRequest) {
     const shareData = getShareByCode(code);
     if (!shareData) {
       return NextResponse.json({ error: '分享不存在或已过期' }, { status: 404 });
+    }
+
+    if (shareData.share_type === 'story' && shareData.story_id) {
+      const readCount = incrementStoryReadCount(shareData.story_id);
+      return NextResponse.json({ share: { ...shareData, read_count: readCount } });
     }
 
     return NextResponse.json({ share: shareData });

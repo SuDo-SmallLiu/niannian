@@ -71,6 +71,14 @@ export interface ApiKeyProfile {
   textModels: string[];
 }
 
+/** 联通云网关优先（cucloud） */
+function sortProfilesCucloudFirst(profiles: ApiKeyProfile[]): ApiKeyProfile[] {
+  return [...profiles].sort((a, b) => {
+    const rank = (url: string) => (url.includes('cucloud') ? 0 : 1);
+    return rank(a.baseURL) - rank(b.baseURL);
+  });
+}
+
 export function getApiKeyProfiles(): ApiKeyProfile[] {
   const profiles: ApiKeyProfile[] = [];
   const primaryKey = process.env.ARK_API_KEY?.trim();
@@ -102,7 +110,7 @@ export function getApiKeyProfiles(): ApiKeyProfile[] {
     });
   }
 
-  return profiles;
+  return sortProfilesCucloudFirst(profiles);
 }
 
 /** 图片解析：默认优先火山引擎；若配置 ARK_VISION_API_KEY 则覆盖 */
@@ -131,17 +139,8 @@ export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
   const volcengineBase =
     process.env.ARK_BASE_URL_FALLBACK?.trim() || 'https://ark.cn-beijing.volces.com/api/v3';
 
-  if (fallbackKey) {
-    profiles.push({
-      apiKey: fallbackKey,
-      baseURL: volcengineBase,
-      visionModels: getVolcengineVisionModelChain(),
-      textModels: [],
-    });
-  }
-
   const primaryKey = process.env.ARK_API_KEY?.trim();
-  if (primaryKey && primaryKey !== fallbackKey) {
+  if (primaryKey) {
     profiles.push({
       apiKey: primaryKey,
       baseURL: process.env.ARK_BASE_URL?.trim() || volcengineBase,
@@ -150,7 +149,17 @@ export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
     });
   }
 
-  return profiles.length > 0 ? profiles : getApiKeyProfiles();
+  if (fallbackKey && fallbackKey !== primaryKey) {
+    profiles.push({
+      apiKey: fallbackKey,
+      baseURL: volcengineBase,
+      visionModels: getVolcengineVisionModelChain(),
+      textModels: [],
+    });
+  }
+
+  const sorted = sortProfilesCucloudFirst(profiles);
+  return sorted.length > 0 ? sorted : getApiKeyProfiles();
 }
 
 function getVolcengineVisionModelChain(): string[] {

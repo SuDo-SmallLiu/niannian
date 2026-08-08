@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import CollapsibleSection from '@/components/CollapsibleSection';
 import UserSupplementPanel, {
   type AiQuestion,
   saveMemoryCardSupplement,
@@ -10,6 +11,9 @@ import type { NarrativeFrame } from '@/lib/narrative-frame';
 import type { StoryLayer } from '@/lib/story-layer';
 import { useSharePoster } from '@/hooks/useSharePoster';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
+import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
+import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
+import { computeMemoryCardCompletion } from '@/lib/memory-card-completion';
 
 interface Tag {
   layer: number;
@@ -97,6 +101,7 @@ export default function MemoryCardPage() {
   const params = useParams();
   const familyId = params.id as string;
   const photoId = params.photoId as string;
+  const appreciate = useAppreciateMode();
 
   const [data, setData] = useState<MemoryCardDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,6 +112,15 @@ export default function MemoryCardPage() {
   const [aiQuestions, setAiQuestions] = useState<AiQuestion[]>([]);
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
   const { confirm, alert } = useAppDialog();
+
+  const itemCompletion = data?.memoryCard
+    ? computeMemoryCardCompletion(data.memoryCard)
+    : undefined;
+
+  useNianNianAgentOverride({
+    itemCompletion,
+    itemLabel: 'memory',
+  });
 
   function applyMemoryCardData(result: {
     photo: MemoryCardDetail['photo'];
@@ -184,7 +198,7 @@ export default function MemoryCardPage() {
   async function handleDelete() {
     const ok = await confirm({
       title: '删除这张记忆卡？',
-      description: '将永久删除照片及 AI 解析结果，此操作不可恢复。',
+      description: '将永久删除照片及念念解析结果，此操作不可恢复。',
       confirmText: '确认删除',
       cancelText: '取消',
       destructive: true,
@@ -239,17 +253,21 @@ export default function MemoryCardPage() {
   }, {});
 
   return (
-    <div className="min-h-screen bg-[#F8F4ED] pb-24">
+    <div className={`min-h-screen bg-[#F8F4ED] pb-24 ${appreciate ? 'text-lg' : ''}`}>
       {shareModal}
       <div className="px-6 pt-8">
         <div className="flex items-center justify-between mb-2">
           <button
-            onClick={() => router.push(`/family/${familyId}/photos`)}
+            onClick={() =>
+              router.push(
+                appreciate ? '/family/memories?appreciate=1' : `/family/${familyId}/photos`
+              )
+            }
             className="text-[#B8A898] hover:text-[#8B7355] text-sm transition-colors"
           >
-            ← 记忆卡列表
+            ← {appreciate ? '照片库' : '记忆卡列表'}
           </button>
-          {memoryCard && (
+          {memoryCard && !appreciate && (
             <button
               onClick={() =>
                 openSharePoster({
@@ -289,7 +307,7 @@ export default function MemoryCardPage() {
 
       {!memoryCard ? (
         <div className="px-6 text-center py-8">
-          <p className="text-[#B8A898] mb-4">这张照片还没有被 AI 解析</p>
+          <p className="text-[#B8A898] mb-4">这张照片还没有被念念解析</p>
         </div>
       ) : (
         <div className={`px-6 space-y-4 animate-fade-in-up delay-100 ${reanalyzing ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -418,13 +436,52 @@ export default function MemoryCardPage() {
             )}
           </section>
 
+          {/* 用户层 · 补充记忆 — 紧跟理解层 */}
+          {!appreciate && (
+          <UserSupplementPanel
+            photoId={photoId}
+            notes={userNotes}
+            onNotesChange={setUserNotes}
+            questions={aiQuestions}
+            onQuestionsChange={setAiQuestions}
+            integratedSummary={
+              userNotes.trim() && memoryCard
+                ? {
+                    people: memoryCard.people,
+                    location: memoryCard.location,
+                    taken_at: memoryCard.taken_at,
+                    significance: memoryCard.significance,
+                  }
+                : null
+            }
+            disabled={reanalyzing}
+            onSaved={(supplement) => {
+              setData((prev) =>
+                prev && prev.memoryCard
+                  ? {
+                      ...prev,
+                      memoryCard: {
+                        ...prev.memoryCard,
+                        ...supplement,
+                      },
+                    }
+                  : prev
+              );
+              setUserNotes(supplement.user_notes);
+              setAiQuestions(supplement.ai_questions);
+            }}
+            onReanalyzed={(result) => {
+              applyMemoryCardData(result as Parameters<typeof applyMemoryCardData>[0]);
+            }}
+          />
+          )}
+
           {/* 叙事层 */}
           {memoryCard.narrative_frame &&
             (memoryCard.narrative_frame.storyline ||
               memoryCard.narrative_frame.shotType ||
               memoryCard.narrative_frame.shotNote) && (
-            <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-              <h2 className="text-xs tracking-wider text-rose-600 font-medium mb-3">叙事层 · 故事线与镜头</h2>
+            <CollapsibleSection title="叙事层 · 故事线与镜头" titleClassName="text-xs tracking-wider text-rose-600 font-medium">
 
               <div className="flex flex-wrap gap-2 mb-3">
                 {memoryCard.narrative_frame.storyline && (
@@ -465,16 +522,15 @@ export default function MemoryCardPage() {
                   ))}
                 </div>
               )}
-            </section>
+            </CollapsibleSection>
           )}
 
-          {/* Story Layer */}
+          {/* 聚类语义层 */}
           {memoryCard.story_layer &&
             (memoryCard.story_layer.meaning ||
               memoryCard.story_layer.scene_type ||
               memoryCard.story_layer.relationship) && (
-            <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-              <h2 className="text-xs tracking-wider text-indigo-600 font-medium mb-3">Story Layer · 聚类语义</h2>
+            <CollapsibleSection title="聚类语义层" titleClassName="text-xs tracking-wider text-indigo-600 font-medium">
               <div className="flex flex-wrap gap-2 mb-3">
                 {memoryCard.story_layer.meaning && (
                   <span className="px-3 py-1.5 rounded-full bg-indigo-500 text-white text-sm font-medium">
@@ -503,13 +559,12 @@ export default function MemoryCardPage() {
                   {memoryCard.story_layer.change}
                 </p>
               )}
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* 变化层 */}
           {(memoryCard.change_detail?.transitions?.length || memoryCard.changes.length > 0) && (
-            <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-              <h2 className="text-xs tracking-wider text-purple-600 font-medium mb-3">变化层 · 人生节点</h2>
+            <CollapsibleSection title="变化层 · 人生节点" titleClassName="text-xs tracking-wider text-purple-600 font-medium">
 
               {memoryCard.change_detail?.summary && (
                 <p className="text-sm text-[#8B7355] mb-3 leading-relaxed">
@@ -535,13 +590,12 @@ export default function MemoryCardPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
 
           {/* 四层标签 */}
           {Object.keys(tagsByLayer).length > 0 && (
-            <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-              <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-3">标签系统</h2>
+            <CollapsibleSection title="标签系统">
               <div className="space-y-3">
                 {Object.entries(tagsByLayer).map(([layer, layerTags]) => {
                   const info = LAYER_NAMES[Number(layer)];
@@ -562,50 +616,13 @@ export default function MemoryCardPage() {
                   );
                 })}
               </div>
-            </section>
+            </CollapsibleSection>
           )}
-
-          {/* 用户层 · 补充记忆 */}
-          <UserSupplementPanel
-            photoId={photoId}
-            notes={userNotes}
-            onNotesChange={setUserNotes}
-            questions={aiQuestions}
-            onQuestionsChange={setAiQuestions}
-            integratedSummary={
-              userNotes.trim() && memoryCard
-                ? {
-                    people: memoryCard.people,
-                    location: memoryCard.location,
-                    taken_at: memoryCard.taken_at,
-                    significance: memoryCard.significance,
-                  }
-                : null
-            }
-            disabled={reanalyzing}
-            onSaved={(supplement) => {
-              setData((prev) =>
-                prev && prev.memoryCard
-                  ? {
-                      ...prev,
-                      memoryCard: {
-                        ...prev.memoryCard,
-                        ...supplement,
-                      },
-                    }
-                  : prev
-              );
-              setUserNotes(supplement.user_notes);
-              setAiQuestions(supplement.ai_questions);
-            }}
-            onReanalyzed={(result) => {
-              applyMemoryCardData(result as Parameters<typeof applyMemoryCardData>[0]);
-            }}
-          />
         </div>
       )}
 
       {/* 底部固定操作栏 */}
+      {!appreciate && (
       <div className="fixed bottom-20 left-0 right-0 px-6 z-40">
         <div className="max-w-md mx-auto space-y-3">
           <button
@@ -616,12 +633,12 @@ export default function MemoryCardPage() {
             {reanalyzing ? (
               <>
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                AI 解析中…
+                念念解析中…
               </>
             ) : memoryCard ? (
               '🔄 重新解析'
             ) : (
-              '✨ 开始 AI 解析'
+              '✨ 开始念念解析'
             )}
           </button>
           <button
@@ -634,6 +651,7 @@ export default function MemoryCardPage() {
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

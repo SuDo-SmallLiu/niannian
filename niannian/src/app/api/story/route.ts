@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   deleteStoryById,
   getStoriesByFamily,
+  getPublishedStoriesByFamily,
   getStory,
   getFamily,
   getStoryMemoryCards,
+  publishStory,
 } from '@/lib/db';
+import { patchStory } from '@/lib/story-edit';
 import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
 
 export async function DELETE(request: NextRequest) {
@@ -22,6 +25,55 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error('删除故事失败:', error);
     return NextResponse.json({ error: '删除失败' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const storyId = body.storyId as string | undefined;
+    if (!storyId) {
+      return NextResponse.json({ error: '缺少 storyId' }, { status: 400 });
+    }
+
+    const story = patchStory({
+      storyId,
+      title: body.title,
+      summary: body.summary,
+      photoOrder: body.photoOrder,
+      removePhotoIds: body.removePhotoIds,
+      segments: body.segments,
+    });
+
+    if (body.publish === true) {
+      publishStory(storyId);
+    }
+
+    const updated = getStory(storyId) || story;
+
+    const segments = getStorySegments(
+      storyId,
+      updated!.photos as string[],
+      updated!.summary || updated!.description
+    );
+    const orderedPhotoIds = segments.map((s) => s.photoId);
+    const photos = getStoryPhotosDetail(
+      updated!.family_id,
+      orderedPhotoIds.length > 0 ? orderedPhotoIds : (updated!.photos as string[])
+    );
+
+    return NextResponse.json({
+      story: {
+        ...updated,
+        description: updated!.summary || updated!.description,
+        photos_detail: photos,
+        segments,
+      },
+    });
+  } catch (error) {
+    console.error('更新故事失败:', error);
+    const message = error instanceof Error ? error.message : '更新失败';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -65,7 +117,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (familyId) {
-      const stories = getStoriesByFamily(familyId);
+      const publishedOnly = searchParams.get('publishedOnly') === '1';
+      const stories = publishedOnly
+        ? getPublishedStoriesByFamily(familyId)
+        : getStoriesByFamily(familyId);
       return NextResponse.json({ stories });
     }
 

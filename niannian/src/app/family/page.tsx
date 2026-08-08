@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import FamilySectionTabs from '@/components/FamilySectionTabs';
+import PipelineSteps from '@/components/PipelineSteps';
 
 interface FamilyInfo {
   id: string;
@@ -39,14 +41,16 @@ export default function FamilyPage() {
       <main className="flex-1 px-6 pt-6 pb-24">
         <FamilySectionTabs />
 
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的主题</h1>
-          <p className="text-sm text-[#B8A898]">管理你的记忆主题空间</p>
+          <p className="text-sm text-[#B8A898] mb-4">按家庭主题组织 Memory Card</p>
+          <PipelineSteps active={1} compact />
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin mb-4" />
+            <p className="text-sm text-[#B8A898]">正在加载主题…</p>
           </div>
         ) : families.length === 0 ? (
           <div className="text-center py-20">
@@ -62,10 +66,11 @@ export default function FamilyPage() {
           <>
             <div className="space-y-4 mb-8">
               {families.map((family) => (
-                <div
+                <Link
                   key={family.id}
-                  onClick={() => router.push(`/family/${family.id}`)}
-                  className="bg-white rounded-2xl p-5 shadow-sm border border-[#E8DCC8] cursor-pointer hover:shadow-md hover:border-[#D98A45]/30 transition-all active:scale-[0.99]"
+                  href={`/family/${family.id}/photos`}
+                  prefetch
+                  className="block bg-white rounded-2xl p-5 shadow-sm border border-[#E8DCC8] hover:shadow-md hover:border-[#D98A45]/30 transition-all active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-lg font-serif text-[#4B3B2F] font-medium">
@@ -87,7 +92,7 @@ export default function FamilyPage() {
                     <span>📷 {family.photo_count || 0} 张照片</span>
                     <span>📖 {family.story_count || 0} 个故事</span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import BottomNav from '@/components/BottomNav';
+import NavShell from '@/components/NavShell';
 import AppProviders from '@/components/providers/app-providers';
 import './globals.css';
 
@@ -27,7 +27,7 @@ export default function RootLayout({
         <AppProviders>
           <div className="min-h-screen flex flex-col max-w-md mx-auto bg-[var(--bg-primary)] relative">
             <main className="flex-1">{children}</main>
-            <BottomNav />
+            <NavShell />
           </div>
         </AppProviders>
       </body>

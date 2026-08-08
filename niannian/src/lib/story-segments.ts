@@ -4,17 +4,51 @@ import {
   getStoryMemoryCards,
   getLatestStoryVersion,
 } from '@/lib/db';
+import type { Valence, Arousal } from '@/lib/affect-theory';
+
+export interface SegmentAffect {
+  archetype?: string;
+  emotions?: string[];
+  valence?: Valence;
+  arousal?: Arousal;
+}
 
 export interface StorySegment {
   photoId: string;
   memorySnippet: string;
   narrative: string;
+  /** 记忆卡情动推测，用于配乐 */
+  affect?: SegmentAffect;
   /** 展示用：人物 / 地点 / 时间 */
   meta?: {
     people: string[];
     location: string;
     taken_at: string;
     action: string;
+  };
+}
+
+function extractAffect(card: ReturnType<typeof getMemoryCardByPhoto>): SegmentAffect | undefined {
+  if (!card) return undefined;
+  const understanding = card.understanding as
+    | {
+        archetype?: string;
+        emotions?: string[];
+        valence?: Valence;
+        arousal?: Arousal;
+      }
+    | undefined;
+  const emotions =
+    understanding?.emotions?.length ? understanding.emotions : card.emotions || [];
+  const archetype = understanding?.archetype?.trim();
+  if (!archetype && emotions.length === 0 && !understanding?.valence) {
+    return undefined;
+  }
+  return {
+    archetype: archetype || undefined,
+    emotions,
+    valence: understanding?.valence,
+    arousal: understanding?.arousal,
   };
 }
 
@@ -69,6 +103,7 @@ export function getStorySegments(
       photoId,
       memorySnippet: fromVersion?.memorySnippet || buildSnippet(card),
       narrative: buildNarrative(fromVersion?.narrative || '', card, storySummary),
+      affect: extractAffect(card),
       meta: card
         ? {
             people: card.people || [],
@@ -95,6 +130,7 @@ export function getStoryPhotosDetail(familyId: string, photoIds: string[]) {
         taken_at: card?.taken_at || photo.taken_at || '',
         action: card?.action || photo.event || '',
         significance: card?.significance || '',
+        affect: extractAffect(card),
       };
     })
     .filter(Boolean);

@@ -12,6 +12,8 @@ interface FilterOptions {
   tags: Array<{ value: string; layer: number; count: number }>;
   people: Array<[string, number]>;
   emotions: Array<[string, number]>;
+  locations: Array<[string, number]>;
+  times: Array<[string, number]>;
 }
 
 interface MemoryCardFilterProps {
@@ -104,7 +106,10 @@ export default function MemoryCardFilter({
     filters.query ||
     filters.analysisStatus !== 'all' ||
     filters.tagValues.length > 0 ||
-    filters.layer !== null;
+    filters.layer !== null ||
+    filters.personTag ||
+    filters.locationTag ||
+    filters.timeTag;
 
   const statusOptions: { value: AnalysisFilter; label: string }[] = [
     { value: 'all', label: '全部' },
@@ -179,6 +184,81 @@ export default function MemoryCardFilter({
         </button>
       </div>
 
+      {/* 时间 / 人物 / 地点 标签检索 */}
+      {(options.times.length > 0 || options.people.length > 0 || options.locations.length > 0) && (
+        <div className="bg-white rounded-2xl p-4 border border-[#E8DCC8] space-y-3">
+          {options.times.length > 0 && (
+            <div>
+              <p className="text-[10px] text-[#B8A898] mb-1.5">时间</p>
+              <div className="flex flex-wrap gap-1.5">
+                {options.times.slice(0, 8).map(([year]) => (
+                  <button
+                    key={year}
+                    type="button"
+                    onClick={() =>
+                      update({ timeTag: filters.timeTag === year ? null : year })
+                    }
+                    className={`px-2.5 py-1 rounded-full text-xs transition-all ${
+                      filters.timeTag === year
+                        ? 'bg-[#D98A45] text-white'
+                        : 'bg-[#FFF8F0] text-[#8B7355] border border-[#F0DCC8]'
+                    }`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {options.people.length > 0 && (
+            <div>
+              <p className="text-[10px] text-[#B8A898] mb-1.5">人物</p>
+              <div className="flex flex-wrap gap-1.5">
+                {options.people.slice(0, 10).map(([name]) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() =>
+                      update({ personTag: filters.personTag === name ? null : name })
+                    }
+                    className={`px-2.5 py-1 rounded-full text-xs transition-all ${
+                      filters.personTag === name
+                        ? 'bg-[#D98A45] text-white'
+                        : 'bg-blue-50 text-blue-700'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {options.locations.length > 0 && (
+            <div>
+              <p className="text-[10px] text-[#B8A898] mb-1.5">地点</p>
+              <div className="flex flex-wrap gap-1.5">
+                {options.locations.slice(0, 10).map(([loc]) => (
+                  <button
+                    key={loc}
+                    type="button"
+                    onClick={() =>
+                      update({ locationTag: filters.locationTag === loc ? null : loc })
+                    }
+                    className={`px-2.5 py-1 rounded-full text-xs transition-all ${
+                      filters.locationTag === loc
+                        ? 'bg-[#D98A45] text-white'
+                        : 'bg-green-50 text-green-700'
+                    }`}
+                  >
+                    {loc}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 标签层筛选 */}
       {showTags && (
         <div className="bg-white rounded-2xl p-4 border border-[#E8DCC8] space-y-3">
@@ -228,7 +308,7 @@ export default function MemoryCardFilter({
                 ))}
             </div>
           ) : (
-            <p className="text-xs text-[#B8A898]">暂无标签，请先完成 AI 解析</p>
+            <p className="text-xs text-[#B8A898]">暂无标签，请先完成念念解析</p>
           )}
 
           {/* 快捷：人物 & 情绪 */}

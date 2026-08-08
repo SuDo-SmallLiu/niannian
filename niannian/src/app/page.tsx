@@ -1,17 +1,43 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { PRESET_MEMBERS } from '@/lib/family-members';
+import PipelineSteps from '@/components/PipelineSteps';
+import HomeWelcomeHero from '@/components/HomeWelcomeHero';
+import NianNianHelpDesk from '@/components/NianNianHelpDesk';
 
 export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F8F4ED]">
+          <div className="w-8 h-8 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const router = useRouter();
-  const [showUpload, setShowUpload] = useState(false);
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<'welcome' | 'create'>('welcome');
   const [familyName, setFamilyName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [customMember, setCustomMember] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      setMode('create');
+    }
+  }, [searchParams]);
 
   const allMembers = [
     ...selectedMembers,
@@ -62,47 +88,48 @@ export default function HomePage() {
     }
   };
 
-  if (showUpload) {
+  if (mode === 'create') {
     return (
-      <div className="min-h-screen px-6 pt-16 pb-8 animate-fade-in">
-        {/* 返回 */}
+      <div className="min-h-screen px-6 pt-12 pb-28 bg-[#F8F4ED] animate-fade-in">
         <button
-          onClick={() => setShowUpload(false)}
-          className="text-[#B8A898] hover:text-[#8B7355] transition-colors text-sm mb-8"
+          onClick={() => setMode('welcome')}
+          className="text-[#B8A898] hover:text-[#8B7355] transition-colors text-sm mb-6"
         >
-          ← 返回
+          ← 返回首页
         </button>
 
-        <div className="text-center mb-8">
-          <p className="text-2xl font-serif text-[#4B3B2F] mb-2">创建家庭记忆</p>
-          <p className="text-sm text-[#B8A898]">为家人建立一个专属的记忆空间</p>
+        <div className="text-center mb-6">
+          <p className="text-xs tracking-[0.25em] text-[#D98A45] mb-2">我要创造</p>
+          <p className="text-2xl font-serif text-[#4B3B2F] mb-1">创建家庭记忆</p>
+          <p className="text-sm text-[#B8A898]">先建主题，再上传 5–20 张有故事的照片</p>
         </div>
 
-        {/* 家庭名称 */}
-        <div className="mb-8">
-          <label className="block text-sm text-[#8B7355] mb-2 font-medium">家庭名称</label>
+        <PipelineSteps active={0} compact className="mb-8" />
+
+        <div className="mb-6">
+          <label className="block text-sm text-[#8B7355] mb-2 font-medium">家庭主题</label>
           <input
             type="text"
             value={familyName}
             onChange={(e) => setFamilyName(e.target.value)}
-            placeholder="例如：李家的故事"
-            maxLength={20}
-            className="w-full px-5 py-3.5 rounded-2xl bg-white border border-[#E8DCC8] text-[#4B3B2F] placeholder:text-[#D8CCB8] text-lg font-serif focus:outline-none focus:ring-2 focus:ring-[#D98A45]/20 focus:border-[#D98A45] transition-all"
+            placeholder="例如：爸爸退休 / 2024 春节 / 一家去云南"
+            maxLength={24}
+            className="w-full px-5 py-3.5 rounded-2xl bg-white border border-[#E8DCC8] text-[#4B3B2F] placeholder:text-[#D8CCB8] text-base font-serif focus:outline-none focus:ring-2 focus:ring-[#D98A45]/20 focus:border-[#D98A45]"
           />
         </div>
 
-        {/* 成员 */}
-        <div className="mb-8">
+        <div className="mb-6">
           <label className="block text-sm text-[#8B7355] mb-3 font-medium">家庭成员</label>
           <div className="flex flex-wrap gap-2 mb-3">
             {PRESET_MEMBERS.map((m) => (
               <button
                 key={m}
+                type="button"
                 onClick={() => toggleMember(m)}
                 className={`px-4 py-2.5 rounded-xl text-sm transition-all ${
                   selectedMembers.includes(m)
                     ? 'bg-[#D98A45] text-white'
-                    : 'bg-white text-[#8B7355] border border-[#E8DCC8] active:bg-[#FFF8F0]'
+                    : 'bg-white text-[#8B7355] border border-[#E8DCC8]'
                 }`}
               >
                 {m}
@@ -115,111 +142,58 @@ export default function HomePage() {
               value={customMember}
               onChange={(e) => setCustomMember(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addCustomMember()}
-              placeholder="自定义…"
-              className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-[#E8DCC8] text-sm placeholder:text-[#D8CCB8] focus:outline-none focus:ring-2 focus:ring-[#D98A45]/20 focus:border-[#D98A45]"
+              placeholder="自定义成员…"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-white border border-[#E8DCC8] text-sm placeholder:text-[#D8CCB8] focus:outline-none focus:ring-2 focus:ring-[#D98A45]/20"
             />
             <button
+              type="button"
               onClick={addCustomMember}
               disabled={!customMember.trim()}
-              className="px-4 py-2.5 rounded-xl bg-[#FFF8F0] text-[#8B7355] text-sm disabled:opacity-30 active:bg-[#F0DCC8] transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-[#FFF8F0] text-[#8B7355] text-sm disabled:opacity-30"
             >
               添加
             </button>
           </div>
-          {allMembers.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {allMembers.map((m) => (
-                <span key={m} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FFF8F0] text-sm text-[#8B7355]">
-                  {m}
-                  <button
-                    onClick={() => setSelectedMembers((prev) => prev.filter((x) => x !== m))}
-                    className="text-[#D8CCB8] hover:text-[#D98A45]"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {error && (
-          <div className="mb-6 p-3 rounded-xl bg-[#FFF8F0] text-[#C04040] text-sm text-center">
-            {error}
-          </div>
+          <div className="mb-6 p-3 rounded-xl bg-[#FFF8F0] text-[#C04040] text-sm text-center">{error}</div>
         )}
 
         <button
+          type="button"
           onClick={handleCreate}
           disabled={creating}
-          className="w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.98]"
+          className="w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg hover:bg-[#C47A3A] disabled:opacity-50 active:scale-[0.98]"
         >
-          {creating ? '创建中...' : '开始上传照片'}
+          {creating ? '创建中…' : '下一步：上传照片'}
         </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center">
-      {/* 顶部 */}
-      <div className="animate-fade-in-up delay-100 mb-3">
-        <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium">NIAN NIAN</p>
-      </div>
+    <div className="min-h-screen flex flex-col bg-[#F8F4ED] pb-28">
+      <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
 
-      <div className="animate-fade-in-up delay-200 mb-2">
-        <h1 className="text-[28px] font-serif font-bold text-[#4B3B2F] leading-tight tracking-wide">
-          念念年年
-        </h1>
-      </div>
+      <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} />
 
-      <div className="animate-fade-in-up delay-300 mb-10">
-        <p className="text-sm text-[#D8CCB8] leading-relaxed">
-          岁岁年年
-          <br />
-          念念不忘
-        </p>
-      </div>
-
-      {/* 主描述 */}
-      <div className="animate-fade-in-up delay-400 mb-8">
-        <p className="text-sm text-[#8B7355] leading-relaxed max-w-[240px]">
-          AI 帮助你重新发现
-          <br />
-          属于家的故事
-        </p>
-      </div>
-
-      {/* 大按钮 */}
-      <div className="animate-fade-in-up delay-500 mb-6">
+      <div className="w-full max-w-xs mx-auto px-5 space-y-3 mt-auto pt-2">
         <button
-          onClick={() => setShowUpload(true)}
-          className="w-40 h-40 rounded-full bg-[#D98A45] text-white flex flex-col items-center justify-center gap-1 animate-breathe hover:bg-[#C47A3A] transition-colors active:scale-95"
+          type="button"
+          onClick={() => setMode('create')}
+          className="w-full py-5 rounded-2xl bg-[#D98A45] text-white text-lg font-serif font-medium shadow-lg shadow-[#D98A45]/25 active:scale-[0.98] transition-transform"
         >
-          <span className="text-2xl">📷</span>
-          <span className="text-sm font-medium">上传家庭照片</span>
+          我要创造
         </button>
+
+        <Link
+          href="/appreciate"
+          className="block w-full py-5 rounded-2xl bg-white border border-[#E8DCC8] text-[#4B3B2F] text-lg font-serif font-medium text-center active:scale-[0.98] transition-transform"
+        >
+          我要欣赏
+        </Link>
       </div>
-
-      <p className="animate-fade-in-up delay-600 text-xs text-[#D8CCB8] mb-16">
-        建议上传 20 张以上照片
-      </p>
-
-      {/* 三步说明 */}
-      <div className="animate-fade-in-up delay-800 flex items-center gap-4 text-xs text-[#B8A898]">
-        <span>AI 寻找人物</span>
-        <span className="text-[#D8CCB8]">→</span>
-        <span>AI 发现变化</span>
-        <span className="text-[#D8CCB8]">→</span>
-        <span>AI 整理故事</span>
-      </div>
-
-      {/* 底部文案 */}
-      <p className="animate-fade-in-up delay-1000 mt-16 text-xs text-[#D8CCB8]">
-        让每一张照片
-        <br />
-        都成为回家的理由
-      </p>
     </div>
   );
 }

@@ -10,9 +10,9 @@ export default function BottomNav() {
     <nav className="sticky bottom-0 bg-white/90 backdrop-blur-md border-t border-[#F0E8D8] safe-bottom z-50">
       <div className="flex items-center justify-around h-16 px-2">
         <NavItem icon="🏠" label="首页" href="/" pathname={pathname} />
+        <NavItem icon="🃏" label="记忆" href="/family/memories" pathname={pathname} />
         <NavItem icon="📖" label="故事" href="/stories" pathname={pathname} />
         <NavItem icon="🎬" label="电影" href="/movies" pathname={pathname} />
-        <NavItem icon="🃏" label="记忆" href="/family" pathname={pathname} />
         <NavItem icon="👤" label="我的" href="/profile" pathname={pathname} />
       </div>
     </nav>
@@ -30,7 +30,12 @@ function NavItem({
   href: string;
   pathname: string;
 }) {
-  const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+  const isActive =
+    href === '/'
+      ? pathname === '/'
+      : href === '/family/memories'
+        ? pathname.startsWith('/family')
+        : pathname.startsWith(href);
 
   return (
     <Link

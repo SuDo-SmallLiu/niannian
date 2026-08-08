@@ -6,7 +6,7 @@ interface LoadingSpinnerProps {
 }
 
 export default function LoadingSpinner({
-  text = 'AI 正在分析你的家庭记忆...',
+  text = '念念正在分析你的家庭记忆...',
   subtext = '这可能需要30秒到1分钟',
 }: LoadingSpinnerProps) {
   return (

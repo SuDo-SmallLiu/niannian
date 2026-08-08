@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  deleteLifeMovieById,
   getFamily,
   getLifeMovie,
   getLifeMoviesByFamily,
@@ -7,6 +8,28 @@ import {
   getStory,
 } from '@/lib/db';
 import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
+import { buildMovieSlidesForServer } from '@/lib/movie-slides-server';
+import {
+  enrichManifestWithDurations,
+  loadMovieNarrationManifest,
+} from '@/lib/narration-tts';
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const movieId = request.nextUrl.searchParams.get('movieId');
+    if (!movieId) {
+      return NextResponse.json({ error: '缺少 movieId' }, { status: 400 });
+    }
+    const ok = deleteLifeMovieById(movieId);
+    if (!ok) {
+      return NextResponse.json({ error: '人生电影不存在' }, { status: 404 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('删除人生电影失败:', error);
+    return NextResponse.json({ error: '删除失败' }, { status: 500 });
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,10 +78,17 @@ export async function GET(request: NextRequest) {
         })
       );
 
+      const built = await buildMovieSlidesForServer(movieId);
+      let narration = built
+        ? loadMovieNarrationManifest(movieId, built.slides)
+        : {};
+      narration = await enrichManifestWithDurations(movieId, narration);
+
       return NextResponse.json({
         movie,
         family: family ? { name: family.name } : null,
         chapters: chapters.filter(Boolean),
+        narration,
       });
     }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MemoryCardComposeItem, {
   getMemoryCardComposeHints,
@@ -41,23 +41,43 @@ interface AnalyzedPhoto {
 export default function ManualStoryComposePage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const familyId = params.id as string;
+  const preselected = searchParams.get('photos')?.split(',').filter(Boolean) ?? [];
 
   const [photos, setPhotos] = useState<AnalyzedPhoto[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [existingStories, setExistingStories] = useState<Array<{ id: string; title: string }>>([]);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/photos?familyId=${familyId}`);
-        const data = await res.json();
+        const [photosRes, storiesRes] = await Promise.all([
+          fetch(`/api/photos?familyId=${familyId}`),
+          fetch(`/api/story?familyId=${familyId}`),
+        ]);
+        const data = await photosRes.json();
+        const storiesData = await storiesRes.json();
+        setExistingStories(
+          (storiesData.stories || []).map((s: { id: string; title: string }) => ({
+            id: s.id,
+            title: s.title,
+          }))
+        );
         const analyzed = (data.photos || []).filter(
           (p: AnalyzedPhoto) => p.memoryCard?.analysis_status === 'analyzed'
         );
         setPhotos(analyzed);
+        if (preselected.length > 0) {
+          const valid = preselected.filter((id) =>
+            analyzed.some((p: AnalyzedPhoto) => p.id === id)
+          );
+          if (valid.length > 0) setSelectedIds(valid);
+        }
       } catch {
         setError('加载照片失败');
       } finally {
@@ -65,7 +85,26 @@ export default function ManualStoryComposePage() {
       }
     }
     load();
-  }, [familyId]);
+  }, [familyId, preselected.join(',')]);
+
+  const handleRegenerate = async (storyId: string) => {
+    setRegeneratingId(storyId);
+    setError('');
+    try {
+      const res = await fetch('/api/story/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId, mode: 'full' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '重新生成失败');
+      router.push(`/family/${familyId}/story?storyId=${storyId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '重新生成失败');
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
 
   const selectedPhotos = useMemo(
     () => selectedIds.map((id) => photos.find((p) => p.id === id)).filter(Boolean) as AnalyzedPhoto[],
@@ -116,7 +155,9 @@ export default function ManualStoryComposePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-[22rem]">
+    <div
+      className={`min-h-screen bg-[#F8F4ED] px-6 pt-8 ${selectedPhotos.length > 0 ? 'pb-[19rem]' : 'pb-36'}`}
+    >
       <Link
         href={`/family/${familyId}/story`}
         className="text-[#B8A898] hover:text-[#8B7355] text-sm mb-6 inline-block"
@@ -127,9 +168,29 @@ export default function ManualStoryComposePage() {
       <div className="text-center mb-6">
         <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">人工组合故事</h1>
         <p className="text-sm text-[#B8A898] leading-relaxed">
-          参考 AI 解析提示选片、排序，再生成故事
+          参考念念解析提示选片、排序，再生成故事；也可在此重新生成已有故事
         </p>
       </div>
+
+      {existingStories.length > 0 && (
+        <div className="max-w-lg mx-auto mb-8 space-y-2">
+          <p className="text-xs text-[#B8A898] mb-2">重新生成已有草稿</p>
+          {existingStories.map((story) => (
+            <button
+              key={story.id}
+              type="button"
+              onClick={() => handleRegenerate(story.id)}
+              disabled={regeneratingId === story.id}
+              className="w-full py-3 px-4 rounded-2xl bg-white border border-[#E8DCC8] text-left hover:border-[#D98A45]/40 disabled:opacity-50 transition-all"
+            >
+              <span className="text-sm text-[#4B3B2F] block truncate">{story.title}</span>
+              <span className="text-xs text-[#D98A45]">
+                {regeneratingId === story.id ? '念念重新生成中…' : '🔄 重新生成故事'}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-20">
@@ -142,13 +203,13 @@ export default function ManualStoryComposePage() {
             href={`/family/${familyId}/analyze`}
             className="text-sm text-[#D98A45] underline underline-offset-2"
           >
-            先去 AI 解析
+            先去念念解析
           </Link>
         </div>
       ) : (
         <>
           <p className="text-xs text-[#B8A898] mb-3">
-            点击卡片选择 · 已选 {selectedIds.length} 张 · 橙色标签为 AI 编排提示
+            点击卡片选择 · 已选 {selectedIds.length} 张 · 橙色标签为念念编排提示
           </p>
           <div className="space-y-3 max-w-lg mx-auto">
             {photos.map((photo) => {
@@ -172,15 +233,15 @@ export default function ManualStoryComposePage() {
       )}
 
       {selectedPhotos.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E8DCC8] px-4 pt-4 pb-6 shadow-lg max-h-[50vh] flex flex-col">
-          <p className="text-xs text-[#B8A898] mb-2 shrink-0">
-            故事顺序（↑↓ 调整 · 参考 AI 提示编排节奏）
+        <div className="fixed bottom-20 left-0 right-0 z-[45] mx-auto max-w-md bg-white border-t border-[#E8DCC8] px-4 pt-3 pb-3 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <p className="text-xs text-[#B8A898] mb-2">
+            故事顺序（↑↓ 调整 · 参考念念提示编排节奏）
           </p>
-          <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide shrink-0">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide max-h-[120px]">
             {selectedPhotos.map((photo, index) => {
               const hints = getMemoryCardComposeHints(photo.memoryCard);
               return (
-                <div key={photo.id} className="shrink-0 w-[100px]">
+                <div key={photo.id} className="shrink-0 w-[88px]">
                   <div className="relative rounded-lg overflow-hidden aspect-square mb-1 border-2 border-[#D98A45]/30">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={photo.url} alt="" className="w-full h-full object-cover" />
@@ -223,15 +284,15 @@ export default function ManualStoryComposePage() {
             })}
           </div>
 
-          {error && <p className="text-xs text-red-500 mb-2 text-center shrink-0">{error}</p>}
+          {error && <p className="text-xs text-red-500 mb-2 text-center">{error}</p>}
 
           <button
             type="button"
             onClick={handleGenerate}
             disabled={generating || selectedIds.length === 0}
-            className="w-full py-3.5 rounded-2xl bg-[#D98A45] text-white font-medium disabled:opacity-50 shrink-0"
+            className="w-full py-4 rounded-2xl bg-[#D98A45] text-white font-medium text-base disabled:opacity-50 active:scale-[0.98] transition-transform"
           >
-            {generating ? 'AI 撰写中…' : `生成故事（${selectedIds.length} 张照片）`}
+            {generating ? '念念撰写中…' : `生成故事（${selectedIds.length} 张照片）`}
           </button>
         </div>
       )}
