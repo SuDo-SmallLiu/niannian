@@ -32,7 +32,7 @@ deploy() {
   git reset --hard "origin/$BRANCH"
 
   cd "$APP_DIR"
-  npm ci --omit=dev
+  npm ci
   npm run build
   pm2 restart niannian || pm2 start npm --name niannian --cwd "$APP_DIR" -- run start
 
