@@ -105,6 +105,62 @@ export function getApiKeyProfiles(): ApiKeyProfile[] {
   return profiles;
 }
 
+/** 图片解析：默认优先火山引擎；若配置 ARK_VISION_API_KEY 则覆盖 */
+export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
+  const visionKey = process.env.ARK_VISION_API_KEY?.trim();
+  if (visionKey) {
+    const visionProfile: ApiKeyProfile = {
+      apiKey: visionKey,
+      baseURL:
+        process.env.ARK_VISION_BASE_URL?.trim() ||
+        process.env.ARK_BASE_URL_FALLBACK?.trim() ||
+        'https://ark.cn-beijing.volces.com/api/v3',
+      visionModels: buildModelChain(
+        process.env.ARK_VISION_MODEL,
+        process.env.ARK_VISION_MODEL_FALLBACKS,
+        getVolcengineVisionModelChain()
+      ),
+      textModels: [],
+    };
+    const others = getApiKeyProfiles().filter((p) => p.apiKey !== visionKey);
+    return [visionProfile, ...others];
+  }
+
+  const profiles: ApiKeyProfile[] = [];
+  const fallbackKey = process.env.ARK_API_KEY_FALLBACK?.trim();
+  const volcengineBase =
+    process.env.ARK_BASE_URL_FALLBACK?.trim() || 'https://ark.cn-beijing.volces.com/api/v3';
+
+  if (fallbackKey) {
+    profiles.push({
+      apiKey: fallbackKey,
+      baseURL: volcengineBase,
+      visionModels: getVolcengineVisionModelChain(),
+      textModels: [],
+    });
+  }
+
+  const primaryKey = process.env.ARK_API_KEY?.trim();
+  if (primaryKey && primaryKey !== fallbackKey) {
+    profiles.push({
+      apiKey: primaryKey,
+      baseURL: process.env.ARK_BASE_URL?.trim() || volcengineBase,
+      visionModels: getVisionModelChain(),
+      textModels: [],
+    });
+  }
+
+  return profiles.length > 0 ? profiles : getApiKeyProfiles();
+}
+
+function getVolcengineVisionModelChain(): string[] {
+  return buildModelChain(
+    process.env.ARK_VISION_MODEL_FALLBACK,
+    process.env.ARK_VISION_MODEL_FALLBACKS,
+    ['doubao-seed-2-0-pro-260215']
+  );
+}
+
 export function getApiKeyChain(): string[] {
   return getApiKeyProfiles().map((p) => p.apiKey);
 }
@@ -155,7 +211,8 @@ export async function chatWithKeyAndModelFallback(
   params: Omit<OpenAI.Chat.ChatCompletionCreateParamsNonStreaming, 'model'>,
   options?: { kind?: 'vision' | 'text' }
 ): Promise<{ response: OpenAI.Chat.ChatCompletion; model: string }> {
-  const profiles = getApiKeyProfiles();
+  const profiles =
+    options?.kind === 'vision' ? getVisionApiKeyProfiles() : getApiKeyProfiles();
   if (profiles.length === 0) {
     throw new Error('未配置 API Key');
   }

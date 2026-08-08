@@ -77,29 +77,86 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
 
     setUploading(true);
     setError('');
+    setProgress(0);
 
-    const formData = new FormData();
-    formData.append('familyId', familyId);
-    files.forEach((file) => formData.append('photos', file));
+    const imageFiles = files.filter((f) => isImageFile(f.name));
+    const jsonFiles = files.filter((f) => isGooglePhotosJsonFile(f.name));
+    const uploadedPhotos: Array<{ id: string; url: string; name: string }> = [];
+    let totalCount = 0;
+
+    const uploadOnce = async (formData: FormData, retries = 2) => {
+      let lastError: unknown;
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          return await fetch('/api/upload', { method: 'POST', body: formData });
+        } catch (err) {
+          lastError = err;
+          if (attempt < retries) {
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          }
+        }
+      }
+      throw lastError;
+    };
 
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
+      for (let i = 0; i < imageFiles.length; i++) {
+        const formData = new FormData();
+        formData.append('familyId', familyId);
+        formData.append('photos', imageFiles[i]);
+        if (i === 0) {
+          jsonFiles.forEach((file) => formData.append('photos', file));
+        }
 
-      if (!res.ok) {
-        setError(data.error || '上传失败');
-        return;
+        const res = await uploadOnce(formData);
+        let data: {
+          error?: string;
+          photos?: Array<{ id: string; url: string; name: string }>;
+          totalCount?: number;
+        } = {};
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
+
+        if (!res.ok) {
+          if (res.status === 413) {
+            throw new Error(
+              `「${imageFiles[i].name}」过大，请压缩后重试（单张建议不超过 20MB）`
+            );
+          }
+          throw new Error(data.error || `「${imageFiles[i].name}」上传失败（${res.status}）`);
+        }
+
+        uploadedPhotos.push(...(data.photos || []));
+        totalCount = data.totalCount ?? totalCount;
+        setProgress(Math.min(100, Math.round(((i + 1) / imageFiles.length) * 100)));
       }
 
-      const uploaded = Array.isArray(data.photos) ? data.photos.length : 0;
-      if (uploaded !== imageCount) {
-        setError(`上传完成 ${uploaded}/${imageCount} 张，部分照片可能未成功，请到记忆卡页查看`);
+      if (uploadedPhotos.length !== imageCount) {
+        setError(`上传完成 ${uploadedPhotos.length}/${imageCount} 张，部分照片可能未成功，请到记忆卡页查看`);
       }
 
       setProgress(100);
-      onUploadComplete(data);
-    } catch {
-      setError('网络错误，请重试');
+      onUploadComplete({
+        photos: uploadedPhotos,
+        totalCount,
+        metadata: jsonFiles.length > 0 ? { jsonFiles: jsonFiles.length, matched: 0 } : undefined,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const lower = msg.toLowerCase();
+      if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('load failed')) {
+        const done = uploadedPhotos.length;
+        setError(
+          done > 0
+            ? `网络连接中断，已成功 ${done}/${imageCount} 张，请检查网络后重试剩余照片`
+            : '网络连接中断，请检查网络或换用 Wi-Fi 后重试'
+        );
+      } else {
+        setError(msg || '网络错误，请重试');
+      }
     } finally {
       setUploading(false);
     }

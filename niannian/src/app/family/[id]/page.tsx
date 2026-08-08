@@ -55,6 +55,9 @@ export default function FamilyDetailPage() {
     setGenerating(true);
     setGenerateError('');
     showLoading('正在发现故事', 'AI 正在聚类并撰写，请稍候…');
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
     try {
       const res = await fetch('/api/story/generate', {
         method: 'POST',
@@ -65,9 +68,40 @@ export default function FamilyDetailPage() {
       if (!res.ok) {
         throw new Error(data.error || '生成失败');
       }
-      router.push(`/family/${familyId}/story`);
+
+      const jobId = data.jobId as string;
+      if (!jobId) {
+        throw new Error('未收到任务 ID');
+      }
+
+      for (let i = 0; i < 180; i++) {
+        await sleep(2000);
+        const pollRes = await fetch(`/api/story/generate?jobId=${encodeURIComponent(jobId)}`);
+        const poll = await pollRes.json();
+        if (!pollRes.ok) {
+          throw new Error(poll.error || '查询进度失败');
+        }
+        if (poll.progress) {
+          showLoading('正在发现故事', poll.progress);
+        }
+        if (poll.status === 'done') {
+          router.push(`/family/${familyId}/story`);
+          return;
+        }
+        if (poll.status === 'error') {
+          throw new Error(poll.error || '生成失败');
+        }
+      }
+
+      throw new Error('生成超时，请稍后在故事页查看是否已完成');
     } catch (err) {
-      setGenerateError(err instanceof Error ? err.message : '生成失败');
+      const msg = err instanceof Error ? err.message : '生成失败';
+      const lower = msg.toLowerCase();
+      if (lower.includes('failed to fetch') || lower.includes('networkerror')) {
+        setGenerateError('网络连接中断，故事可能仍在后台生成，请稍后刷新故事页查看');
+      } else {
+        setGenerateError(msg);
+      }
     } finally {
       hideLoading();
       setGenerating(false);
@@ -119,7 +153,7 @@ export default function FamilyDetailPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F4ED] px-8">
         <p className="text-[#8B7355] mb-4">家庭不存在</p>
         <Link href="/family" className="text-sm text-[#D98A45] underline underline-offset-2">
-          返回家庭列表
+          返回主题列表
         </Link>
       </div>
     );
@@ -162,7 +196,7 @@ export default function FamilyDetailPage() {
         onClick={() => router.push('/family')}
         className="text-[#B8A898] hover:text-[#8B7355] text-sm mb-6 transition-colors"
       >
-        ← 我的家庭
+        ← 我的主题
       </button>
 
       <div className="text-center mb-8 animate-fade-in-up">

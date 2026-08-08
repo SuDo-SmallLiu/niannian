@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import FamilySectionTabs from '@/components/FamilySectionTabs';
 
 interface FamilyInfo {
   id: string;
@@ -36,11 +36,12 @@ export default function FamilyPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
-      <Header />
-      <main className="flex-1 px-6 py-8">
+      <main className="flex-1 px-6 pt-6 pb-24">
+        <FamilySectionTabs />
+
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的家庭</h1>
-          <p className="text-sm text-[#B8A898]">管理你的家庭记忆空间</p>
+          <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的主题</h1>
+          <p className="text-sm text-[#B8A898]">管理你的记忆主题空间</p>
         </div>
 
         {loading ? (
@@ -49,12 +50,12 @@ export default function FamilyPage() {
           </div>
         ) : families.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-[#B8A898] text-sm mb-6">还没有家庭，创建一个吧</p>
+            <p className="text-[#B8A898] text-sm mb-6">还没有主题，创建一个吧</p>
             <button
               onClick={() => router.push('/create')}
               className="py-3 px-8 rounded-2xl bg-[#D98A45] text-white font-serif hover:bg-[#C47A3A] transition-all active:scale-[0.98]"
             >
-              + 创建新家庭
+              + 创建新主题
             </button>
           </div>
         ) : (
@@ -94,7 +95,7 @@ export default function FamilyPage() {
               onClick={() => router.push('/create')}
               className="w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg hover:bg-[#C47A3A] transition-all active:scale-[0.98]"
             >
-              + 创建新家庭
+              + 创建新主题
             </button>
           </>
         )}

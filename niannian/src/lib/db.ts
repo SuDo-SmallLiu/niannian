@@ -264,10 +264,59 @@ function migrateDatabase(database: Database.Database) {
       FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_movie_chapters_movie ON movie_chapters(movie_id, order_index);
+
+    -- 统一检索层（Read Model，非业务真相源）
+    CREATE TABLE IF NOT EXISTS global_memory_search (
+      photo_id TEXT PRIMARY KEY,
+      memory_card_id TEXT,
+      family_id TEXT NOT NULL,
+      family_name TEXT DEFAULT '',
+      photo_url TEXT DEFAULT '',
+      taken_at TEXT DEFAULT '',
+      location TEXT DEFAULT '',
+      people TEXT DEFAULT '[]',
+      people_text TEXT DEFAULT '',
+      tags TEXT DEFAULT '[]',
+      tags_text TEXT DEFAULT '',
+      action TEXT DEFAULT '',
+      significance TEXT DEFAULT '',
+      analysis_status TEXT DEFAULT 'pending',
+      story_ids TEXT DEFAULT '[]',
+      search_text TEXT DEFAULT '',
+      synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE,
+      FOREIGN KEY (family_id) REFERENCES families(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_gms_family ON global_memory_search(family_id);
+    CREATE INDEX IF NOT EXISTS idx_gms_taken_at ON global_memory_search(taken_at);
+    CREATE INDEX IF NOT EXISTS idx_gms_location ON global_memory_search(location);
+    CREATE INDEX IF NOT EXISTS idx_gms_analysis_status ON global_memory_search(analysis_status);
+    CREATE INDEX IF NOT EXISTS idx_gms_people_text ON global_memory_search(people_text);
+    CREATE INDEX IF NOT EXISTS idx_gms_tags_text ON global_memory_search(tags_text);
   `);
 
   migrateStoriesV1ToV2(database);
   migrateStoryPhotosToMemoryCards(database);
+  scheduleSearchIndexBackfillIfEmpty();
+}
+
+function scheduleSearchIndexSync(photoId: string): void {
+  void import('@/lib/global-memory-search')
+    .then((m) => m.syncGlobalMemorySearch(photoId))
+    .catch((err) => console.error('[global_memory_search] sync failed', photoId, err));
+}
+
+function scheduleSearchIndexBackfillIfEmpty(): void {
+  const database = db;
+  const row = database.prepare('SELECT COUNT(*) AS count FROM global_memory_search').get() as { count: number };
+  if (row.count > 0) return;
+
+  void import('@/lib/global-memory-search')
+    .then((m) => {
+      const synced = m.backfillGlobalMemorySearch();
+      console.log(`[global_memory_search] backfilled ${synced} rows`);
+    })
+    .catch((err) => console.error('[global_memory_search] backfill failed', err));
 }
 
 function migrateStoriesV1ToV2(database: Database.Database) {
@@ -339,6 +388,7 @@ export function addPhoto(
   database.prepare(
     'INSERT INTO photos (id, family_id, url, original_name) VALUES (?, ?, ?, ?)'
   ).run(id, familyId, url, originalName);
+  scheduleSearchIndexSync(id);
   return id;
 }
 
@@ -381,6 +431,7 @@ export function updatePhotoSourceMetadata(
   database.prepare(
     'UPDATE photos SET source_type = ?, source_metadata = ? WHERE id = ?'
   ).run(sourceType, JSON.stringify(sourceMetadata), id);
+  scheduleSearchIndexSync(id);
 }
 
 export function updatePhotoAnalysis(
@@ -413,6 +464,7 @@ export function updatePhotoAnalysis(
     taken_at,
     id
   );
+  scheduleSearchIndexSync(id);
 }
 
 export function getPhotoCount(familyId: string): number {
@@ -552,6 +604,7 @@ export function deletePhotoById(photoId: string): boolean {
   database.prepare('DELETE FROM memory_cards WHERE photo_id = ?').run(photoId);
   database.prepare('DELETE FROM story_memory_cards WHERE memory_card_id = ?').run(photoId);
   database.prepare('DELETE FROM photo_shares WHERE photo_id = ?').run(photoId);
+  database.prepare('DELETE FROM global_memory_search WHERE photo_id = ?').run(photoId);
   database.prepare('DELETE FROM photos WHERE id = ?').run(photoId);
 
   if (photo.url?.startsWith('/uploads/')) {
@@ -571,6 +624,14 @@ export function setStoryMemoryCards(
   items: Array<{ photoId: string; orderIndex: number; sceneId?: string }>
 ): void {
   const database = getDb();
+  const oldRows = database
+    .prepare('SELECT memory_card_id FROM story_memory_cards WHERE story_id = ?')
+    .all(storyId) as Array<{ memory_card_id: string }>;
+  const affectedPhotoIds = new Set([
+    ...oldRows.map((r) => r.memory_card_id),
+    ...items.map((i) => i.photoId),
+  ]);
+
   database.prepare('DELETE FROM story_memory_cards WHERE story_id = ?').run(storyId);
   const insert = database.prepare(`
     INSERT INTO story_memory_cards (story_id, memory_card_id, order_index, scene_id)
@@ -578,6 +639,10 @@ export function setStoryMemoryCards(
   `);
   for (const item of items) {
     insert.run(storyId, item.photoId, item.orderIndex, item.sceneId || null);
+  }
+
+  for (const photoId of affectedPhotoIds) {
+    scheduleSearchIndexSync(photoId);
   }
 }
 
@@ -1065,6 +1130,7 @@ export function upsertMemoryCard(data: MemoryCardData): string {
       data.analysis_status || 'analyzed',
       data.photo_id
     );
+    scheduleSearchIndexSync(data.photo_id);
     return existing.id;
   }
 
@@ -1095,6 +1161,7 @@ export function upsertMemoryCard(data: MemoryCardData): string {
     JSON.stringify(data.ai_questions || []),
     data.analysis_status || 'analyzed'
   );
+  scheduleSearchIndexSync(data.photo_id);
   return id;
 }
 
@@ -1162,6 +1229,7 @@ export function updateMemoryCardSupplement(
     JSON.stringify(supplement.ai_questions ?? existing.ai_questions ?? []),
     photoId
   );
+  scheduleSearchIndexSync(photoId);
   return true;
 }
 
@@ -1174,6 +1242,7 @@ export function setMemoryCardQuestions(photoId: string, questions: AiQuestion[])
     UPDATE memory_cards SET ai_questions = ?, updated_at = datetime('now')
     WHERE photo_id = ?
   `).run(JSON.stringify(questions), photoId);
+  scheduleSearchIndexSync(photoId);
   return true;
 }
 
@@ -1191,6 +1260,7 @@ export function saveTagsForPhoto(photoId: string, tags: TagData[]): void {
     if (!value) continue;
     insert.run(generateId(), photoId, tag.layer, key, value, tag.source || 'ai');
   }
+  scheduleSearchIndexSync(photoId);
 }
 
 export function getTagsByPhoto(photoId: string) {

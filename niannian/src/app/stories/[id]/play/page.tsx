@@ -77,6 +77,8 @@ export default function StoryPlayPage() {
       slides={slides}
       onClose={() => router.push(`/stories/${storyId}`)}
       autoPlayMs={7000}
+      enableMusic
+      enableNarration
     />
   );
 }

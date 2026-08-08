@@ -25,8 +25,8 @@ export default function ProfilePage() {
         <div className="bg-white rounded-2xl shadow-sm border border-[#E8DCC8] overflow-hidden mb-4">
           <MenuItem
             icon="🏠"
-            title="我的家庭"
-            subtitle="管理和切换家庭空间"
+            title="我的主题"
+            subtitle="管理和切换记忆主题"
             onClick={() => (window.location.href = '/family')}
           />
           <Divider />

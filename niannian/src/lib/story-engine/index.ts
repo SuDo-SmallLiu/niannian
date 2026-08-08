@@ -42,6 +42,7 @@ function toSnapshot(
 export interface RunStoryEngineOptions {
   replaceExisting?: boolean;
   maxStories?: number;
+  onProgress?: (message: string) => void;
 }
 
 /** Memory Cards → Scenes → Stories，并写入 DB */
@@ -70,7 +71,10 @@ export async function runStoryEngine(
 
   const composedStories: ComposedStory[] = [];
 
-  for (const scene of selectedScenes) {
+  for (let i = 0; i < selectedScenes.length; i++) {
+    const scene = selectedScenes[i];
+    options.onProgress?.(`正在撰写故事 ${i + 1}/${selectedScenes.length}…`);
+
     const sceneCards = scene.memoryCardIds
       .map((id) => cards.find((c) => c.photoId === id))
       .filter((c): c is MemoryCardSnapshot => !!c);

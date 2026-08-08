@@ -8,9 +8,11 @@ interface UseThemeMusicOptions {
   enabled: boolean;
   /** 用户已交互（满足浏览器自动播放策略） */
   unlocked: boolean;
+  /** 旁白播放时压低 BGM 音量 */
+  duck?: boolean;
 }
 
-export function useThemeMusic({ theme, enabled, unlocked }: UseThemeMusicOptions) {
+export function useThemeMusic({ theme, enabled, unlocked, duck = false }: UseThemeMusicOptions) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentSrcRef = useRef<string>('');
 
@@ -41,7 +43,7 @@ export function useThemeMusic({ theme, enabled, unlocked }: UseThemeMusicOptions
 
     const audio = new Audio(src);
     audio.loop = true;
-    audio.volume = track.volume;
+    audio.volume = duck ? track.volume * 0.25 : track.volume;
     audioRef.current = audio;
     currentSrcRef.current = src;
 
@@ -52,7 +54,14 @@ export function useThemeMusic({ theme, enabled, unlocked }: UseThemeMusicOptions
     return () => {
       audio.pause();
     };
-  }, [theme, enabled, unlocked]);
+  }, [theme, enabled, unlocked, duck]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !theme) return;
+    const track = getMusicForTheme(theme);
+    audio.volume = duck ? track.volume * 0.25 : track.volume;
+  }, [duck, theme]);
 
   useEffect(() => {
     return () => {

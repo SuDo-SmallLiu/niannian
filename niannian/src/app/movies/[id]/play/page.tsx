@@ -100,6 +100,8 @@ export default function MoviePlayPage() {
         onClose={() => router.push('/movies')}
         onShare={shareLoading ? undefined : handleShare}
         autoPlayMs={8000}
+        enableMusic
+        enableNarration
       />
     </>
   );

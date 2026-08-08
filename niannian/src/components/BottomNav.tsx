@@ -12,7 +12,7 @@ export default function BottomNav() {
         <NavItem icon="🏠" label="首页" href="/" pathname={pathname} />
         <NavItem icon="📖" label="故事" href="/stories" pathname={pathname} />
         <NavItem icon="🎬" label="电影" href="/movies" pathname={pathname} />
-        <NavItem icon="👨‍👩‍👧" label="家庭" href="/family" pathname={pathname} />
+        <NavItem icon="🃏" label="记忆" href="/family" pathname={pathname} />
         <NavItem icon="👤" label="我的" href="/profile" pathname={pathname} />
       </div>
     </nav>

@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { H5Slide } from '@/lib/h5-story-slides';
 import { getThemeFromSlide } from '@/lib/theme-music';
+import { estimateNarrationMs, getSlideNarrationText } from '@/lib/slide-narration';
 import { useThemeMusic } from '@/hooks/useThemeMusic';
-import { ChevronLeft, Pause, Play, Share2, Volume2, VolumeX, X } from 'lucide-react';
+import { useNarration } from '@/hooks/useNarration';
+import { ChevronLeft, Mic, MicOff, Pause, Play, Share2, Volume2, VolumeX, X } from 'lucide-react';
 
 interface InteractiveStoryPlayerProps {
   slides: H5Slide[];
@@ -13,6 +15,7 @@ interface InteractiveStoryPlayerProps {
   autoPlayMs?: number;
   showClose?: boolean;
   enableMusic?: boolean;
+  enableNarration?: boolean;
 }
 
 export default function InteractiveStoryPlayer({
@@ -22,17 +25,32 @@ export default function InteractiveStoryPlayer({
   autoPlayMs = 6000,
   showClose = true,
   enableMusic = true,
+  enableNarration = false,
 }: InteractiveStoryPlayerProps) {
   const [index, setIndex] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [musicOn, setMusicOn] = useState(true);
+  const [narrationOn, setNarrationOn] = useState(true);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [animKey, setAnimKey] = useState(0);
   const [progressKey, setProgressKey] = useState(0);
+  const [narrationKey, setNarrationKey] = useState(0);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const total = slides.length;
   const slide = slides[index];
+
+  const narrationText = useMemo(() => {
+    if (!enableNarration || !slide) return null;
+    return getSlideNarrationText(slide);
+  }, [enableNarration, slide]);
+
+  const slideDurationMs = useMemo(() => {
+    if (enableNarration && narrationOn && narrationText) {
+      return estimateNarrationMs(narrationText);
+    }
+    return autoPlayMs;
+  }, [enableNarration, narrationOn, narrationText, autoPlayMs]);
 
   const activeTheme = useMemo(() => {
     let lastTheme: string | undefined;
@@ -47,6 +65,7 @@ export default function InteractiveStoryPlayer({
     theme: activeTheme,
     enabled: enableMusic && musicOn,
     unlocked: audioUnlocked,
+    duck: enableNarration && narrationOn && Boolean(narrationText),
   });
 
   const unlockAudio = useCallback(() => {
@@ -59,6 +78,7 @@ export default function InteractiveStoryPlayer({
       if (i >= total - 1) return i;
       setAnimKey((k) => k + 1);
       setProgressKey((k) => k + 1);
+      setNarrationKey((k) => k + 1);
       return i + 1;
     });
   }, [total, unlockAudio]);
@@ -69,15 +89,33 @@ export default function InteractiveStoryPlayer({
       if (i <= 0) return i;
       setAnimKey((k) => k + 1);
       setProgressKey((k) => k + 1);
+      setNarrationKey((k) => k + 1);
       return i - 1;
     });
   }, [unlockAudio]);
+
+  const handleNarrationEnd = useCallback(() => {
+    if (autoPlay && index < total - 1) {
+      goNext();
+    }
+  }, [autoPlay, index, total, goNext]);
+
+  useNarration({
+    text: narrationText,
+    enabled: enableNarration && narrationOn,
+    unlocked: audioUnlocked,
+    speakKey: `${index}-${narrationKey}`,
+    onEnd: handleNarrationEnd,
+  });
 
   const toggleAutoPlay = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     unlockAudio();
     setAutoPlay((v) => {
-      if (!v) setProgressKey((k) => k + 1);
+      if (!v) {
+        setProgressKey((k) => k + 1);
+        setNarrationKey((k) => k + 1);
+      }
       return !v;
     });
   }, [unlockAudio]);
@@ -88,11 +126,22 @@ export default function InteractiveStoryPlayer({
     setMusicOn((v) => !v);
   }, [unlockAudio]);
 
+  const toggleNarration = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    unlockAudio();
+    setNarrationOn((v) => {
+      if (!v) setNarrationKey((k) => k + 1);
+      return !v;
+    });
+  }, [unlockAudio]);
+
   useEffect(() => {
     if (!autoPlay || index >= total - 1) return;
-    const timer = setTimeout(goNext, autoPlayMs);
+    if (enableNarration && narrationOn && narrationText) return;
+
+    const timer = setTimeout(goNext, slideDurationMs);
     return () => clearTimeout(timer);
-  }, [autoPlay, index, total, autoPlayMs, goNext, progressKey]);
+  }, [autoPlay, index, total, slideDurationMs, goNext, progressKey, enableNarration, narrationOn, narrationText]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -137,7 +186,7 @@ export default function InteractiveStoryPlayer({
               }`}
               style={
                 i === index && autoPlay
-                  ? ({ '--progress-ms': `${autoPlayMs}ms` } as React.CSSProperties)
+                  ? ({ '--progress-ms': `${slideDurationMs}ms` } as React.CSSProperties)
                   : undefined
               }
             />
@@ -160,6 +209,18 @@ export default function InteractiveStoryPlayer({
           <ChevronLeft className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-2 pointer-events-auto">
+          {enableNarration && (
+            <button
+              type="button"
+              onClick={toggleNarration}
+              className={`w-11 h-11 rounded-full flex items-center justify-center touch-manipulation ${
+                narrationOn ? 'bg-[#D98A45]/80 text-white' : 'bg-black/40 text-white/60'
+              }`}
+              aria-label={narrationOn ? '关闭旁白' : '开启旁白'}
+            >
+              {narrationOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            </button>
+          )}
           {enableMusic && (
             <button
               type="button"
