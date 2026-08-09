@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { countGlobalMemory, searchGlobalMemory } from '@/lib/global-memory-search';
+import {
+  countGlobalMemory,
+  getGlobalMemoryFacets,
+  searchGlobalMemory,
+} from '@/lib/global-memory-search';
 import { requireAuth, AuthError, unauthorizedResponse } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -7,12 +11,20 @@ export async function GET(request: NextRequest) {
     const user = await requireAuth(request);
     const sp = request.nextUrl.searchParams;
 
+    if (sp.get('facets') === '1') {
+      return NextResponse.json({
+        success: true,
+        facets: getGlobalMemoryFacets(user.id),
+      });
+    }
+
     const params = {
       userId: user.id,
       familyIds: sp.getAll('familyId').filter(Boolean),
       q: sp.get('q') || undefined,
       location: sp.get('location') || undefined,
       people: sp.get('people') || undefined,
+      time: sp.get('time') || undefined,
       takenAfter: sp.get('takenAfter') || undefined,
       takenBefore: sp.get('takenBefore') || undefined,
       analysisStatus: (sp.get('analysisStatus') as 'pending' | 'analyzed' | 'all' | null) || 'all',

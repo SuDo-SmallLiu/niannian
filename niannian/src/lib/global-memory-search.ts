@@ -29,6 +29,8 @@ export interface GlobalMemorySearchParams {
   q?: string;
   location?: string;
   people?: string;
+  /** 时间年份，如 2024 */
+  time?: string;
   takenAfter?: string;
   takenBefore?: string;
   analysisStatus?: 'pending' | 'analyzed' | 'all';
@@ -225,6 +227,11 @@ export function searchGlobalMemory(params: GlobalMemorySearchParams = {}): Globa
     values.push(`%${params.people.trim().toLowerCase()}%`);
   }
 
+  if (params.time?.trim()) {
+    conditions.push('taken_at LIKE ?');
+    values.push(`%${params.time.trim()}%`);
+  }
+
   if (params.takenAfter?.trim()) {
     conditions.push('taken_at >= ?');
     values.push(params.takenAfter.trim());
@@ -303,6 +310,11 @@ export function countGlobalMemory(params: GlobalMemorySearchParams = {}): number
     values.push(`%${params.people.trim().toLowerCase()}%`);
   }
 
+  if (params.time?.trim()) {
+    conditions.push('taken_at LIKE ?');
+    values.push(`%${params.time.trim()}%`);
+  }
+
   if (params.takenAfter?.trim()) {
     conditions.push('taken_at >= ?');
     values.push(params.takenAfter.trim());
@@ -321,4 +333,66 @@ export function countGlobalMemory(params: GlobalMemorySearchParams = {}): number
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const row = database.prepare(`SELECT COUNT(*) AS count FROM global_memory_search ${where}`).get(...values) as { count: number };
   return row.count;
+}
+
+export interface GlobalMemoryFacets {
+  times: Array<{ value: string; label: string; count: number }>;
+  people: Array<{ value: string; count: number }>;
+  locations: Array<{ value: string; count: number }>;
+}
+
+/** 聚合当前用户可访问记忆的时间/人物/地点筛选项 */
+export function getGlobalMemoryFacets(userId: string): GlobalMemoryFacets {
+  const database = getDb();
+  const familyRows = database
+    .prepare('SELECT family_id FROM family_users WHERE user_id = ?')
+    .all(userId) as Array<{ family_id: string }>;
+
+  if (familyRows.length === 0) {
+    return { times: [], people: [], locations: [] };
+  }
+
+  const placeholders = familyRows.map(() => '?').join(',');
+  const rows = database
+    .prepare(
+      `SELECT people, location, taken_at FROM global_memory_search
+       WHERE family_id IN (${placeholders})`
+    )
+    .all(...familyRows.map((r) => r.family_id)) as Array<{
+    people: string;
+    location: string;
+    taken_at: string;
+  }>;
+
+  const times = new Map<string, number>();
+  const people = new Map<string, number>();
+  const locations = new Map<string, number>();
+
+  for (const row of rows) {
+    const takenAt = row.taken_at || '';
+    const yearMatch = takenAt.match(/\d{4}/);
+    if (yearMatch) {
+      const year = yearMatch[0];
+      times.set(year, (times.get(year) || 0) + 1);
+    }
+
+    for (const person of parseJsonArray(row.people)) {
+      if (person) people.set(person, (people.get(person) || 0) + 1);
+    }
+
+    const loc = (row.location || '').trim();
+    if (loc) locations.set(loc, (locations.get(loc) || 0) + 1);
+  }
+
+  return {
+    times: Array.from(times.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([value, count]) => ({ value, label: `${value}年`, count })),
+    people: Array.from(people.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([value, count]) => ({ value, count })),
+    locations: Array.from(locations.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([value, count]) => ({ value, count })),
+  };
 }
