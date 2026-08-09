@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { isGooglePhotosJsonFile, isImageFile } from '@/lib/google-photos-metadata';
+import { isGooglePhotosJsonFile, isImageFile, matchJsonToPhoto } from '@/lib/google-photos-metadata';
 
 interface PhotoUploaderProps {
   onUploadComplete: (result: {
@@ -14,6 +14,13 @@ interface PhotoUploaderProps {
 
 const UPLOAD_TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 2;
+const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${bytes}B`;
+}
 
 interface UploadResponse {
   ok: boolean;
@@ -86,12 +93,17 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
       const validFiles: File[] = [];
       const validPreviews: Array<{ url: string; isJson: boolean }> = [];
 
+      const skippedLarge: string[] = [];
+
       for (let i = 0; i < newFiles.length; i++) {
         const file = newFiles[i];
         const isJson = isGooglePhotosJsonFile(file.name);
         const isImage = isImageFile(file.name);
         if (!isJson && !isImage) continue;
-        if (!isJson && file.size > 20 * 1024 * 1024) continue;
+        if (!isJson && file.size > MAX_PHOTO_BYTES) {
+          skippedLarge.push(`${file.name}（${formatFileSize(file.size)}）`);
+          continue;
+        }
 
         validFiles.push(file);
         validPreviews.push({
@@ -107,9 +119,13 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
         return;
       }
 
+      if (skippedLarge.length > 0) {
+        setError(`以下照片超过 20MB，已跳过：${skippedLarge.join('、')}`);
+      }
+
       setFiles((prev) => [...prev, ...validFiles]);
       setPreviews((prev) => [...prev, ...validPreviews]);
-      setError('');
+      if (skippedLarge.length === 0) setError('');
     },
     [files]
   );
@@ -177,6 +193,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
     try {
       for (let i = 0; i < imageFiles.length; i++) {
         const current = imageFiles[i];
+        const matchedJson = jsonFiles.filter((jf) => matchJsonToPhoto(current.name, jf.name));
         const shortName =
           current.name.length > 18 ? `${current.name.slice(0, 15)}…` : current.name;
         setUploadLabel(`正在上传 ${i + 1}/${imageFiles.length} · ${shortName}`);
@@ -184,9 +201,9 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
         const formData = new FormData();
         formData.append('familyId', familyId);
         formData.append('photos', current);
-        if (i === 0) {
-          jsonFiles.forEach((file) => formData.append('photos', file));
-        }
+        matchedJson.forEach((file) => formData.append('photos', file));
+
+        const requestBytes = [current, ...matchedJson].reduce((sum, f) => sum + f.size, 0);
 
         const { ok, status, data } = await uploadOnce(formData, (ratio) => {
           const overall = ((i + ratio) / imageFiles.length) * 100;
@@ -195,7 +212,10 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
 
         if (!ok) {
           if (status === 413) {
-            throw new Error(`「${current.name}」过大，请压缩后重试（单张建议不超过 20MB）`);
+            throw new Error(
+              `「${current.name}」（${formatFileSize(current.size)}，本次请求 ${formatFileSize(requestBytes)}）上传被拒绝。` +
+                `若照片不大仍失败，多半是服务器 nginx 未配置 client_max_body_size，请联系管理员`
+            );
           }
           throw new Error(data.error || `「${current.name}」上传失败（${status}）`);
         }

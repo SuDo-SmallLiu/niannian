@@ -15,6 +15,14 @@ import {
   type PhotoSourceFacts,
 } from '@/lib/google-photos-metadata';
 
+const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)}KB`;
+  return `${bytes}B`;
+}
+
 async function writeUploadedFile(file: File, filePath: string) {
   const webStream = file.stream();
   const nodeStream = Readable.fromWeb(webStream as import('stream/web').ReadableStream);
@@ -38,6 +46,17 @@ export async function POST(request: NextRequest) {
 
     if (imageFiles.length === 0) {
       return NextResponse.json({ error: '请至少上传一张照片' }, { status: 400 });
+    }
+
+    for (const file of imageFiles) {
+      if (file.size > MAX_PHOTO_BYTES) {
+        return NextResponse.json(
+          {
+            error: `「${file.name}」大小 ${formatFileSize(file.size)}，单张不能超过 ${formatFileSize(MAX_PHOTO_BYTES)}`,
+          },
+          { status: 413 }
+        );
+      }
     }
 
     if (imageFiles.length > 50) {
