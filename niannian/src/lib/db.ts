@@ -1022,6 +1022,12 @@ export function findUserByPhone(phone: string) {
   return row || null;
 }
 
+export function getUserById(id: string) {
+  const database = getDb();
+  const row = database.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+  return row || null;
+}
+
 export function createUser(phone: string, name?: string): string {
   const id = generateId();
   const database = getDb();
@@ -1033,18 +1039,19 @@ export function createUser(phone: string, name?: string): string {
 
 export function saveVerifyCode(phone: string, code: string): void {
   const database = getDb();
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const expiresAt = Math.floor((Date.now() + 30 * 60 * 1000) / 1000);
   database.prepare(
     'INSERT INTO verify_codes (phone, code, expires_at) VALUES (?, ?, ?)'
-  ).run(phone, code, expiresAt);
+  ).run(phone, code, String(expiresAt));
 }
 
 export function verifyCode(phone: string, code: string): boolean {
   const database = getDb();
+  const now = Math.floor(Date.now() / 1000);
   const row = database.prepare(
     `SELECT * FROM verify_codes WHERE phone = ? AND code = ? AND used = 0
-     AND expires_at > datetime('now') ORDER BY id DESC LIMIT 1`
-  ).get(phone, code) as any;
+     AND CAST(expires_at AS INTEGER) > ? ORDER BY id DESC LIMIT 1`
+  ).get(phone, code, now) as any;
   if (!row) return false;
 
   database.prepare('UPDATE verify_codes SET used = 1 WHERE id = ?').run(row.id);

@@ -3,15 +3,20 @@
 import Link from 'next/link';
 import Header from '@/components/Header';
 import PipelineSteps from '@/components/PipelineSteps';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function ProfilePage() {
+  const { user, loading, logout } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
       <Header />
       <main className="flex-1 px-6 py-8 pb-28">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的</h1>
-          <p className="text-sm text-[#B8A898] mb-4">记忆、故事与电影的入口</p>
+          <p className="text-sm text-[#B8A898] mb-4">
+            {loading ? '加载中…' : user?.phoneMasked || user?.phone || '记忆、故事与电影的入口'}
+          </p>
           <PipelineSteps active={1} compact />
         </div>
 
@@ -47,17 +52,26 @@ export default function ProfilePage() {
           <MenuItem icon="🔔" title="提醒设置" subtitle="纪念日与家庭助手" subtitle2="即将上线" />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-[#E8DCC8] overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-[#E8DCC8] overflow-hidden mb-4">
           <MenuItem icon="ℹ️" title="关于念念年年" subtitle="MVP V3 · 家庭故事流水线" />
           <Divider />
           <MenuItem
             icon="❤️"
             title="让每一张照片都成为回家的理由"
-            subtitle="Photo → Memory → Story → Movie"
           />
         </div>
 
-        <p className="text-center text-xs text-[#D8CCB8] mt-8">NIAN NIAN — 家庭记忆连接器</p>
+        {user && (
+          <button
+            type="button"
+            onClick={logout}
+            className="w-full py-3.5 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:bg-[#FFF8F0] transition-colors"
+          >
+            退出登录
+          </button>
+        )}
+
+        <p className="text-center text-xs text-[#D8CCB8] mt-8">念念年年 — 家庭记忆连接器</p>
       </main>
     </div>
   );
@@ -93,7 +107,7 @@ function MenuItem({
       <span className="text-xl">{icon}</span>
       <div className="flex-1">
         <p className="text-sm font-medium text-[#4B3B2F]">{title}</p>
-        <p className="text-xs text-[#B8A898]">{subtitle}</p>
+        {subtitle && <p className="text-xs text-[#B8A898]">{subtitle}</p>}
         {subtitle2 && (
           <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#F0E8D8] text-[10px] text-[#B8A898]">
             {subtitle2}

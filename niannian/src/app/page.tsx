@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { PRESET_MEMBERS } from '@/lib/family-members';
 import PipelineSteps from '@/components/PipelineSteps';
 import HomeWelcomeHero from '@/components/HomeWelcomeHero';
+import HomeLoginPanel from '@/components/HomeLoginPanel';
 import NianNianHelpDesk from '@/components/NianNianHelpDesk';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function HomePage() {
   return (
@@ -25,6 +27,7 @@ export default function HomePage() {
 function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, loading } = useAuth();
   const [mode, setMode] = useState<'welcome' | 'create'>('welcome');
   const [familyName, setFamilyName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
@@ -33,11 +36,19 @@ function HomePageContent() {
   const [error, setError] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
 
+  const redirect = searchParams.get('redirect') || '/';
+
   useEffect(() => {
-    if (searchParams.get('create') === '1') {
+    if (searchParams.get('create') === '1' && user) {
       setMode('create');
     }
-  }, [searchParams]);
+  }, [searchParams, user]);
+
+  useEffect(() => {
+    if (user && redirect !== '/') {
+      router.replace(redirect);
+    }
+  }, [user, redirect, router]);
 
   const allMembers = [
     ...selectedMembers,
@@ -87,6 +98,26 @@ function HomePageContent() {
       setCreating(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F4ED]">
+        <div className="w-8 h-8 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#F8F4ED] pb-10">
+        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} />
+        <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
+        <div className="mt-auto">
+          <HomeLoginPanel redirect={redirect} compact />
+        </div>
+      </div>
+    );
+  }
 
   if (mode === 'create') {
     return (

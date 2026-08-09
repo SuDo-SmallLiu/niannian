@@ -4,12 +4,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
+import { useAuth } from '@/components/providers/auth-provider';
 
 export default function NavShell() {
   const appreciate = useAppreciateMode();
   const pathname = usePathname();
+  const { user, loading } = useAuth();
 
   if (pathname.startsWith('/share/') || pathname.includes('/play')) {
+    return null;
+  }
+
+  if (pathname === '/' && (loading || !user)) {
     return null;
   }
 
