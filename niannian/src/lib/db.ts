@@ -1125,6 +1125,7 @@ export function useInvitation(code: string, userId: string): { familyId: string;
   database.prepare(
     'UPDATE invitations SET used_by = ?, used_at = datetime(\'now\') WHERE id = ?'
   ).run(userId, inv.id);
+  addFamilyMember(inv.family_id, userId, 'member');
   return { familyId: inv.family_id, success: true };
 }
 

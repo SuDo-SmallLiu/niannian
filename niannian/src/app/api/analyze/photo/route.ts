@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMemoryCardWithPhoto } from '@/lib/db';
 import { analyzeAndSavePhoto } from '@/lib/analyze-photo';
 import { AiServiceError } from '@/lib/ai';
+import { requirePhotoAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少 photoId' }, { status: 400 });
     }
 
+    await requirePhotoAccess(request, photoId);
     await analyzeAndSavePhoto(photoId, { withSupplement: !!withSupplement });
 
     const data = getMemoryCardWithPhoto(photoId);
@@ -20,6 +22,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: 'done', ...data });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('单张重新解析失败:', error);
     if (error instanceof AiServiceError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: 502 });

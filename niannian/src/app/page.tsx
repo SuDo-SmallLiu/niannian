@@ -109,11 +109,18 @@ function HomePageContent() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#F8F4ED] pb-10">
-        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} />
+      <div className="min-h-screen flex flex-col bg-[#F8F4ED] pb-8">
+        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} compact />
         <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
-        <div className="mt-auto">
-          <HomeLoginPanel redirect={redirect} compact />
+        <div className="w-full max-w-sm mx-auto px-5 -mt-2">
+          {redirect !== '/' && (
+            <p className="text-center text-sm text-[#8B7355] mb-3 bg-[#FFF8F0] border border-[#E8DCC8] rounded-xl py-2.5">
+              登录后继续访问
+            </p>
+          )}
+          <div className="bg-white rounded-3xl border border-[#E8DCC8] shadow-sm p-1">
+            <HomeLoginPanel redirect={redirect} compact />
+          </div>
         </div>
       </div>
     );

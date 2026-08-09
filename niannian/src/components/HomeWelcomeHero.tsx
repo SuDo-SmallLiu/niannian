@@ -13,9 +13,10 @@ const RIGHT_TEXT =
 
 interface HomeWelcomeHeroProps {
   onOpenHelp: () => void;
+  compact?: boolean;
 }
 
-export default function HomeWelcomeHero({ onOpenHelp }: HomeWelcomeHeroProps) {
+export default function HomeWelcomeHero({ onOpenHelp, compact = false }: HomeWelcomeHeroProps) {
   const [rightStart, setRightStart] = useState(false);
 
   return (
@@ -33,7 +34,11 @@ export default function HomeWelcomeHero({ onOpenHelp }: HomeWelcomeHeroProps) {
       </div>
 
       {/* 念念 + 左右气泡 ≈ 半屏 */}
-      <div className="relative w-full min-h-[48vh] sm:min-h-[50vh] flex flex-col items-center justify-center px-3 py-4">
+      <div
+        className={`relative w-full flex flex-col items-center justify-center px-3 py-4 ${
+          compact ? 'min-h-[28vh]' : 'min-h-[48vh] sm:min-h-[50vh]'
+        }`}
+      >
         {/* 桌面：左气泡 | 念念 | 右气泡 */}
         <div className="hidden sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3 w-full max-w-2xl mx-auto">
           <div className="niannian-bubble-soft rounded-2xl rounded-tr-sm px-3.5 py-3 text-left text-xs text-[#4B3B2F] leading-relaxed min-h-[120px]">

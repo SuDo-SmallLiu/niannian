@@ -10,6 +10,11 @@ import {
 } from '@/lib/db';
 import { patchStory } from '@/lib/story-edit';
 import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
+import {
+  requireFamilyAccess,
+  requireStoryAccess,
+  familyAccessErrorResponse,
+} from '@/lib/family-access';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -17,12 +22,15 @@ export async function DELETE(request: NextRequest) {
     if (!storyId) {
       return NextResponse.json({ error: '缺少 storyId' }, { status: 400 });
     }
+    await requireStoryAccess(request, storyId);
     const ok = deleteStoryById(storyId);
     if (!ok) {
       return NextResponse.json({ error: '故事不存在' }, { status: 404 });
     }
     return NextResponse.json({ success: true });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('删除故事失败:', error);
     return NextResponse.json({ error: '删除失败' }, { status: 500 });
   }
@@ -35,6 +43,8 @@ export async function PATCH(request: NextRequest) {
     if (!storyId) {
       return NextResponse.json({ error: '缺少 storyId' }, { status: 400 });
     }
+
+    await requireStoryAccess(request, storyId);
 
     const story = patchStory({
       storyId,
@@ -71,6 +81,8 @@ export async function PATCH(request: NextRequest) {
       },
     });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('更新故事失败:', error);
     const message = error instanceof Error ? error.message : '更新失败';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -84,6 +96,7 @@ export async function GET(request: NextRequest) {
     const storyId = searchParams.get('storyId');
 
     if (storyId) {
+      await requireStoryAccess(request, storyId);
       const story = getStory(storyId);
       if (!story) {
         return NextResponse.json({ error: '故事不存在' }, { status: 404 });
@@ -117,6 +130,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (familyId) {
+      await requireFamilyAccess(request, familyId);
       const publishedOnly = searchParams.get('publishedOnly') === '1';
       const stories = publishedOnly
         ? getPublishedStoriesByFamily(familyId)
@@ -126,6 +140,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ error: '请提供 familyId 或 storyId' }, { status: 400 });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('获取故事失败:', error);
     return NextResponse.json({ error: '获取失败' }, { status: 500 });
   }

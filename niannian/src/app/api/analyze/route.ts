@@ -6,6 +6,7 @@ import {
   summarizeJob,
 } from '@/lib/photo-analysis-job';
 import { runFamilyPhotoAnalysis } from '@/services/photo-batch-analysis.service';
+import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少家庭ID' }, { status: 400 });
     }
 
+    await requireFamilyAccess(request, familyId);
     const family = getFamily(familyId);
     if (!family) {
       return NextResponse.json({ error: '家庭不存在' }, { status: 404 });
@@ -38,16 +40,21 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: 'processing', familyId, total: photoIds.length });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('AI分析启动失败:', error);
     return NextResponse.json({ error: '分析启动失败' }, { status: 500 });
   }
 }
 
 export async function GET(request: NextRequest) {
-  const familyId = request.nextUrl.searchParams.get('familyId');
-  if (!familyId) {
-    return NextResponse.json({ error: '缺少familyId' }, { status: 400 });
-  }
+  try {
+    const familyId = request.nextUrl.searchParams.get('familyId');
+    if (!familyId) {
+      return NextResponse.json({ error: '缺少familyId' }, { status: 400 });
+    }
+
+    await requireFamilyAccess(request, familyId);
 
   const job = getAnalysisJob(familyId);
 
@@ -93,4 +100,10 @@ export async function GET(request: NextRequest) {
     ...summary,
     photos,
   });
+  } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
+    console.error('获取分析进度失败:', error);
+    return NextResponse.json({ error: '获取失败' }, { status: 500 });
+  }
 }

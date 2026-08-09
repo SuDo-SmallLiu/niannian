@@ -4,6 +4,7 @@ import {
   updateMemoryCardSupplement,
   type AiQuestion,
 } from '@/lib/db';
+import { requirePhotoAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '缺少 photoId' }, { status: 400 });
     }
 
+    await requirePhotoAccess(request, photoId);
     const data = getMemoryCardWithPhoto(photoId);
     if (!data) {
       return NextResponse.json({ error: '照片不存在' }, { status: 404 });
@@ -19,6 +21,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('获取记忆卡失败:', error);
     return NextResponse.json({ error: '获取失败' }, { status: 500 });
   }
@@ -38,20 +42,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: '缺少 photoId' }, { status: 400 });
     }
 
-    const ok = updateMemoryCardSupplement(photoId, {
+    await requirePhotoAccess(request, photoId);
+    updateMemoryCardSupplement(photoId, {
       user_notes,
       voice_transcript,
       ai_questions,
     });
 
-    if (!ok) {
-      return NextResponse.json({ error: '记忆卡不存在' }, { status: 404 });
-    }
-
     const data = getMemoryCardWithPhoto(photoId);
     return NextResponse.json(data);
   } catch (error) {
-    console.error('保存用户补充失败:', error);
-    return NextResponse.json({ error: '保存失败' }, { status: 500 });
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
+    console.error('更新记忆卡失败:', error);
+    return NextResponse.json({ error: '更新失败' }, { status: 500 });
   }
 }

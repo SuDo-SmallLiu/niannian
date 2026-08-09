@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runMovieEngine } from '@/lib/movie-engine';
 import { scheduleMovieNarrationPrefetch } from '@/lib/movie-narration-prefetch';
+import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
 export const maxDuration = 300;
 
@@ -17,6 +18,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少家庭 ID' }, { status: 400 });
     }
 
+    await requireFamilyAccess(request, familyId);
+
     const result = runMovieEngine(familyId, { replaceExisting: replaceExisting !== false });
 
     if (prefetchAudio === true) {
@@ -29,6 +32,8 @@ export async function POST(request: NextRequest) {
       audio: prefetchAudio === true ? { status: 'prefetching' as const } : { status: 'lazy' as const },
     });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     const message = error instanceof Error ? error.message : '生成失败';
     return NextResponse.json({ error: message }, { status: 500 });
   }

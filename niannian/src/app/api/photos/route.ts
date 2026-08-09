@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deletePhotoById, getPhotosByFamily, getMemoryCardsByFamily, getTagsByFamily } from '@/lib/db';
+import {
+  familyAccessErrorResponse,
+  requireFamilyAccess,
+  requirePhotoAccess,
+} from '@/lib/family-access';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -22,6 +27,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '缺少 photoId 或 photoIds' }, { status: 400 });
     }
 
+    for (const photoId of photoIds) {
+      await requirePhotoAccess(request, photoId);
+    }
+
     let deleted = 0;
     for (const photoId of photoIds) {
       if (deletePhotoById(photoId)) deleted += 1;
@@ -33,6 +42,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, deleted, requested: photoIds.length });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('删除记忆卡失败:', error);
     return NextResponse.json({ error: '删除失败' }, { status: 500 });
   }
@@ -44,6 +55,8 @@ export async function GET(request: NextRequest) {
     if (!familyId) {
       return NextResponse.json({ error: '缺少 familyId' }, { status: 400 });
     }
+
+    await requireFamilyAccess(request, familyId);
 
     const photos = getPhotosByFamily(familyId);
     const memoryCards = getMemoryCardsByFamily(familyId);
@@ -65,6 +78,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ photos: result, total: result.length });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('获取照片列表失败:', error);
     return NextResponse.json({ error: '获取失败' }, { status: 500 });
   }

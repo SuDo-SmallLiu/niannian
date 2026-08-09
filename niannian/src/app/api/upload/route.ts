@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addPhoto, getPhotoCount, updatePhotoSourceMetadata } from '@/lib/db';
+import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import {
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
     if (!familyId) {
       return NextResponse.json({ error: '缺少家庭ID' }, { status: 400 });
     }
+
+    await requireFamilyAccess(request, familyId);
 
     const imageFiles = allFiles.filter((f) => isImageFile(f.name));
     const jsonFiles = allFiles.filter((f) => isGooglePhotosJsonFile(f.name));
@@ -80,6 +83,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('上传照片失败:', error);
     return NextResponse.json({ error: '上传失败，请重试' }, { status: 500 });
   }

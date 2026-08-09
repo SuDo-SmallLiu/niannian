@@ -3,6 +3,7 @@ import { AiServiceError } from '@/lib/ai';
 import { regenerateStoryById } from '@/lib/regenerate-story';
 import type { RegenMode } from '@/lib/story-engine/types';
 import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
+import { requireStoryAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
 const MODES: RegenMode[] = ['full', 'rediscover_theme', 'keep_theme', 'reorder'];
 
@@ -14,6 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '缺少 storyId' }, { status: 400 });
     }
 
+    await requireStoryAccess(request, storyId);
     const regenMode = MODES.includes(mode) ? (mode as RegenMode) : 'full';
     const story = await regenerateStoryById(storyId, regenMode);
 
@@ -34,6 +36,8 @@ export async function POST(request: NextRequest) {
       mode: regenMode,
     });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('重新生成故事失败:', error);
     if (error instanceof AiServiceError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: 502 });

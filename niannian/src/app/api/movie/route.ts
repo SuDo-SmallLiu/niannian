@@ -13,6 +13,11 @@ import {
   enrichManifestWithDurations,
   loadMovieNarrationManifest,
 } from '@/lib/narration-tts';
+import {
+  requireFamilyAccess,
+  requireMovieAccess,
+  familyAccessErrorResponse,
+} from '@/lib/family-access';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -20,12 +25,15 @@ export async function DELETE(request: NextRequest) {
     if (!movieId) {
       return NextResponse.json({ error: '缺少 movieId' }, { status: 400 });
     }
+    await requireMovieAccess(request, movieId);
     const ok = deleteLifeMovieById(movieId);
     if (!ok) {
       return NextResponse.json({ error: '人生电影不存在' }, { status: 404 });
     }
     return NextResponse.json({ success: true });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('删除人生电影失败:', error);
     return NextResponse.json({ error: '删除失败' }, { status: 500 });
   }
@@ -38,6 +46,7 @@ export async function GET(request: NextRequest) {
     const familyId = searchParams.get('familyId');
 
     if (movieId) {
+      await requireMovieAccess(request, movieId);
       const movie = getLifeMovie(movieId);
       if (!movie) {
         return NextResponse.json({ error: '人生电影不存在' }, { status: 404 });
@@ -93,12 +102,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (familyId) {
+      await requireFamilyAccess(request, familyId);
       const movies = getLifeMoviesByFamily(familyId);
       return NextResponse.json({ movies });
     }
 
     return NextResponse.json({ error: '请提供 movieId 或 familyId' }, { status: 400 });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('获取人生电影失败:', error);
     return NextResponse.json({ error: '获取失败' }, { status: 500 });
   }
