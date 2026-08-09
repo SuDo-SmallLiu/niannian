@@ -482,9 +482,8 @@ export default function PhotoLibraryPage() {
           router.push(`/family/${familyId}/story/compose`);
         }}
         onAuto={() => {
-          void generateStories({ existingCount: storyCount }).then((ok) => {
-            if (ok) closeGenerateSheet();
-          });
+          closeGenerateSheet();
+          void generateStories({ existingCount: storyCount });
         }}
         autoLoading={generatingStory}
         autoDisabled={!canGenerateStory}
