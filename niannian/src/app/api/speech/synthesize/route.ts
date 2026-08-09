@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { synthesizeNarration } from '@/lib/narration-tts';
 import { estimateNarrationMs } from '@/lib/slide-narration';
 
+export const maxDuration = 300;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

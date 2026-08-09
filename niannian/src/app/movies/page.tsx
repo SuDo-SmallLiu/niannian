@@ -70,12 +70,12 @@ export default function MoviesPage() {
 
   async function handleGenerate(familyId: string) {
     setGeneratingFamilyId(familyId);
-    showLoading('正在编排人生电影', '串联故事章节，完成后即可播放…');
+    showLoading('正在编排人生电影', '串联故事章节并渲染音视频，完成后即可播放…');
     try {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId }),
+        body: JSON.stringify({ familyId, prefetchAudio: true, renderVideo: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '生成失败');

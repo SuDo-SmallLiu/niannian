@@ -11,6 +11,8 @@ function isPublicPage(pathname: string): boolean {
 function isPublicApi(pathname: string, method: string): boolean {
   if (pathname.startsWith('/api/auth/')) return true;
   if (pathname.startsWith('/api/uploads/')) return true;
+  if (pathname.startsWith('/api/audio/narration/')) return true;
+  if (pathname.startsWith('/api/video/movies/')) return true;
   if (pathname === '/api/share/play') return true;
   if (pathname === '/api/share' && method === 'GET') return true;
   return false;
@@ -19,6 +21,7 @@ function isPublicApi(pathname: string, method: string): boolean {
 function isStaticAsset(pathname: string): boolean {
   if (pathname.startsWith('/_next')) return true;
   if (pathname.startsWith('/audio/')) return true;
+  if (pathname.startsWith('/video/')) return true;
   if (/\.(ico|png|jpg|jpeg|gif|webp|svg|mp3|woff2?)$/i.test(pathname)) return true;
   return false;
 }

@@ -11,6 +11,15 @@ const nextConfig: NextConfig = {
         source: '/uploads/:path*',
         destination: '/api/uploads/:path*',
       },
+      // build 后 runtime 生成的旁白 WAV / 渲染 MP4 需走 API 动态读取
+      {
+        source: '/audio/narration/:path*',
+        destination: '/api/audio/narration/:path*',
+      },
+      {
+        source: '/video/movies/:path*',
+        destination: '/api/video/movies/:path*',
+      },
     ];
   },
   // 允许上传大文件 (最大 20MB)

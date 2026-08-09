@@ -110,6 +110,7 @@ export default function PhotoLibraryPage() {
     pendingCount,
     analyzedCount,
     photoCount: photos.length,
+    storyCount,
   });
 
   const readyForStory = countReadyForStory(photos.map((p) => p.memoryCard));

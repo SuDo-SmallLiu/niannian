@@ -1,10 +1,18 @@
 import { buildMovieSlidesForServer } from '@/lib/movie-slides-server';
 import { generateMovieNarrations } from '@/lib/narration-tts';
+import { scheduleMovieRenderAfterNarration } from '@/lib/movie-render-queue';
 
 const prefetching = new Set<string>();
 
+export interface MovieNarrationPrefetchOptions {
+  renderVideo?: boolean;
+}
+
 /** 后台批量预生成人生电影旁白（幂等，同一 movieId 不重复启动） */
-export function scheduleMovieNarrationPrefetch(movieId: string): boolean {
+export function scheduleMovieNarrationPrefetch(
+  movieId: string,
+  options: MovieNarrationPrefetchOptions = {}
+): boolean {
   if (prefetching.has(movieId)) return false;
   prefetching.add(movieId);
 
@@ -15,6 +23,9 @@ export function scheduleMovieNarrationPrefetch(movieId: string): boolean {
       const audio = await generateMovieNarrations(movieId, built.slides);
       if (audio.failed > 0) {
         console.warn('[movie-narration-prefetch] partial failure:', movieId, audio);
+      }
+      if (options.renderVideo) {
+        scheduleMovieRenderAfterNarration(movieId);
       }
     } catch (err) {
       console.error('[movie-narration-prefetch] failed:', movieId, err);

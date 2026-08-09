@@ -56,19 +56,19 @@ export default function FamilyDetailPage() {
     if (!family || generatingMovie) return;
     const ok = await confirm({
       title: '生成人生电影？',
-      description: '将把家庭下所有故事按主题串联成一部可播放的 H5 人生电影。',
+      description: '将把家庭下所有故事按主题串联，并生成含 BGM 与旁白的完整 MP4 电影。',
       confirmText: '开始生成',
       cancelText: '取消',
     });
     if (!ok) return;
 
     setGeneratingMovie(true);
-    showLoading('正在编排人生电影', '串联故事章节，完成后即可播放…');
+    showLoading('正在编排人生电影', '串联故事章节并渲染音视频，完成后即可播放…');
     try {
       const res = await fetch('/api/movie/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId }),
+        body: JSON.stringify({ familyId, prefetchAudio: true, renderVideo: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '生成失败');

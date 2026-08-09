@@ -45,5 +45,6 @@ next-env.d.ts
 /data
 /public/uploads
 /public/audio/narration/
+/public/video/movies/
 /services/narration/.venv/
 /services/narration/output/

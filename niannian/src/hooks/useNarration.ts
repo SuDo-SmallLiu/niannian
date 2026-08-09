@@ -167,6 +167,7 @@ export function useNarration({
       startedAt = Date.now();
       const audio = new Audio(url);
       configureMobileAudio(audio);
+      audio.volume = 1;
       audioRef.current = audio;
 
       audio.onloadedmetadata = () => {
@@ -183,19 +184,16 @@ export function useNarration({
       audio.onended = finish;
       audio.onerror = () => {
         if (cancelled) return;
-        cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
+        requestSynthesize();
       };
 
       audio.play().catch(() => {
         if (cancelled) return;
-        cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
+        requestSynthesize();
       });
     };
 
-    if (audioUrl) {
-      playUrl(audioUrl);
-    } else {
-      // 全平台优先 MeloTTS 预生成/按需音频，失败再降级浏览器朗读
+    const requestSynthesize = () => {
       void fetch('/api/speech/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,6 +212,15 @@ export function useNarration({
           if (cancelled) return;
           cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
         });
+    };
+
+    // 有 movieId 时走服务端合成（命中磁盘缓存即秒回），避免 manifest 未刷新或静态 404
+    if (movieId && slideId && text) {
+      requestSynthesize();
+    } else if (audioUrl) {
+      playUrl(audioUrl);
+    } else {
+      requestSynthesize();
     }
 
     return () => {

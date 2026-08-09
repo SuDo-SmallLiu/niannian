@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import NianNianAvatar from '@/components/NianNianAvatar';
 import type { PipelineStats } from '@/lib/agent-types';
-import { AGENT_STEPS, stepLabel } from '@/lib/agent-steps';
+import { formatPipelineProgress } from '@/lib/agent-types';
+import { AGENT_STEPS, stepLabel, getCurrentStepIndex } from '@/lib/agent-steps';
+import type { AgentRole } from '@/lib/agent-events';
 
 interface FamilyBrief {
   id: string;
@@ -22,8 +24,18 @@ interface HelpStep {
 interface NianNianHelpDeskProps {
   open: boolean;
   onClose: () => void;
-  pipeline?: PipelineStats | null;
+  pipeline?: (PipelineStats & { needsSupplementCount?: number }) | null;
+  currentStep?: number;
+  agentRole?: AgentRole;
 }
+
+const ROLE_INTRO: Record<AgentRole, string> = {
+  'memory-assistant': '我是 Memory 助手，帮你上传照片、读懂每一张记忆卡～',
+  'story-assistant': '我是 Story 助手，帮你从记忆卡里发现温暖的家庭故事～',
+  'editor-assistant': '我是编辑助手，帮你润色故事，保留你原本的情感～',
+  'movie-director': '我是 Movie 导演，帮你把故事变成专属家庭电影～',
+  'family-assistant': '我是家庭助手，提醒生日、去年今日，帮你分享给家人～',
+};
 
 function buildSteps(families: FamilyBrief[]): HelpStep[] {
   const firstFamilyId = families[0]?.id;
@@ -36,7 +48,13 @@ function buildSteps(families: FamilyBrief[]): HelpStep[] {
   }));
 }
 
-export default function NianNianHelpDesk({ open, onClose, pipeline }: NianNianHelpDeskProps) {
+export default function NianNianHelpDesk({
+  open,
+  onClose,
+  pipeline,
+  currentStep,
+  agentRole = 'memory-assistant',
+}: NianNianHelpDeskProps) {
   const router = useRouter();
   const [families, setFamilies] = useState<FamilyBrief[]>([]);
 
@@ -76,12 +94,22 @@ export default function NianNianHelpDesk({ open, onClose, pipeline }: NianNianHe
   }, [open]);
 
   const steps = useMemo(() => buildSteps(families), [families]);
+  const activeStep = currentStep ?? getCurrentStepIndex(pipeline);
+  const progressText = pipeline ? formatPipelineProgress(pipeline) : '';
 
   if (!open) return null;
 
   const handleStepClick = (step: HelpStep) => {
     onClose();
     router.push(step.href);
+  };
+
+  const handlePrimaryAction = () => {
+    const step = steps.find((s) => s.id === activeStep);
+    if (step) {
+      onClose();
+      router.push(step.href);
+    }
   };
 
   return (
@@ -96,24 +124,45 @@ export default function NianNianHelpDesk({ open, onClose, pipeline }: NianNianHe
           ‹
         </button>
         <h1 className="text-base font-serif font-medium text-[#4B3B2F]">念念帮助台</h1>
-        <button
-          type="button"
-          className="w-10 h-10 flex items-center justify-center text-[#B8A898] text-sm rounded-full border border-[#E8DCC8] bg-white"
-          aria-label="帮助说明"
-        >
-          ?
-        </button>
+        <div className="w-10" />
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-28">
-        <div className="flex items-start gap-3 mt-2 mb-6">
+        <div className="flex items-start gap-3 mt-2 mb-4">
           <NianNianAvatar variant="wave" size={120} animate />
           <div className="flex-1 mt-4 rounded-2xl rounded-tl-sm bg-white border border-[#F0E8D8] px-4 py-3 shadow-sm">
-            <p className="text-sm text-[#4B3B2F] leading-relaxed">
-              嗨呀～我是念念！我会陪你一起记录属于你们家的美好时光～
-            </p>
+            <p className="text-sm text-[#4B3B2F] leading-relaxed">{ROLE_INTRO[agentRole]}</p>
           </div>
         </div>
+
+        {pipeline && (
+          <div className="mb-5 rounded-2xl bg-white border border-[#F0E8D8] px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-[#8B7355]">作品进度</span>
+              <span className="text-xs font-medium text-[#D98A45]">{pipeline.pipelineProgress}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[#F0E8D8] overflow-hidden mb-2">
+              <div
+                className="h-full bg-[#D98A45] transition-all"
+                style={{ width: `${pipeline.pipelineProgress}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-[#B8A898] leading-relaxed">{progressText}</p>
+            {pipeline.needsSupplementCount != null && pipeline.needsSupplementCount > 0 && (
+              <p className="text-[11px] text-[#D98A45] mt-1.5">
+                {pipeline.needsSupplementCount} 张记忆卡还可以补充细节（可选，不阻断生成故事）
+              </p>
+            )}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handlePrimaryAction}
+          className="w-full mb-5 py-3.5 rounded-2xl bg-[#D98A45] text-white text-sm font-medium shadow-lg shadow-[#D98A45]/20 active:scale-[0.99] transition-transform"
+        >
+          继续第 {activeStep} 步 · {AGENT_STEPS[activeStep - 1]?.title}
+        </button>
 
         <p className="text-center text-sm text-[#8B7355] mb-5">
           <span className="text-[#D98A45]">✨</span>
@@ -122,30 +171,47 @@ export default function NianNianHelpDesk({ open, onClose, pipeline }: NianNianHe
         </p>
 
         <div className="space-y-3">
-          {steps.map((step) => (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => handleStepClick(step)}
-              className="w-full text-left flex items-center gap-3 p-4 rounded-2xl bg-white border border-[#F0E8D8] shadow-sm transition-all hover:border-[#D98A45]/30 active:scale-[0.99]"
-            >
-              <span className="w-11 h-11 shrink-0 rounded-xl bg-[#FFF8F0] flex items-center justify-center text-xl">
-                {step.icon}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#4B3B2F]">
-                  {stepLabel(step.id)} · {step.title}
-                </p>
-                <p className="text-xs text-[#B8A898] mt-0.5 leading-relaxed">{step.desc}</p>
-              </div>
-              <span className="shrink-0 text-[#D98A45] text-sm">›</span>
-            </button>
-          ))}
+          {steps.map((step) => {
+            const isActive = step.id === activeStep;
+            const isDone = step.id < activeStep;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => handleStepClick(step)}
+                className={`w-full text-left flex items-center gap-3 p-4 rounded-2xl border shadow-sm transition-all active:scale-[0.99] ${
+                  isActive
+                    ? 'bg-[#FFF8F0] border-[#D98A45]/50 ring-2 ring-[#D98A45]/20'
+                    : isDone
+                      ? 'bg-white border-[#E8DCC8] opacity-80'
+                      : 'bg-white border-[#F0E8D8] hover:border-[#D98A45]/30'
+                }`}
+              >
+                <span
+                  className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-xl ${
+                    isActive ? 'bg-[#D98A45]/10' : 'bg-[#FFF8F0]'
+                  }`}
+                >
+                  {isDone ? '✓' : step.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#4B3B2F]">
+                    {stepLabel(step.id)} · {step.title}
+                    {isActive && (
+                      <span className="ml-2 text-[10px] text-[#D98A45] font-normal">当前</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-[#B8A898] mt-0.5 leading-relaxed">{step.desc}</p>
+                </div>
+                <span className="shrink-0 text-[#D98A45] text-sm">›</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className="mt-8 flex items-end gap-3">
           <p className="flex-1 text-xs text-[#B8A898] leading-relaxed">
-            念念一直都在～有问题随时找我，我会帮你记录每一个值得珍藏的瞬间！
+            补充记忆卡是可选的——解析完成后就可以生成故事；补充细节只会让故事更生动。
           </p>
           <NianNianAvatar variant="small" size={72} />
         </div>

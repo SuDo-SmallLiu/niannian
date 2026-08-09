@@ -204,6 +204,27 @@ function migrateDatabase(database: Database.Database) {
     database.exec(`ALTER TABLE stories ADD COLUMN published INTEGER NOT NULL DEFAULT 0`);
   }
 
+  const movieCols = database.prepare('PRAGMA table_info(life_movies)').all() as Array<{ name: string }>;
+  const movieColNames = new Set(movieCols.map((c) => c.name));
+  if (!movieColNames.has('media_url')) {
+    database.exec(`ALTER TABLE life_movies ADD COLUMN media_url TEXT`);
+  }
+  if (!movieColNames.has('render_status')) {
+    database.exec(`ALTER TABLE life_movies ADD COLUMN render_status TEXT NOT NULL DEFAULT 'none'`);
+  }
+  if (!movieColNames.has('render_error')) {
+    database.exec(`ALTER TABLE life_movies ADD COLUMN render_error TEXT`);
+  }
+  if (!movieColNames.has('rendered_at')) {
+    database.exec(`ALTER TABLE life_movies ADD COLUMN rendered_at TEXT`);
+  }
+  if (!movieColNames.has('audio_plan')) {
+    database.exec(`ALTER TABLE life_movies ADD COLUMN audio_plan TEXT NOT NULL DEFAULT '{}'`);
+  }
+  if (!movieColNames.has('render_progress')) {
+    database.exec(`ALTER TABLE life_movies ADD COLUMN render_progress TEXT NOT NULL DEFAULT '{}'`);
+  }
+
   database.exec(`
     CREATE TABLE IF NOT EXISTS story_memory_cards (
       story_id TEXT NOT NULL,
@@ -1402,6 +1423,12 @@ export interface LifeMovieRow {
   title: string;
   summary: string;
   cover_story_id: string | null;
+  media_url: string | null;
+  render_status: string;
+  render_error: string | null;
+  rendered_at: string | null;
+  audio_plan: string;
+  render_progress: string;
   created_at: string;
   updated_at: string;
 }
@@ -1476,6 +1503,73 @@ export function getMovieChapters(movieId: string) {
     title: string;
     theme: string;
   }>;
+}
+
+export function saveMovieAudioPlan(movieId: string, plan: unknown): void {
+  const database = getDb();
+  database
+    .prepare(
+      `UPDATE life_movies SET audio_plan = ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    .run(JSON.stringify(plan), movieId);
+}
+
+export function updateMovieRenderProgress(movieId: string, progress: unknown): void {
+  const database = getDb();
+  database
+    .prepare(
+      `UPDATE life_movies SET render_progress = ?, updated_at = datetime('now') WHERE id = ?`
+    )
+    .run(JSON.stringify(progress), movieId);
+}
+
+export function updateMovieRenderStatus(
+  movieId: string,
+  status: string,
+  options?: { mediaUrl?: string; error?: string | null; progress?: unknown }
+): void {
+  const database = getDb();
+  if (status === 'ready' && options?.mediaUrl) {
+    database
+      .prepare(
+        `UPDATE life_movies SET render_status = ?, media_url = ?, render_error = NULL,
+         rendered_at = datetime('now'), render_progress = ?, updated_at = datetime('now') WHERE id = ?`
+      )
+      .run(
+        status,
+        options.mediaUrl,
+        JSON.stringify(options.progress ?? { phase: 'done', percent: 100, message: '渲染完成' }),
+        movieId
+      );
+    return;
+  }
+  if (status === 'failed') {
+    database
+      .prepare(
+        `UPDATE life_movies SET render_status = ?, render_error = ?, render_progress = ?,
+         updated_at = datetime('now') WHERE id = ?`
+      )
+      .run(
+        status,
+        options?.error || '渲染失败',
+        JSON.stringify(
+          options?.progress ?? { phase: 'failed', percent: 0, message: options?.error || '渲染失败' }
+        ),
+        movieId
+      );
+    return;
+  }
+  if (options?.progress) {
+    database
+      .prepare(
+        `UPDATE life_movies SET render_status = ?, render_progress = ?, updated_at = datetime('now') WHERE id = ?`
+      )
+      .run(status, JSON.stringify(options.progress), movieId);
+    return;
+  }
+  database
+    .prepare(`UPDATE life_movies SET render_status = ?, updated_at = datetime('now') WHERE id = ?`)
+    .run(status, movieId);
 }
 
 // --- 工具函数 ---

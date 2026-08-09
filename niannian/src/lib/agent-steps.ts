@@ -55,7 +55,9 @@ export const AGENT_STEPS: AgentStepDef[] = [
 
 export function getCurrentStepIndex(stats: PipelineStats | null | undefined): number {
   if (!stats || stats.photoCount === 0) return 1;
-  if (stats.pendingCount > 0 || stats.completionAvg < 70) return 2;
+  // 第二步：仍有待解析 / 尚未产生任何记忆卡
+  if (stats.pendingCount > 0 || stats.analyzedCount === 0) return 2;
+  // 完成度不阻断进度——解析完即可进入「生成故事」
   if (stats.storyCount === 0) return 3;
   if (stats.movieCount === 0) return 4;
   return 5;
@@ -63,7 +65,7 @@ export function getCurrentStepIndex(stats: PipelineStats | null | undefined): nu
 
 export function getStepBubbleMessage(
   stats: PipelineStats | null | undefined,
-  options?: { appreciate?: boolean; page?: AgentPage }
+  options?: { appreciate?: boolean; page?: AgentPage; needsSupplementCount?: number }
 ): string {
   if (options?.appreciate) {
     return '你现在正在欣赏作品。点我去创造它们！';
@@ -71,14 +73,27 @@ export function getStepBubbleMessage(
 
   const current = getCurrentStepIndex(stats);
   const step = AGENT_STEPS[current - 1]!;
-  const next =
-    current < 5 ? AGENT_STEPS[current]! : AGENT_STEPS[4]!;
 
-  if (current >= 5) {
-    return `你现在处于第 5 步：${step.title}。可以继续欣赏或分享家人。`;
+  if (current === 2 && stats && stats.pendingCount > 0) {
+    return `第 2 步 · ${step.title}：还有 ${stats.pendingCount} 张待解析，点我开始 AI 读懂照片。`;
   }
 
-  return `你现在处于第 ${current} 步：${step.title}。下一步：${next.title}。`;
+  if (current === 3 && stats) {
+    const supplement =
+      (options?.needsSupplementCount ?? 0) > 0
+        ? `（${options!.needsSupplementCount} 张可补充细节）`
+        : stats.completionAvg < 70
+          ? `（完成度 ${stats.completionAvg}%，补充后故事更生动）`
+          : '';
+    return `第 3 步 · 去生成故事：记忆卡已就绪${supplement}，点我开始写故事。`;
+  }
+
+  if (current >= 5) {
+    return `第 5 步 · ${step.title}：去欣赏或分享给家人吧。`;
+  }
+
+  const next = current < 5 ? AGENT_STEPS[current]! : AGENT_STEPS[4]!;
+  return `第 ${current} 步 · ${step.title}。下一步：${next.title}。`;
 }
 
 export function stepLabel(id: number): string {

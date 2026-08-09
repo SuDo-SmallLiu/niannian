@@ -11,9 +11,11 @@ const execFileAsync = promisify(execFile);
 const PROJECT_ROOT = process.cwd();
 const NARRATION_ROOT = path.join(PROJECT_ROOT, 'public', 'audio', 'narration');
 const MELO_SCRIPT = path.join(PROJECT_ROOT, 'services', 'narration', 'melo-tts-service.py');
+const MELO_BATCH_SCRIPT = path.join(PROJECT_ROOT, 'services', 'narration', 'melo-tts-batch.py');
 const MELO_PYTHON = process.env.MELO_PYTHON || 'python3';
 const NUMBA_CACHE_DIR =
   process.env.NUMBA_CACHE_DIR || path.join(PROJECT_ROOT, '.cache', 'numba');
+const MELO_TIMEOUT_MS = 300_000;
 
 export interface NarrationResult {
   url: string;
@@ -69,7 +71,9 @@ async function probeDurationMs(filePath: string): Promise<number> {
     ]);
     const seconds = parseFloat(stdout.trim());
     if (Number.isFinite(seconds) && seconds > 0) {
-      return Math.round(seconds * 1000);
+      // 异常 WAV 元数据可能返回极大值，拖垮 FFmpeg
+      const capped = Math.min(seconds, 120);
+      return Math.round(capped * 1000);
     }
   } catch {
     /* fallback below */
@@ -79,30 +83,84 @@ async function probeDurationMs(filePath: string): Promise<number> {
 
 async function runMeloTts(text: string, outputPath: string): Promise<void> {
   ensureDir(path.dirname(outputPath));
+  ensureDir(NUMBA_CACHE_DIR);
+  const meloEnv = {
+    ...process.env,
+    HF_ENDPOINT: process.env.HF_ENDPOINT || 'https://hf-mirror.com',
+    NUMBA_CACHE_DIR,
+    NUMBA_DISABLE_JIT: process.env.NUMBA_DISABLE_JIT || '0',
+    PYTHONWARNINGS: 'ignore',
+  };
+
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await execFileAsync(MELO_PYTHON, [MELO_SCRIPT, text, outputPath, '-l', 'ZH'], {
+        timeout: MELO_TIMEOUT_MS,
+        maxBuffer: 8 * 1024 * 1024,
+        env: meloEnv,
+      });
+      if (fs.existsSync(outputPath)) return;
+      lastErr = new Error('MeloTTS 未生成音频文件');
+    } catch (err: unknown) {
+      const execErr = err as { stderr?: string; message?: string; killed?: boolean };
+      const detail = `${execErr.stderr || ''} ${execErr.message || ''}`;
+      if (detail.includes('MELO_NOT_INSTALLED')) {
+        throw new Error('MeloTTS 未安装。请运行: bash scripts/setup-melo-tts.sh');
+      }
+      lastErr = new Error(detail.trim().slice(0, 400) || 'MeloTTS 生成失败');
+      if (!execErr.killed || attempt >= 1) break;
+    }
+  }
+  throw lastErr || new Error('MeloTTS 生成失败');
+}
+
+async function runMeloTtsBatch(
+  tasks: Array<{ text: string; output: string }>
+): Promise<void> {
+  if (!tasks.length) return;
+  if (!fs.existsSync(MELO_BATCH_SCRIPT)) {
+    for (const task of tasks) {
+      await runMeloTts(task.text, task.output);
+    }
+    return;
+  }
+
+  ensureDir(NUMBA_CACHE_DIR);
+  const tmpDir = path.join(PROJECT_ROOT, '.cache', 'melo-batch');
+  ensureDir(tmpDir);
+  const tasksFile = path.join(tmpDir, `tasks-${Date.now()}.json`);
+  fs.writeFileSync(tasksFile, JSON.stringify(tasks));
+
   try {
-    ensureDir(NUMBA_CACHE_DIR);
-    await execFileAsync(MELO_PYTHON, [MELO_SCRIPT, text, outputPath, '-l', 'ZH'], {
-      timeout: 120_000,
-      maxBuffer: 4 * 1024 * 1024,
+    await execFileAsync(MELO_PYTHON, [MELO_BATCH_SCRIPT, tasksFile], {
+      timeout: MELO_TIMEOUT_MS * Math.max(1, tasks.length),
+      maxBuffer: 8 * 1024 * 1024,
       env: {
         ...process.env,
         HF_ENDPOINT: process.env.HF_ENDPOINT || 'https://hf-mirror.com',
         NUMBA_CACHE_DIR,
         NUMBA_DISABLE_JIT: process.env.NUMBA_DISABLE_JIT || '0',
+        PYTHONWARNINGS: 'ignore',
       },
     });
   } catch (err: unknown) {
     const execErr = err as { stderr?: string; message?: string };
     const detail = `${execErr.stderr || ''} ${execErr.message || ''}`;
     if (detail.includes('MELO_NOT_INSTALLED')) {
-      throw new Error(
-        'MeloTTS 未安装。请运行: bash scripts/setup-melo-tts.sh'
-      );
+      throw new Error('MeloTTS 未安装。请运行: bash scripts/setup-melo-tts.sh');
     }
-    throw new Error(detail.trim().slice(0, 400) || 'MeloTTS 生成失败');
-  }
-  if (!fs.existsSync(outputPath)) {
-    throw new Error('MeloTTS 未生成音频文件');
+    // 批量失败时逐条重试
+    for (const task of tasks) {
+      if (fs.existsSync(task.output)) continue;
+      await runMeloTts(task.text, task.output);
+    }
+  } finally {
+    try {
+      fs.unlinkSync(tasksFile);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -163,7 +221,7 @@ export async function enrichManifestWithDurations(
   return enriched;
 }
 
-/** 为人生电影预生成全部幻灯片旁白（MeloTTS） */
+/** 为人生电影预生成全部幻灯片旁白（MeloTTS，批量单次加载模型） */
 export async function generateMovieNarrations(
   movieId: string,
   slides: H5Slide[]
@@ -175,6 +233,7 @@ export async function generateMovieNarrations(
   let skipped = 0;
   let failed = 0;
   const errors: string[] = [];
+  const pending: Array<{ slide: H5Slide; text: string; output: string }> = [];
 
   for (const slide of slides) {
     const text = getSlideNarrationText(slide);
@@ -189,14 +248,41 @@ export async function generateMovieNarrations(
       continue;
     }
 
+    pending.push({ slide, text, output: filePath });
+  }
+
+  if (pending.length > 0) {
     try {
-      await synthesizeNarration(text, { movieId, slideId: slide.id });
-      generated++;
-    } catch (err) {
-      failed++;
-      errors.push(
-        `${slide.id}: ${err instanceof Error ? err.message : '生成失败'}`
+      await runMeloTtsBatch(
+        pending.map((p) => ({ text: p.text, output: p.output }))
       );
+      for (const p of pending) {
+        if (fs.existsSync(p.output)) {
+          generated++;
+        } else {
+          failed++;
+          errors.push(`${p.slide.id}: 批量生成后文件缺失`);
+        }
+      }
+    } catch (err) {
+      for (const p of pending) {
+        if (fs.existsSync(p.output)) {
+          generated++;
+          continue;
+        }
+        try {
+          await synthesizeNarration(p.text, { movieId, slideId: p.slide.id });
+          generated++;
+        } catch (slideErr) {
+          failed++;
+          errors.push(
+            `${p.slide.id}: ${slideErr instanceof Error ? slideErr.message : '生成失败'}`
+          );
+        }
+      }
+      if (failed === pending.length && err instanceof Error) {
+        errors.unshift(`batch: ${err.message}`);
+      }
     }
   }
 

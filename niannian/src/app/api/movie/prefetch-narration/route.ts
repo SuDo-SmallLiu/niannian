@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const movieId = body.movieId as string | undefined;
+    const renderVideo = body.renderVideo === true;
 
     if (!movieId) {
       return NextResponse.json({ error: '缺少 movieId' }, { status: 400 });
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '人生电影不存在' }, { status: 404 });
     }
 
-    const started = scheduleMovieNarrationPrefetch(movieId);
+    const started = scheduleMovieNarrationPrefetch(movieId, { renderVideo });
 
     return NextResponse.json({
       success: true,
