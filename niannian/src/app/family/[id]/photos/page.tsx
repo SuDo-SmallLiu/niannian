@@ -97,7 +97,9 @@ export default function PhotoLibraryPage() {
   });
 
   const readyForStory = countReadyForStory(photos.map((p) => p.memoryCard));
-  const canGenerateStory = readyForStory >= 3 || completionAvg >= 70;
+  /** 已全部解析即可生成；完成度只影响质量提示，不阻断操作 */
+  const canGenerateStory = analyzedCount > 0;
+  const storyQualityHint = completionAvg < 70 && readyForStory < 3;
   const selectedCount = selectedIds.size;
   const allFilteredSelected =
     filteredPhotos.length > 0 && filteredPhotos.every((p) => selectedIds.has(p.id));
@@ -442,7 +444,7 @@ export default function PhotoLibraryPage() {
       )}
 
       {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount === photos.length && (
-        <div className="fixed bottom-20 left-0 right-0 px-6 z-40">
+        <div className="fixed bottom-20 left-0 right-0 px-6 z-50">
           <div className="max-w-md mx-auto space-y-2">
             <button
               type="button"
@@ -472,9 +474,9 @@ export default function PhotoLibraryPage() {
             >
               主题管理 · 家庭故事
             </Link>
-            {!canGenerateStory && (
+            {storyQualityHint && (
               <p className="text-[10px] text-center text-[#B8A898] px-2">
-                建议至少完善 3 张记忆卡或整体完成度达 70% 后再自动生成
+                补充记忆卡细节后，故事会更生动（当前平均完成度 {completionAvg}%）
               </p>
             )}
             {generateStoryError && (

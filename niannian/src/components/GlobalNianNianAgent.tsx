@@ -134,7 +134,7 @@ export default function GlobalNianNianAgent() {
       <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={pipeline} />
 
       <div
-        className={`fixed right-4 z-40 flex flex-col items-end gap-2 pointer-events-none ${
+        className={`fixed right-4 z-30 flex flex-col items-end gap-2 pointer-events-none ${
           isFullscreen ? 'bottom-[max(5.5rem,env(safe-area-inset-bottom))]' : 'bottom-20'
         }`}
       >
