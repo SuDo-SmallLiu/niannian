@@ -135,7 +135,7 @@ export default function MoviesPage() {
   return (
     <div className={`min-h-screen flex flex-col bg-[#1a1612] text-white ${appreciate ? 'text-lg' : ''}`}>
       {shareModal}
-      <Header />
+      <Header dark />
       <main className="flex-1 px-6 py-8 pb-24">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#D98A45]/20 mb-4">
