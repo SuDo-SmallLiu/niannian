@@ -33,43 +33,13 @@ export default function HomeWelcomeHero({ onOpenHelp, compact = false }: HomeWel
         />
       </div>
 
-      {/* 念念 + 左右气泡 ≈ 半屏 */}
+      {/* 念念 + 上下气泡（应用为 max-w-md 手机壳，统一用纵向布局） */}
       <div
         className={`relative w-full flex flex-col items-center justify-center px-3 py-4 ${
-          compact ? 'min-h-[28vh]' : 'min-h-[48vh] sm:min-h-[50vh]'
+          compact ? 'min-h-[28vh]' : 'min-h-[48vh]'
         }`}
       >
-        {/* 桌面：左气泡 | 念念 | 右气泡 */}
-        <div className="hidden sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3 w-full max-w-2xl mx-auto">
-          <div className="niannian-bubble-soft rounded-2xl rounded-tr-sm px-3.5 py-3 text-left text-xs text-[#4B3B2F] leading-relaxed min-h-[120px]">
-            <TypewriterText
-              text={LEFT_TEXT}
-              speed={32}
-              className="whitespace-pre-line"
-              onComplete={() => setRightStart(true)}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={onOpenHelp}
-            className="shrink-0 bg-transparent border-0 p-0 active:scale-[0.98] transition-transform"
-            aria-label="打开念念帮助台"
-          >
-            <NianNianAvatar variant="hero" size={200} animate edgeSoft />
-          </button>
-
-          <div className="niannian-bubble-soft rounded-2xl rounded-tl-sm px-3.5 py-3 text-left text-xs text-[#4B3B2F] leading-relaxed min-h-[120px]">
-            {rightStart ? (
-              <TypewriterText text={RIGHT_TEXT} speed={32} delay={200} className="whitespace-pre-line" />
-            ) : (
-              <span className="text-[#D8CCB8]">…</span>
-            )}
-          </div>
-        </div>
-
-        {/* 手机：念念居中，气泡上下 */}
-        <div className="sm:hidden w-full max-w-sm flex flex-col items-center gap-3">
+        <div className="w-full max-w-sm flex flex-col items-center gap-3">
           <div className="niannian-bubble-soft w-full rounded-2xl rounded-bl-sm px-4 py-3 text-left text-sm text-[#4B3B2F] leading-relaxed">
             <TypewriterText
               text={LEFT_TEXT}

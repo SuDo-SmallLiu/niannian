@@ -23,7 +23,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen antialiased bg-[var(--bg-primary)]">
         <AppProviders>
           <div className="min-h-screen flex flex-col max-w-md mx-auto bg-[var(--bg-primary)] relative">
             <main className="flex-1">{children}</main>
