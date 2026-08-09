@@ -1,9 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
+import {
+  Bell,
+  BookOpen,
+  ChevronRight,
+  Clapperboard,
+  Heart,
+  Images,
+  Info,
+  Sparkles,
+  Tag,
+} from 'lucide-react';
+import NianNianAvatar from '@/components/NianNianAvatar';
 import Header from '@/components/Header';
-import PipelineSteps from '@/components/PipelineSteps';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function ProfilePage() {
@@ -21,130 +32,156 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
-      <Header />
-      <main className="flex-1 px-6 py-8 pb-28">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的</h1>
-          <p className="text-sm text-[#B8A898] mb-4">
-            {loading ? '加载中…' : user?.phoneMasked || user?.phone || '记忆、故事与电影的入口'}
-          </p>
-          <PipelineSteps active={1} compact />
-        </div>
+    <div className="profile-page">
+      <Header minimal />
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#E8DCC8] mb-4 text-center">
-          <div className="w-20 h-20 rounded-full bg-[#FFF8F0] flex items-center justify-center mx-auto mb-3">
-            <span className="text-3xl">✨</span>
+      <div className="profile-body">
+        {/* 2. 个人身份卡 */}
+        <section className="profile-identity-card">
+          <div className="profile-identity-card__avatar">
+            <NianNianAvatar variant="small" size={80} edgeSoft />
           </div>
-          <h3 className="text-lg font-serif text-[#4B3B2F]">家庭记忆守护者</h3>
-          <p className="text-sm text-[#B8A898] mt-1">念念不忘，岁岁年年</p>
-        </div>
+          <div className="profile-identity-card__info">
+            <p className="profile-identity-card__title">我的</p>
+            <p className="profile-identity-card__phone">
+              {loading ? '加载中…' : user?.phoneMasked || user?.phone || '—'}
+            </p>
+            <span className="profile-identity-card__badge">家庭记忆守护者</span>
+            <p className="profile-identity-card__tagline">念念不忘，岁岁年年</p>
+          </div>
+        </section>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <QuickLink href="/family/memories" icon="🃏" label="我的记忆" />
-          <QuickLink href="/stories" icon="📖" label="我的故事" />
-          <QuickLink href="/movies" icon="🎬" label="我的电影" />
-        </div>
+        {/* 3. 快速入口 */}
+        <section className="profile-quick-panel">
+          <QuickEntry href="/family/memories" icon={Images} label="我的记忆" />
+          <QuickEntry href="/stories" icon={BookOpen} label="我的故事" />
+          <QuickEntry href="/movies" icon={Clapperboard} label="我的电影" />
+        </section>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-[#E8DCC8] overflow-hidden mb-4">
-          <MenuItem
-            icon="🏷️"
-            title="我的主题"
-            subtitle="按春节、旅行等主题管理记忆"
+        {/* 4. 主题与管理 */}
+        <section className="profile-card">
+          <h2 className="profile-card__heading">主题与管理</h2>
+          <MenuRow
             href="/family"
+            icon={Tag}
+            title="我的主题"
+            subtitle="按季节、旅行等主题管理记忆"
           />
-          <Divider />
-          <MenuItem
-            icon="🌸"
+          <MenuDivider />
+          <MenuRow
+            href="/appreciate"
+            icon={Sparkles}
             title="欣赏模式"
             subtitle="大字号浏览，适合与家人一起看"
-            href="/appreciate"
           />
-          <Divider />
-          <MenuItem icon="🔔" title="提醒设置" subtitle="纪念日与家庭助手" subtitle2="即将上线" />
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-[#E8DCC8] overflow-hidden mb-4">
-          <MenuItem icon="ℹ️" title="关于念念年年" subtitle="MVP V3 · 家庭故事流水线" />
-          <Divider />
-          <MenuItem
-            icon="❤️"
-            title="让每一张照片都成为回家的理由"
+          <MenuDivider />
+          <MenuRow
+            icon={Bell}
+            title="提醒设置"
+            subtitle="纪念日与家庭助手"
+            badge="即将上线"
           />
-        </div>
+        </section>
 
+        {/* 5. 更多 */}
+        <section className="profile-card">
+          <h2 className="profile-card__heading">更多</h2>
+          <MenuRow icon={Info} title="关于念念年年" subtitle="MVP V3 · 家庭故事流水线" />
+          <MenuDivider />
+          <MenuRow icon={Heart} title="让每一张照片都成为回家的理由" titleWrap tall />
+        </section>
+
+        {/* 6. 退出登录 */}
         {user && (
           <button
             type="button"
             onClick={handleLogout}
             disabled={loggingOut}
-            className="w-full py-3.5 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:bg-[#FFF8F0] transition-colors disabled:opacity-60 touch-manipulation relative z-10"
+            className="profile-logout-btn"
           >
             {loggingOut ? '退出中…' : '退出登录'}
           </button>
         )}
 
-        <p className="text-center text-xs text-[#D8CCB8] mt-8">念念年年 — 家庭记忆连接器</p>
-      </main>
+        {/* 7. 底部品牌陪伴 */}
+        <footer className="profile-companion">
+          <NianNianAvatar variant="small" size={36} />
+          <span className="profile-companion__text">念念年年 · 家庭记忆助手</span>
+        </footer>
+      </div>
     </div>
   );
 }
 
-function QuickLink({ href, icon, label }: { href: string; icon: string; label: string }) {
+function QuickEntry({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  label: string;
+}) {
   return (
-    <Link
-      href={href}
-      className="flex flex-col items-center gap-2 py-4 rounded-2xl bg-white border border-[#E8DCC8] active:scale-[0.98] transition-transform"
-    >
-      <span className="text-2xl">{icon}</span>
-      <span className="text-xs text-[#4B3B2F] font-medium">{label}</span>
+    <Link href={href} className="profile-quick-entry">
+      <span className="profile-quick-entry__icon">
+        <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+      </span>
+      <span className="profile-quick-entry__label">{label}</span>
     </Link>
   );
 }
 
-function MenuItem({
-  icon,
+function MenuRow({
+  icon: Icon,
   title,
   subtitle,
-  subtitle2,
+  badge,
   href,
+  titleWrap,
+  tall,
 }: {
-  icon: string;
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
   title: string;
   subtitle?: string;
-  subtitle2?: string;
+  badge?: string;
   href?: string;
+  titleWrap?: boolean;
+  tall?: boolean;
 }) {
+  const rowClass = `profile-menu-row${tall ? ' profile-menu-row--tall' : ''}${href ? ' profile-menu-row--link' : ''}`;
+
   const inner = (
     <>
-      <span className="text-xl">{icon}</span>
-      <div className="flex-1">
-        <p className="text-sm font-medium text-[#4B3B2F]">{title}</p>
-        {subtitle && <p className="text-xs text-[#B8A898]">{subtitle}</p>}
-        {subtitle2 && (
-          <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-[#F0E8D8] text-[10px] text-[#B8A898]">
-            {subtitle2}
-          </span>
-        )}
+      <span className="profile-menu-row__icon">
+        <Icon className="w-[17px] h-[17px]" strokeWidth={1.75} />
+      </span>
+      <div className="profile-menu-row__text">
+        <div className="profile-menu-row__title-line">
+          <p className={`profile-menu-row__title${titleWrap ? ' profile-menu-row__title--wrap' : ''}`}>
+            {title}
+          </p>
+          {badge && <span className="profile-menu-row__badge">{badge}</span>}
+        </div>
+        {subtitle && <p className="profile-menu-row__subtitle">{subtitle}</p>}
       </div>
-      {href && <span className="text-[#D8CCB8] text-sm">→</span>}
+      {href && (
+        <ChevronRight className="profile-menu-row__chevron w-4 h-4 shrink-0" strokeWidth={1.75} />
+      )}
     </>
   );
 
   if (href) {
     return (
-      <Link
-        href={href}
-        className="flex items-center gap-4 px-5 py-4 hover:bg-[#FFF8F0] active:bg-[#F0DCC8] transition-colors"
-      >
+      <Link href={href} className={rowClass}>
         {inner}
       </Link>
     );
   }
 
-  return <div className="flex items-center gap-4 px-5 py-4">{inner}</div>;
+  return <div className={rowClass}>{inner}</div>;
 }
 
-function Divider() {
-  return <div className="border-t border-[#F0E8D8] mx-5" />;
+function MenuDivider() {
+  return <div className="profile-menu-divider" />;
 }

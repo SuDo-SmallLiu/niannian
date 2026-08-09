@@ -159,7 +159,7 @@ export default function GlobalNianNianAgent() {
   const isFullscreen = page === 'display' || page === 'share';
   const avatarSize = appreciate ? 88 : 80;
 
-  if (pathname === '/') {
+  if (pathname === '/' || pathname === '/profile') {
     return null;
   }
 
