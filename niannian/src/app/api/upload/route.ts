@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addPhoto, getPhotoCount, updatePhotoSourceMetadata } from '@/lib/db';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
-import { writeFile, mkdir } from 'fs/promises';
+import { mkdir } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { Readable } from 'stream';
 import path from 'path';
 import {
   isGooglePhotosJsonFile,
@@ -11,6 +14,12 @@ import {
   findMetadataForPhoto,
   type PhotoSourceFacts,
 } from '@/lib/google-photos-metadata';
+
+async function writeUploadedFile(file: File, filePath: string) {
+  const webStream = file.stream();
+  const nodeStream = Readable.fromWeb(webStream as import('stream/web').ReadableStream);
+  await pipeline(nodeStream, createWriteStream(filePath));
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,8 +65,7 @@ export async function POST(request: NextRequest) {
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
       const filePath = path.join(uploadDir, fileName);
 
-      const bytes = await file.arrayBuffer();
-      await writeFile(filePath, Buffer.from(bytes));
+      await writeUploadedFile(file, filePath);
 
       const url = `/uploads/${familyId}/${fileName}`;
       const id = addPhoto(familyId, url, file.name);

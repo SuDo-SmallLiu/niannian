@@ -12,11 +12,66 @@ interface PhotoUploaderProps {
   familyId: string;
 }
 
+const UPLOAD_TIMEOUT_MS = 120_000;
+const MAX_RETRIES = 2;
+
+interface UploadResponse {
+  ok: boolean;
+  status: number;
+  data: {
+    error?: string;
+    photos?: Array<{ id: string; url: string; name: string }>;
+    totalCount?: number;
+  };
+}
+
+function uploadWithProgress(
+  formData: FormData,
+  onProgress: (ratio: number) => void,
+  timeoutMs = UPLOAD_TIMEOUT_MS
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
+    xhr.timeout = timeoutMs;
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onProgress(event.loaded / event.total);
+      }
+    };
+
+    xhr.onload = () => {
+      let data: UploadResponse['data'] = {};
+      try {
+        data = JSON.parse(xhr.responseText || '{}');
+      } catch {
+        data = {};
+      }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data });
+    };
+
+    xhr.onerror = () => reject(new Error('network'));
+    xhr.ontimeout = () => reject(new Error('timeout'));
+    xhr.send(formData);
+  });
+}
+
+function isRetryableUploadError(err: unknown, status?: number): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    if (msg === 'timeout' || msg === 'network') return true;
+  }
+  if (status && status >= 500) return true;
+  return false;
+}
+
 export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploaderProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Array<{ url: string; isJson: boolean }>>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadLabel, setUploadLabel] = useState('');
   const [error, setError] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,67 +133,86 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
     setUploading(true);
     setError('');
     setProgress(0);
+    setUploadLabel('准备上传…');
 
     const imageFiles = files.filter((f) => isImageFile(f.name));
     const jsonFiles = files.filter((f) => isGooglePhotosJsonFile(f.name));
     const uploadedPhotos: Array<{ id: string; url: string; name: string }> = [];
     let totalCount = 0;
 
-    const uploadOnce = async (formData: FormData, retries = 2) => {
-      let lastError: unknown;
-      for (let attempt = 0; attempt <= retries; attempt++) {
+    const uploadOnce = async (
+      formData: FormData,
+      onFileProgress: (ratio: number) => void
+    ): Promise<UploadResponse> => {
+      let lastResult: UploadResponse | undefined;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-          return await fetch('/api/upload', { method: 'POST', body: formData });
-        } catch (err) {
-          lastError = err;
-          if (attempt < retries) {
+          const result = await uploadWithProgress(formData, onFileProgress);
+          if (
+            !result.ok &&
+            isRetryableUploadError(null, result.status) &&
+            attempt < MAX_RETRIES
+          ) {
+            lastResult = result;
+            onFileProgress(0);
             await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
           }
+          return result;
+        } catch (err) {
+          if (attempt < MAX_RETRIES && isRetryableUploadError(err)) {
+            onFileProgress(0);
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          throw err;
         }
       }
-      throw lastError;
+
+      if (lastResult) return lastResult;
+      throw new Error('network');
     };
 
     try {
       for (let i = 0; i < imageFiles.length; i++) {
+        const current = imageFiles[i];
+        const shortName =
+          current.name.length > 18 ? `${current.name.slice(0, 15)}…` : current.name;
+        setUploadLabel(`正在上传 ${i + 1}/${imageFiles.length} · ${shortName}`);
+
         const formData = new FormData();
         formData.append('familyId', familyId);
-        formData.append('photos', imageFiles[i]);
+        formData.append('photos', current);
         if (i === 0) {
           jsonFiles.forEach((file) => formData.append('photos', file));
         }
 
-        const res = await uploadOnce(formData);
-        let data: {
-          error?: string;
-          photos?: Array<{ id: string; url: string; name: string }>;
-          totalCount?: number;
-        } = {};
-        try {
-          data = await res.json();
-        } catch {
-          data = {};
-        }
+        const { ok, status, data } = await uploadOnce(formData, (ratio) => {
+          const overall = ((i + ratio) / imageFiles.length) * 100;
+          setProgress(Math.min(99, Math.round(overall)));
+        });
 
-        if (!res.ok) {
-          if (res.status === 413) {
-            throw new Error(
-              `「${imageFiles[i].name}」过大，请压缩后重试（单张建议不超过 20MB）`
-            );
+        if (!ok) {
+          if (status === 413) {
+            throw new Error(`「${current.name}」过大，请压缩后重试（单张建议不超过 20MB）`);
           }
-          throw new Error(data.error || `「${imageFiles[i].name}」上传失败（${res.status}）`);
+          throw new Error(data.error || `「${current.name}」上传失败（${status}）`);
         }
 
         uploadedPhotos.push(...(data.photos || []));
         totalCount = data.totalCount ?? totalCount;
-        setProgress(Math.min(100, Math.round(((i + 1) / imageFiles.length) * 100)));
+        setProgress(Math.min(99, Math.round(((i + 1) / imageFiles.length) * 100)));
       }
 
       if (uploadedPhotos.length !== imageCount) {
-        setError(`上传完成 ${uploadedPhotos.length}/${imageCount} 张，部分照片可能未成功，请到记忆卡页查看`);
+        setError(
+          `上传完成 ${uploadedPhotos.length}/${imageCount} 张，部分照片可能未成功，请到记忆卡页查看`
+        );
       }
 
       setProgress(100);
+      setUploadLabel('上传完成');
       onUploadComplete({
         photos: uploadedPhotos,
         totalCount,
@@ -147,18 +221,31 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       const lower = msg.toLowerCase();
-      if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('load failed')) {
+      if (
+        lower.includes('failed to fetch') ||
+        lower.includes('networkerror') ||
+        lower.includes('load failed') ||
+        lower === 'network'
+      ) {
         const done = uploadedPhotos.length;
         setError(
           done > 0
             ? `网络连接中断，已成功 ${done}/${imageCount} 张，请检查网络后重试剩余照片`
             : '网络连接中断，请检查网络或换用 Wi-Fi 后重试'
         );
+      } else if (lower === 'timeout') {
+        const done = uploadedPhotos.length;
+        setError(
+          done > 0
+            ? `上传超时，已成功 ${done}/${imageCount} 张，请重试剩余照片`
+            : '上传超时，请检查网络后重试'
+        );
       } else {
         setError(msg || '网络错误，请重试');
       }
     } finally {
       setUploading(false);
+      setUploadLabel('');
     }
   };
 
@@ -168,9 +255,16 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
         className={`rounded-2xl border-2 border-dashed border-[#E8DCC8] p-10 text-center cursor-pointer transition-all ${
           dragOver ? 'bg-[#FFFBF5] border-[#D98A45]/40' : 'bg-white hover:bg-[#FFFBF5] hover:border-[#D98A45]/40'
         }`}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
         onClick={() => fileInputRef.current?.click()}
       >
         <input
@@ -203,7 +297,9 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
             </p>
             <button
               onClick={() => {
-                previews.forEach((p) => { if (p.url) URL.revokeObjectURL(p.url); });
+                previews.forEach((p) => {
+                  if (p.url) URL.revokeObjectURL(p.url);
+                });
                 setFiles([]);
                 setPreviews([]);
               }}
@@ -228,7 +324,10 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
                   <img src={previews[i]?.url} alt="" className="w-full h-full object-cover" />
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(i);
+                  }}
                   className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
                 >
                   ×
@@ -245,6 +344,20 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
         </div>
       )}
 
+      {uploading && (
+        <div className="mt-4">
+          <div className="h-2 rounded-full bg-[#E8DCC8] overflow-hidden">
+            <div
+              className="h-full bg-[#D98A45] transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          {uploadLabel && (
+            <p className="text-xs text-[#8B7355] text-center mt-2 truncate">{uploadLabel}</p>
+          )}
+        </div>
+      )}
+
       {imageCount > 0 && (
         <div className="mt-8">
           <button
@@ -255,7 +368,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
             {uploading ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                上传中... {progress}%
+                上传中… {progress}%
               </span>
             ) : (
               `上传 ${imageCount} 张照片${jsonCount > 0 ? `（含 ${jsonCount} 个 JSON）` : ''}`
