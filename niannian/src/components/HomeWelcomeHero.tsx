@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import NianNianAvatar from '@/components/NianNianAvatar';
-import HomeBackgroundDecor from '@/components/HomeBackgroundDecor';
 
 const LEFT_BUBBLE = `我是你的记忆助手念念📷
 别看我软乎乎的，我们海兔可是诺贝尔奖级记忆研究里的「记忆专家」哦～`;
@@ -25,8 +24,7 @@ export default function HomeWelcomeHero({
   const mascotSize = compact ? 200 : 308;
 
   return (
-    <div className={`home-hero relative flex flex-col ${compact ? 'home-hero--compact' : ''}`}>
-      <HomeBackgroundDecor />
+    <div className={`home-hero relative flex flex-col z-[1] ${compact ? 'home-hero--compact' : ''}`}>
 
       {/* 顶部 Logo — 扣图缩小 */}
       <header className="relative z-10 flex justify-center pt-2 pb-0 px-4 shrink-0">

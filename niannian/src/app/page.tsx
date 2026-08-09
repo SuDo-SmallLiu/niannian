@@ -6,6 +6,7 @@ import { PRESET_MEMBERS } from '@/lib/family-members';
 import PipelineSteps from '@/components/PipelineSteps';
 import HomeWelcomeHero from '@/components/HomeWelcomeHero';
 import HomeFeatureCards from '@/components/HomeFeatureCards';
+import HomeBackgroundDecor from '@/components/HomeBackgroundDecor';
 import HomeLoginPanel from '@/components/HomeLoginPanel';
 import NianNianHelpDesk from '@/components/NianNianHelpDesk';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -109,7 +110,8 @@ function HomePageContent() {
 
   if (!user) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-[#F8F4ED] overflow-hidden">
+      <div className="home-page min-h-[100dvh] flex flex-col bg-[#F8F4ED] overflow-hidden relative">
+        <HomeBackgroundDecor />
         <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} compact showGuideTitle={false} />
         <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
         <div className="relative z-10 w-full max-w-sm mx-auto px-5 pb-6 shrink-0">
@@ -211,7 +213,8 @@ function HomePageContent() {
   }
 
   return (
-    <div className="home-page h-[calc(100dvh-4rem)] max-h-[calc(844px-4rem)] flex flex-col bg-[#F8F4ED] overflow-hidden">
+    <div className="home-page h-[calc(100dvh-4rem)] max-h-[calc(844px-4rem)] flex flex-col bg-[#F8F4ED] overflow-hidden relative">
+      <HomeBackgroundDecor />
       <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
 
       <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} />
