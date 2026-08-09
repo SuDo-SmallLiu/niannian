@@ -43,7 +43,7 @@ export default function FamilyPage() {
 
         <div className="text-center mb-6">
           <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的主题</h1>
-          <p className="text-sm text-[#B8A898] mb-4">按家庭主题组织 Memory Card</p>
+          <p className="text-sm text-[#B8A898] mb-4">按家庭主题组织记忆卡</p>
           <PipelineSteps active={1} compact />
         </div>
 
