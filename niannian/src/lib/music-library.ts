@@ -69,5 +69,5 @@ export function getMusicSrcForTheme(theme?: string): string {
 }
 
 export function getMusicVolumeForTheme(_theme?: string): number {
-  return 0.42;
+  return 0.32;
 }

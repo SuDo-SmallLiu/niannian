@@ -13,8 +13,6 @@ interface UseNarrationOptions {
   audioUrl?: string | null;
   onEnd?: () => void;
   onDurationKnown?: (ms: number) => void;
-  /** 旁白音频开始播放（用于与 BGM 混音时恢复背景音乐） */
-  onAudioStart?: () => void;
 }
 
 function configureMobileAudio(audio: HTMLAudioElement) {
@@ -39,8 +37,7 @@ function pickChineseVoice(): SpeechSynthesisVoice | null {
 function speakWithBrowserTts(
   text: string,
   onEnd: () => void,
-  onDurationKnown?: (ms: number) => void,
-  onAudioStart?: () => void
+  onDurationKnown?: (ms: number) => void
 ): () => void {
   const estimated = Math.max(estimateNarrationMs(text), MIN_NARRATION_MS);
   onDurationKnown?.(estimated);
@@ -70,7 +67,6 @@ function speakWithBrowserTts(
     if (cancelled) return;
     startedAt = Date.now();
     window.speechSynthesis.cancel();
-    onAudioStart?.();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
@@ -123,11 +119,9 @@ export function useNarration({
   audioUrl,
   onEnd,
   onDurationKnown,
-  onAudioStart,
 }: UseNarrationOptions) {
   const onEndRef = useRef(onEnd);
   const onDurationRef = useRef(onDurationKnown);
-  const onAudioStartRef = useRef(onAudioStart);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -137,10 +131,6 @@ export function useNarration({
   useEffect(() => {
     onDurationRef.current = onDurationKnown;
   }, [onDurationKnown]);
-
-  useEffect(() => {
-    onAudioStartRef.current = onAudioStart;
-  }, [onAudioStart]);
 
   const cancel = useCallback(() => {
     if (audioRef.current) {
@@ -190,30 +180,15 @@ export function useNarration({
         }
       };
 
-      audio.onplaying = () => {
-        if (!cancelled) onAudioStartRef.current?.();
-      };
-
       audio.onended = finish;
       audio.onerror = () => {
         if (cancelled) return;
-        cleanupBrowser = speakWithBrowserTts(
-          text,
-          finish,
-          onDurationRef.current,
-          () => onAudioStartRef.current?.()
-        );
+        cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
       };
 
-      onAudioStartRef.current?.();
       audio.play().catch(() => {
         if (cancelled) return;
-        cleanupBrowser = speakWithBrowserTts(
-          text,
-          finish,
-          onDurationRef.current,
-          () => onAudioStartRef.current?.()
-        );
+        cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
       });
     };
 
@@ -232,22 +207,12 @@ export function useNarration({
           if (res.ok && data.url) {
             playUrl(data.url);
           } else {
-            cleanupBrowser = speakWithBrowserTts(
-              text,
-              finish,
-              onDurationRef.current,
-              () => onAudioStartRef.current?.()
-            );
+            cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
           }
         })
         .catch(() => {
           if (cancelled) return;
-          cleanupBrowser = speakWithBrowserTts(
-            text,
-            finish,
-            onDurationRef.current,
-            () => onAudioStartRef.current?.()
-          );
+          cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
         });
     }
 

@@ -79,19 +79,13 @@ export default function InteractiveStoryPlayer({
 
   const activeMusic = useMemo(() => getMusicFromSlide(slide), [slide]);
 
-  const { prime: primeMusic, resume: resumeMusic } = useThemeMusic({
+  const { prime: primeMusic } = useThemeMusic({
     src: activeMusic.file,
     volume: activeMusic.volume,
     enabled: enableMusic && musicOn,
     unlocked: audioUnlocked,
     duck: enableNarration && narrationOn && Boolean(narrationText),
   });
-
-  const keepBgmAlive = useCallback(() => {
-    if (enableMusic && musicOn) {
-      resumeMusic(true);
-    }
-  }, [enableMusic, musicOn, resumeMusic]);
 
   const unlockAudio = useCallback(() => {
     setAudioUnlocked(true);
@@ -107,7 +101,7 @@ export default function InteractiveStoryPlayer({
 
   const handleStartPlayback = useCallback(() => {
     unlockAudio();
-    primeMusic(true);
+    primeMusic();
     setAutoPlay(true);
     setProgressKey((k) => k + 1);
     setNarrationKey((k) => k + 1);
@@ -135,7 +129,7 @@ export default function InteractiveStoryPlayer({
       setNarrationKey((k) => k + 1);
       return i - 1;
     });
-  }, [unlockAudio, primeMusic]);
+  }, [unlockAudio]);
 
   const handleNarrationEnd = useCallback(() => {
     if (autoPlay && index < total - 1) {
@@ -153,20 +147,11 @@ export default function InteractiveStoryPlayer({
     audioUrl: slide?.narrationUrl,
     onEnd: handleNarrationEnd,
     onDurationKnown: setNarrationDurationMs,
-    onAudioStart: keepBgmAlive,
   });
-
-  useEffect(() => {
-    if (!autoPlay || !audioUnlocked || !enableMusic || !musicOn) return;
-    keepBgmAlive();
-    const timer = setInterval(keepBgmAlive, 2500);
-    return () => clearInterval(timer);
-  }, [autoPlay, audioUnlocked, enableMusic, musicOn, keepBgmAlive, index]);
 
   const toggleAutoPlay = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     unlockAudio();
-    primeMusic(true);
     setAutoPlay((v) => {
       if (!v) {
         setProgressKey((k) => k + 1);

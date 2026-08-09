@@ -30,7 +30,7 @@ function configureBgmAudio(audio: HTMLAudioElement) {
 /** 在用户手势回调中同步调用，绕过移动端 autoplay 限制 */
 export function useThemeMusic({
   src,
-  volume = 0.42,
+  volume = 0.32,
   theme,
   getSrc,
   getVolume,
@@ -47,7 +47,7 @@ export function useThemeMusic({
   const applyVolume = useCallback(
     (audio: HTMLAudioElement) => {
       const base = getBaseVolume();
-      audio.volume = duck ? base * 0.55 : base;
+      audio.volume = duck ? base * 0.35 : base;
     },
     [duck, getBaseVolume]
   );
@@ -98,24 +98,6 @@ export function useThemeMusic({
     [src, getSrc, enabled, ensureAudio, tryPlay]
   );
 
-  /** 旁白或其它音频抢占后，尝试恢复 BGM */
-  const resume = useCallback(
-    (force = false) => {
-      const resolvedSrc = resolveSrc(src, getSrc);
-      if (!resolvedSrc) return;
-      if (!enabled && !force) return;
-      if (!unlocked && !primedRef.current) return;
-
-      const audio = ensureAudio(resolvedSrc);
-      if (audio.paused) {
-        tryPlay(audio);
-      } else {
-        applyVolume(audio);
-      }
-    },
-    [src, getSrc, enabled, unlocked, ensureAudio, tryPlay, applyVolume]
-  );
-
   useEffect(() => {
     const resolvedSrc = resolveSrc(src, getSrc);
 
@@ -143,5 +125,5 @@ export function useThemeMusic({
     };
   }, []);
 
-  return { prime, resume };
+  return { prime };
 }
