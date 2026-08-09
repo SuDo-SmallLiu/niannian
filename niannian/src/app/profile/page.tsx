@@ -1,12 +1,24 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import Header from '@/components/Header';
 import PipelineSteps from '@/components/PipelineSteps';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function ProfilePage() {
   const { user, loading, logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } catch {
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
@@ -64,10 +76,11 @@ export default function ProfilePage() {
         {user && (
           <button
             type="button"
-            onClick={logout}
-            className="w-full py-3.5 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:bg-[#FFF8F0] transition-colors"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="w-full py-3.5 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm hover:bg-[#FFF8F0] transition-colors disabled:opacity-60 touch-manipulation relative z-10"
           >
-            退出登录
+            {loggingOut ? '退出中…' : '退出登录'}
           </button>
         )}
 

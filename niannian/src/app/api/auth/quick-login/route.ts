@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const token = await createSessionToken(user.id, user.phone);
     const response = NextResponse.json({ user, code });
-    setSessionCookie(response, token);
+    setSessionCookie(response, token, request);
     return response;
   } catch (error) {
     console.error('快速登录失败:', error);

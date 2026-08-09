@@ -188,10 +188,10 @@ export default function StoryPage() {
     setPublishingStoryId(story.id);
     setRegenerateError('');
     try {
-      const res = await fetch('/api/story', {
-        method: 'PATCH',
+      const res = await fetch('/api/story/publish', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id, publish: true }),
+        body: JSON.stringify({ storyId: story.id }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '发布失败');

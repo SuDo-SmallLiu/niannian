@@ -73,26 +73,41 @@ export async function verifySessionToken(
   }
 }
 
-function cookieSecure(): boolean {
-  return process.env.AUTH_COOKIE_SECURE === 'true';
+function cookieSecureFromRequest(request?: Request): boolean {
+  if (process.env.AUTH_COOKIE_SECURE === 'true') return true;
+  if (process.env.AUTH_COOKIE_SECURE === 'false') return false;
+  if (request) {
+    const forwarded = request.headers.get('x-forwarded-proto');
+    if (forwarded) {
+      return forwarded.split(',')[0]?.trim().toLowerCase() === 'https';
+    }
+    try {
+      return new URL(request.url).protocol === 'https:';
+    } catch {
+      /* ignore */
+    }
+  }
+  return false;
 }
 
-export function setSessionCookie(response: NextResponse, token: string) {
+export function setSessionCookie(response: NextResponse, token: string, request?: Request) {
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: cookieSecure(),
+    secure: cookieSecureFromRequest(request),
     path: '/',
     maxAge: SESSION_MAX_AGE_SEC,
   });
 }
 
-export function clearSessionCookie(response: NextResponse) {
-  response.cookies.set(SESSION_COOKIE, '', {
+/** 同时清除 secure / non-secure 两种 cookie，避免 HTTPS 代理与登录时不一致导致退不掉 */
+export function clearSessionCookie(response: NextResponse, _request?: Request) {
+  const base = {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: cookieSecure(),
+    sameSite: 'lax' as const,
     path: '/',
     maxAge: 0,
-  });
+  };
+  response.cookies.set(SESSION_COOKIE, '', { ...base, secure: false });
+  response.cookies.set(SESSION_COOKIE, '', { ...base, secure: true });
 }

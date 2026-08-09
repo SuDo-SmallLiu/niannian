@@ -410,9 +410,9 @@ export default function UserSupplementPanel({
       )}
 
       {!voice.supported && (
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <p className="text-xs text-muted-foreground text-center mt-2 leading-relaxed">
           {typeof window !== 'undefined' && !window.isSecureContext
-            ? '语音需要 HTTPS，请改用文字输入'
+            ? '语音需要 HTTPS 安全连接。请使用 https://niannian-years.top:8799 访问，或改用文字输入'
             : '当前浏览器不支持语音，请改用文字输入'}
         </p>
       )}

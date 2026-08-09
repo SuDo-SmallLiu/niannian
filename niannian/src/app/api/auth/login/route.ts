@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     const token = await createSessionToken(user.id, user.phone);
     const response = NextResponse.json({ user });
-    setSessionCookie(response, token);
+    setSessionCookie(response, token, request);
     return response;
   } catch (error) {
     console.error('登录失败:', error);

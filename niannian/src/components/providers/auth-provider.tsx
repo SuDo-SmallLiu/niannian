@@ -47,9 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+    } catch {
+      /* 网络失败也继续清本地状态 */
+    }
     setUser(null);
-    window.location.href = '/';
+    window.location.assign('/');
   }, []);
 
   useEffect(() => {
