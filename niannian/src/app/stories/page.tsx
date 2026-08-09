@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import PageShell from '@/components/PageShell';
+import PageHero from '@/components/PageHero';
 import SharePosterCard from '@/components/SharePosterCard';
 import PipelineSteps from '@/components/PipelineSteps';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
@@ -37,7 +39,7 @@ export default function StoriesPage() {
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
-  const { confirm, alert } = useAppDialog();
+  const { confirm, alert, showLoading, hideLoading } = useAppDialog();
   const appreciate = useAppreciateMode();
 
   useEffect(() => {
@@ -126,6 +128,7 @@ export default function StoriesPage() {
     if (!ok) return;
 
     setDeletingId(story.id);
+    showLoading('正在删除', `移除「${story.title}」…`);
     try {
       const res = await fetch(`/api/story?storyId=${story.id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -137,22 +140,21 @@ export default function StoriesPage() {
         description: err instanceof Error ? err.message : '请稍后重试',
       });
     } finally {
+      hideLoading();
       setDeletingId(null);
     }
   };
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[#F8F4ED] ${appreciate ? 'text-lg' : ''}`}>
+    <PageShell className={appreciate ? 'text-lg' : ''}>
       {shareModal}
-      <Header />
-      <main className="flex-1 px-6 py-8 pb-24">
-        <div className="text-center mb-8">
-          <h1 className={`font-serif text-[#4B3B2F] mb-2 ${appreciate ? 'text-3xl' : 'text-2xl'}`}>
-            家庭故事
-          </h1>
-          <p className="text-sm text-[#B8A898] mb-3">来自记忆卡，不是你的相册流水账</p>
-          <PipelineSteps active={2} compact />
-        </div>
+      <PageHero
+        title="家庭故事"
+        subtitle="来自记忆卡，不是你的相册流水账"
+        large={appreciate}
+      >
+        <PipelineSteps active={2} compact />
+      </PageHero>
 
         {families.length > 1 && (
           <div className="max-w-md mx-auto mb-6">
@@ -277,7 +279,6 @@ export default function StoriesPage() {
             ))}
           </div>
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }

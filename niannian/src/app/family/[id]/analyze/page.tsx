@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import AnalysisProgress from '@/components/memory/AnalysisProgress';
+import PageShell from '@/components/PageShell';
+import PageHero from '@/components/PageHero';
 import MemoryCardStatus, {
   type MemoryCardAnalysisStatus,
 } from '@/components/memory/MemoryCardStatus';
@@ -27,6 +29,26 @@ interface PhotoTask {
   url?: string;
 }
 
+interface PollPayload {
+  status?: string;
+  redirectTo?: string;
+  message?: string;
+  total?: number;
+  completed?: number;
+  failed?: number;
+  active?: number;
+  progress?: number;
+  photos?: PhotoTask[];
+}
+
+function isTerminalPoll(pollData: PollPayload): boolean {
+  if (pollData.status === 'done' || pollData.status === 'error') return true;
+  const total = pollData.total ?? 0;
+  if (total <= 0) return false;
+  const finished = (pollData.completed ?? 0) + (pollData.failed ?? 0);
+  return finished >= total && (pollData.active ?? 0) === 0;
+}
+
 export default function AnalyzePage() {
   const router = useRouter();
   const params = useParams();
@@ -43,41 +65,66 @@ export default function AnalyzePage() {
     progress: 0,
   });
   const hasRun = useRef(false);
+  const cancelledRef = useRef(false);
 
   useNianNianAgentOverride({
-    pendingCount: Math.max(0, summary.total - summary.completed),
+    pendingCount: Math.max(0, summary.total - summary.completed - summary.failed),
     analyzedCount: summary.completed,
     photoCount: summary.total,
+    analyzeActive: summary.active,
+    analyzeFailed: summary.failed,
   });
 
   useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const phraseTimer = setInterval(() => {
-      setPhraseIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
+      if (!cancelledRef.current) {
+        setPhraseIndex((prev) => (prev + 1) % LOADING_PHRASES.length);
+      }
     }, 4000);
     return () => clearInterval(phraseTimer);
   }, []);
 
-  const pollStatus = useCallback(async () => {
+  const pollStatus = useCallback(async (): Promise<PollPayload> => {
     const pollRes = await fetch(`/api/analyze?familyId=${familyId}`);
     return pollRes.json();
   }, [familyId]);
 
-  const applyPollData = useCallback((pollData: Record<string, unknown>) => {
+  const applyPollData = useCallback((pollData: PollPayload) => {
+    if (cancelledRef.current) return;
     if (typeof pollData.total === 'number') {
       setSummary({
-        total: pollData.total as number,
-        completed: (pollData.completed as number) || 0,
-        failed: (pollData.failed as number) || 0,
-        active: (pollData.active as number) || 0,
-        progress: (pollData.progress as number) || 0,
+        total: pollData.total,
+        completed: pollData.completed ?? 0,
+        failed: pollData.failed ?? 0,
+        active: pollData.active ?? 0,
+        progress: pollData.progress ?? 0,
       });
     }
     if (Array.isArray(pollData.photos)) {
-      setPhotos(pollData.photos as PhotoTask[]);
+      setPhotos(pollData.photos);
     }
   }, []);
 
+  const finishSuccess = useCallback(
+    (pollData: PollPayload) => {
+      if (cancelledRef.current) return;
+      const redirectTo = pollData.redirectTo || `/family/${familyId}/photos`;
+      setTimeout(() => {
+        if (!cancelledRef.current) router.push(redirectTo);
+      }, 800);
+    },
+    [familyId, router]
+  );
+
   const startAnalysis = useCallback(async () => {
+    if (cancelledRef.current) return;
     setError('');
     hasRun.current = true;
 
@@ -88,6 +135,8 @@ export default function AnalyzePage() {
         body: JSON.stringify({ familyId }),
       });
       const startData = await startRes.json();
+
+      if (cancelledRef.current) return;
 
       if (!startRes.ok) {
         setError(startData.error || '启动分析失败');
@@ -102,30 +151,38 @@ export default function AnalyzePage() {
       const startTime = Date.now();
 
       while (Date.now() - startTime < POLL_TIMEOUT) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+        if (cancelledRef.current) return;
+
         const pollData = await pollStatus();
+        if (cancelledRef.current) return;
+
         applyPollData(pollData);
 
-        if (pollData.status === 'done') {
-          const redirectTo = pollData.redirectTo || `/family/${familyId}/photos`;
-          setTimeout(() => router.push(redirectTo), 800);
+        if (pollData.status === 'done' || (pollData.status !== 'error' && isTerminalPoll(pollData))) {
+          finishSuccess(pollData);
           return;
         }
 
         if (pollData.status === 'error') {
-          setError((pollData.message as string) || '解析失败，请重试');
+          setError(pollData.message || '解析失败，请重试');
           hasRun.current = false;
           return;
         }
+
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
       }
 
-      setError('解析时间较长，可先去照片库查看已完成的结果。');
-      hasRun.current = false;
+      if (!cancelledRef.current) {
+        setError('解析时间较长，可先去照片库查看已完成的结果。');
+        hasRun.current = false;
+      }
     } catch {
-      setError('网络不太稳定，解析可能中断了。你可以重试。');
-      hasRun.current = false;
+      if (!cancelledRef.current) {
+        setError('网络不太稳定，解析可能中断了。你可以重试。');
+        hasRun.current = false;
+      }
     }
-  }, [familyId, pollStatus, applyPollData, router]);
+  }, [familyId, pollStatus, applyPollData, finishSuccess]);
 
   useEffect(() => {
     if (hasRun.current) return;
@@ -143,12 +200,8 @@ export default function AnalyzePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col px-6 pt-10 pb-28 bg-[#F8F4ED]">
-      <div className="w-full max-w-md mx-auto">
-        <h1 className="text-xl font-serif text-[#4B3B2F] text-center mb-2">念念正在读懂照片</h1>
-        <p className="text-sm text-[#B8A898] text-center mb-6">
-          并发解析中，完成一张保存一张
-        </p>
+    <PageShell minimalHeader bodyClassName="pt-4">
+      <PageHero title="念念正在读懂照片" subtitle="并发解析中，完成一张保存一张" />
 
         <AnalysisProgress
           completed={summary.completed}
@@ -174,7 +227,7 @@ export default function AnalyzePage() {
                 {photo.url && (
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-[#F0E8D8] shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={photo.url} alt="" className="w-full h-full object-cover" />
+                    <img src={photo.url} alt="" className="w-full h-full object-cover" loading="lazy" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
@@ -216,7 +269,6 @@ export default function AnalyzePage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </PageShell>
   );
 }

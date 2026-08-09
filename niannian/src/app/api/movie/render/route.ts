@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, audioPlan: plan });
     }
 
-    if (movie.render_status === 'ready' && movie.media_url) {
+    if (movie.render_status === 'ready' && movie.media_url && !retry) {
       return NextResponse.json({
         success: true,
         renderStatus: 'ready',

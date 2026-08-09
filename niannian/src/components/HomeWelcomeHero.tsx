@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import NianNianAvatar from '@/components/NianNianAvatar';
 
-const LEFT_BUBBLE = `我是你的记忆助手念念📷
+const LEFT_BUBBLE = `我是你的记忆助手念念
 别看我软乎乎的，我们海兔可是诺贝尔奖级记忆研究里的「记忆专家」哦～`;
 
 const RIGHT_BUBBLE = `或许游得不快，
@@ -26,15 +26,16 @@ export default function HomeWelcomeHero({
   return (
     <div className={`home-hero relative flex flex-col z-[1] ${compact ? 'home-hero--compact' : ''}`}>
 
-      {/* 顶部 Logo — 透明抠图，含「岁岁年年，念念不忘」 */}
-      <header className="relative z-10 flex justify-center pt-2.5 pb-0 px-4 shrink-0">
+      {/* 顶部 Logo — 透明抠图嵌入背景，居中 */}
+      <header className="home-brand-header relative z-10 shrink-0">
         <Image
           src="/niannian/brand-banner.png"
           alt="NianNian · 岁岁年年，念念不忘"
           width={875}
           height={288}
           priority
-          className={`home-brand-banner w-auto ${compact ? 'max-w-[132px]' : 'max-w-[168px]'}`}
+          unoptimized
+          className="home-brand-banner"
         />
       </header>
 

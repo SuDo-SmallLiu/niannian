@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 :root {
   --bg-primary: #F8F4ED;
   --bg-card: #FFFFFF;
@@ -15,9 +26,9 @@
   --border: #E8DCC8;
   --border-light: #F0E8D8;
 
-  /* 品牌字体 — 标题衬线 / 正文无衬线 */
-  --font-display: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
-  --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 品牌字体 — next/font 自托管 + 系统中文字体回退 */
+  --font-display: var(--font-noto-serif), 'Songti SC', 'STSong', 'SimSun', serif;
+  --font-body: var(--font-noto-sans), 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 
   /* shadcn/ui — 映射念念年年暖色，适老大字号 */
   --background: 40 33% 96%;
@@ -76,6 +87,181 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* 语义字体类 — Tailwind 失效时仍可正确显示中文 */
+.font-serif {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* 应用壳层 — 390px 手机宽度，与首页 / 我的页一致 */
+.app-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 390px;
+  margin-left: auto;
+  margin-right: auto;
+  background: var(--bg-primary);
+  position: relative;
+  overflow-x: hidden;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 二级页面统一壳层 */
+.app-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  font-family: var(--font-body);
+  color: var(--text-primary);
+}
+
+.app-page--dark {
+  background: #1a1612;
+  color: #fff;
+}
+
+.app-page__body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 20px 6rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-page--dark .app-page__body {
+  padding-bottom: 6rem;
+}
+
+.app-page-hero {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-top: 8px;
+}
+
+.app-page-hero__title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+  margin: 0 0 6px;
+  letter-spacing: 0.02em;
+}
+
+.app-page-hero__title--lg {
+  font-size: 26px;
+}
+
+.app-page--dark .app-page-hero__title {
+  color: #fff;
+}
+
+.app-page-hero__subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.app-page--dark .app-page-hero__subtitle {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* 通用卡片 / 按钮 — 语义样式，不依赖 Tailwind 工具类 */
+.app-card {
+  border-radius: 20px;
+  background: #fffefb;
+  border: 1px solid rgba(232, 220, 200, 0.95);
+  box-shadow: 0 3px 14px rgba(75, 59, 47, 0.04);
+}
+
+.app-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 16px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.app-btn-primary:active:not(:disabled) {
+  background: var(--accent-hover);
+  transform: scale(0.98);
+}
+
+.app-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.2;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-secondary);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.app-chip--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.app-loading__spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(217, 138, 69, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 底部导航安全区 */
@@ -252,6 +438,11 @@ body {
   filter: drop-shadow(0 2px 10px rgba(75, 59, 47, 0.12));
 }
 
+/* 全局念念浮层 — 高于底部导航与页面固定操作栏 */
+.niannian-agent-float {
+  z-index: 55;
+}
+
 /* 念念气泡 — 柔和边缘，无硬边框 */
 .niannian-bubble-soft {
   background: rgba(255, 252, 248, 0.92);
@@ -268,12 +459,30 @@ body {
   font-family: var(--font-body);
 }
 
-/* 顶部品牌 Logo — 透明抠图，保留下方标语 */
+/* 首页顶部 Logo 区 — 居中嵌入背景 */
+.home-brand-header {
+  padding: 8px 20px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .home-brand-banner {
   display: block;
+  width: 128px;
   height: auto;
+  margin: 0 auto;
   object-fit: contain;
+  object-position: center center;
   filter: drop-shadow(0 1px 2px rgba(75, 59, 47, 0.06));
+}
+
+.home-hero--compact .home-brand-header {
+  padding: 6px 20px 0;
+}
+
+.home-hero--compact .home-brand-banner {
+  width: 112px;
 }
 
 /* 背景 — 奶油纸张 + 记忆碎片（3–8%，非重复 pattern，70% 区域留白） */
@@ -736,6 +945,8 @@ body {
 /* ── 「我的」个人主页 · 单屏 390×844 ── */
 
 .profile-page {
+  flex: 1;
+  min-height: 0;
   height: calc(100dvh - 4rem);
   max-height: calc(844px - 4rem);
   display: flex;

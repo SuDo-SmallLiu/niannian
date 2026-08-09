@@ -133,6 +133,7 @@ export default function StoryDetailPage() {
     if (!ok) return;
 
     setDeleting(true);
+    showLoading('正在删除', `移除「${story.title}」…`);
     try {
       const res = await fetch(`/api/story?storyId=${story.id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -144,6 +145,7 @@ export default function StoryDetailPage() {
         description: err instanceof Error ? err.message : '请稍后重试',
       });
     } finally {
+      hideLoading();
       setDeleting(false);
     }
   };

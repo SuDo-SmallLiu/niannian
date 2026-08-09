@@ -20,6 +20,8 @@ interface InteractiveStoryPlayerProps {
   appreciateMode?: boolean;
   /** 用户点击开始后自动播放（电影/故事播放页） */
   autoStart?: boolean;
+  /** 已由外层入口确认开始，跳过「点击开始播放」遮罩 */
+  initialStarted?: boolean;
   /** 人生电影 ID，用于 MeloTTS 旁白缓存 */
   movieId?: string;
 }
@@ -35,14 +37,15 @@ export default function InteractiveStoryPlayer({
   enableNarration = false,
   appreciateMode = false,
   autoStart = false,
+  initialStarted = false,
   movieId,
 }: InteractiveStoryPlayerProps) {
   const [index, setIndex] = useState(0);
   /** 必须用户点击「开始播放」后才自动翻页，避免无声快闪 */
-  const [autoPlay, setAutoPlay] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(initialStarted);
   const [musicOn, setMusicOn] = useState(true);
   const [narrationOn, setNarrationOn] = useState(true);
-  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(initialStarted);
   const [animKey, setAnimKey] = useState(0);
   const [progressKey, setProgressKey] = useState(0);
   const [narrationKey, setNarrationKey] = useState(0);
@@ -108,6 +111,12 @@ export default function InteractiveStoryPlayer({
     setProgressKey((k) => k + 1);
     setNarrationKey((k) => k + 1);
   }, [unlockAudio, primeMusic]);
+
+  useEffect(() => {
+    if (!initialStarted) return;
+    unlockAudio();
+    primeMusic();
+  }, [initialStarted, unlockAudio, primeMusic]);
 
   const goNext = useCallback(() => {
     unlockAudio();
@@ -472,7 +481,7 @@ function SlideContent({ slide }: { slide: H5Slide }) {
         )}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
           <p className="text-sm tracking-[0.3em] text-[#D98A45] mb-4 h5-text-enter">
-            Chapter {String(slide.interstitialIndex).padStart(2, '0')} / {slide.interstitialTotal}
+            第 {String(slide.interstitialIndex).padStart(2, '0')} 章 / 共 {slide.interstitialTotal} 章
           </p>
           {slide.interstitialTheme && (
             <span className="text-sm text-white/60 mb-3 h5-text-enter h5-delay-1">{slide.interstitialTheme}</span>
@@ -495,7 +504,7 @@ function SlideContent({ slide }: { slide: H5Slide }) {
         )}
         <div className="absolute top-[max(4.5rem,env(safe-area-inset-top))] left-0 right-0 text-center z-10">
           <p className="text-xs tracking-[0.35em] text-white/50">
-            {String(slide.chapterIndex).padStart(2, '0')} / {String(slide.chapterTotal).padStart(2, '0')}
+            第 {String(slide.chapterIndex).padStart(2, '0')} 张 / 共 {String(slide.chapterTotal).padStart(2, '0')} 张
           </p>
         </div>
         <div className="absolute bottom-0 left-0 right-0 px-6 pb-28">

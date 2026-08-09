@@ -7,6 +7,8 @@ import MemoryCardFilter from '@/components/MemoryCardFilter';
 import MemoryCardStatusBadge from '@/components/MemoryCardStatusBadge';
 import MemoryCardCompletionBar from '@/components/MemoryCardCompletionBar';
 import PipelineSteps from '@/components/PipelineSteps';
+import PageShell from '@/components/PageShell';
+import PageHero from '@/components/PageHero';
 import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
 import {
   aggregateCompletion,
@@ -212,7 +214,7 @@ export default function PhotoLibraryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-24">
+    <PageShell bodyClassName="pt-4">
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => (selectMode ? exitSelectMode() : router.push(`/family/${familyId}`))}
@@ -462,7 +464,7 @@ export default function PhotoLibraryPage() {
 
       {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount === photos.length && !showGenerateSheet && (
         <div className="fixed bottom-20 left-0 right-0 px-6 z-50">
-          <div className="max-w-md mx-auto">
+          <div className="max-w-md mx-auto flex flex-col gap-2">
             <button
               type="button"
               onClick={() => setShowGenerateSheet(true)}
@@ -471,6 +473,12 @@ export default function PhotoLibraryPage() {
             >
               去生成故事
             </button>
+            <Link
+              href={`/family/${familyId}/story`}
+              className="block w-full py-3.5 rounded-2xl bg-white border border-[#E8DCC8] text-[#8B7355] text-sm font-medium text-center hover:bg-[#FFF8F0] transition-all"
+            >
+              查看已生成的故事草稿{storyCount > 0 ? `（${storyCount}）` : ''}
+            </Link>
           </div>
         </div>
       )}
@@ -496,6 +504,6 @@ export default function PhotoLibraryPage() {
         }
       />
 
-    </div>
+    </PageShell>
   );
 }

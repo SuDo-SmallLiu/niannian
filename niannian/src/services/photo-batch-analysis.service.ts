@@ -1,5 +1,6 @@
 import pLimit from 'p-limit';
 import { analyzeAndSavePhoto } from '@/lib/analyze-photo';
+import { regenerateMemoryCardQuestions } from '@/lib/memory-card-questions';
 import { getPhoto, upsertMemoryCard } from '@/lib/db';
 import {
   createAnalysisJob,
@@ -33,8 +34,11 @@ export async function runFamilyPhotoAnalysis(familyId: string, photoIds: string[
     limit(async () => {
       updatePhotoTask(familyId, photoId, { status: 'active' });
       try {
-        await analyzeAndSavePhoto(photoId);
+        await analyzeAndSavePhoto(photoId, { skipQuestions: true });
         updatePhotoTask(familyId, photoId, { status: 'completed' });
+        void regenerateMemoryCardQuestions(photoId).catch((err) => {
+          console.warn(`照片 ${photoId} 追问生成失败（不影响解析结果）:`, err);
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : '解析失败';
         updatePhotoTask(familyId, photoId, { status: 'failed', error: message });

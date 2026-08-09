@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense } from 'react';
+import AppErrorBoundary from '@/components/AppErrorBoundary';
 import GlobalNianNianAgent from '@/components/GlobalNianNianAgent';
 import { AppDialogProvider } from '@/components/providers/app-dialog-provider';
 import { AppreciateModeProvider } from '@/components/providers/appreciate-mode-provider';
@@ -14,7 +15,9 @@ export default function AppProviders({ children }: { children: React.ReactNode }
         <Suspense fallback={null}>
           <AppreciateModeProvider>
             <NianNianAgentProvider>
-              {children}
+              <AppErrorBoundary>
+                {children}
+              </AppErrorBoundary>
               <GlobalNianNianAgent />
             </NianNianAgentProvider>
           </AppreciateModeProvider>

@@ -109,7 +109,7 @@ export function saveMemoryCardFromAnalysis(
 
 export async function analyzeAndSavePhoto(
   photoId: string,
-  options?: { withSupplement?: boolean }
+  options?: { withSupplement?: boolean; skipQuestions?: boolean }
 ): Promise<PhotoAnalysis> {
   const photo = getPhoto(photoId);
   if (!photo) {
@@ -162,7 +162,9 @@ export async function analyzeAndSavePhoto(
     preserveUserNotes: true,
   });
 
-  await regenerateMemoryCardQuestions(photo.id);
+  if (!options?.skipQuestions) {
+    await regenerateMemoryCardQuestions(photo.id);
+  }
 
   return analysis;
 }

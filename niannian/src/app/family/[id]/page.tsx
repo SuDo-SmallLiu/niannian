@@ -56,7 +56,7 @@ export default function FamilyDetailPage() {
     if (!family || generatingMovie) return;
     const ok = await confirm({
       title: '生成人生电影？',
-      description: '将把家庭下所有故事按主题串联，并生成含 BGM 与旁白的完整 MP4 电影。',
+      description: '将把家庭下所有故事按主题串联，并生成含配乐与旁白的完整视频电影。',
       confirmText: '开始生成',
       cancelText: '取消',
     });
@@ -227,7 +227,7 @@ export default function FamilyDetailPage() {
             disabled={generatingMovie}
             className="w-full rounded-2xl py-4 px-5 bg-[#4B3B2F] text-white font-medium shadow-sm hover:bg-[#3B2F25] disabled:opacity-60 transition-all active:scale-[0.99]"
           >
-            {generatingMovie ? '正在生成…' : '🎬 生成人生电影（H5 播放）'}
+            {generatingMovie ? '正在生成…' : '🎬 生成人生电影（互动版播放）'}
           </button>
           <p className="text-xs text-center text-[#B8A898] mt-2">
             将 {family.story_count} 个故事串联为沉浸式人生电影

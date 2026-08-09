@@ -286,7 +286,7 @@ export async function renderMovieToMp4(movieId: string): Promise<MovieRenderResu
       phase: 'segments',
       segmentDone: 0,
       segmentTotal: slideTotal,
-      message: `开始渲染 ${slideTotal} 个片段（每段含 BGM + 旁白混音）…`,
+      message: `开始渲染 ${slideTotal} 个片段（每段含配乐与旁白混音）…`,
     })
   );
 
@@ -310,7 +310,7 @@ export async function renderMovieToMp4(movieId: string): Promise<MovieRenderResu
           phase: 'segments',
           segmentDone: i,
           segmentTotal: slideTotal,
-          message: `FFmpeg 渲染 ${i + 1}/${slideTotal} · BGM: ${segment.musicId}${segment.affectArchetype ? `（${segment.affectArchetype}）` : ''}`,
+          message: `视频渲染 ${i + 1}/${slideTotal} · 配乐：${segment.musicId}${segment.affectArchetype ? `（${segment.affectArchetype}）` : ''}`,
           currentMusicId: segment.musicId,
           currentAffect: segment.affectArchetype,
         })
@@ -332,7 +332,7 @@ export async function renderMovieToMp4(movieId: string): Promise<MovieRenderResu
         segmentDone: slideTotal,
         segmentTotal: slideTotal,
         percent: 95,
-        message: '正在拼接完整 MP4…',
+        message: '正在拼接完整视频…',
       })
     );
 

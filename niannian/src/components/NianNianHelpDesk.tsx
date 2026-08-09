@@ -6,7 +6,6 @@ import NianNianAvatar from '@/components/NianNianAvatar';
 import type { PipelineStats } from '@/lib/agent-types';
 import { formatPipelineProgress } from '@/lib/agent-types';
 import { AGENT_STEPS, stepLabel, getCurrentStepIndex } from '@/lib/agent-steps';
-import type { AgentRole } from '@/lib/agent-events';
 
 interface FamilyBrief {
   id: string;
@@ -26,16 +25,9 @@ interface NianNianHelpDeskProps {
   onClose: () => void;
   pipeline?: (PipelineStats & { needsSupplementCount?: number }) | null;
   currentStep?: number;
-  agentRole?: AgentRole;
 }
 
-const ROLE_INTRO: Record<AgentRole, string> = {
-  'memory-assistant': '我是 Memory 助手，帮你上传照片、读懂每一张记忆卡～',
-  'story-assistant': '我是 Story 助手，帮你从记忆卡里发现温暖的家庭故事～',
-  'editor-assistant': '我是编辑助手，帮你润色故事，保留你原本的情感～',
-  'movie-director': '我是 Movie 导演，帮你把故事变成专属家庭电影～',
-  'family-assistant': '我是家庭助手，提醒生日、去年今日，帮你分享给家人～',
-};
+const HELP_DESK_GREETING = '我是念念，随时陪你整理家庭回忆~';
 
 function buildSteps(families: FamilyBrief[]): HelpStep[] {
   const firstFamilyId = families[0]?.id;
@@ -53,7 +45,6 @@ export default function NianNianHelpDesk({
   onClose,
   pipeline,
   currentStep,
-  agentRole = 'memory-assistant',
 }: NianNianHelpDeskProps) {
   const router = useRouter();
   const [families, setFamilies] = useState<FamilyBrief[]>([]);
@@ -131,7 +122,7 @@ export default function NianNianHelpDesk({
         <div className="flex items-start gap-3 mt-2 mb-4">
           <NianNianAvatar variant="wave" size={120} animate />
           <div className="flex-1 mt-4 rounded-2xl rounded-tl-sm bg-white border border-[#F0E8D8] px-4 py-3 shadow-sm">
-            <p className="text-sm text-[#4B3B2F] leading-relaxed">{ROLE_INTRO[agentRole]}</p>
+            <p className="text-sm text-[#4B3B2F] leading-relaxed">{HELP_DESK_GREETING}</p>
           </div>
         </div>
 

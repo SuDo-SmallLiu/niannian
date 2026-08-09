@@ -86,10 +86,13 @@ export default function NianNianAvatar({
 
     let raf = 0;
     let cancelled = false;
+    let lastDraw = 0;
+    const FRAME_MS = 1000 / 24;
 
-    const draw = () => {
+    const draw = (now: number) => {
       if (cancelled) return;
-      if (video.readyState >= 2) {
+      if (now - lastDraw >= FRAME_MS && video.readyState >= 2) {
+        lastDraw = now;
         ctx.clearRect(0, 0, displaySize, displaySize);
         ctx.drawImage(video, 0, 0, displaySize, displaySize);
         try {
@@ -103,12 +106,25 @@ export default function NianNianAvatar({
       raf = requestAnimationFrame(draw);
     };
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        video.pause();
+      } else {
+        void video.play().catch(() => setShowPoster(true));
+      }
+    };
+
     const start = () => {
       video.muted = true;
       video.playsInline = true;
       video.loop = true;
-      void video.play().then(draw).catch(() => setShowPoster(true));
+      void video.play().then(() => {
+        lastDraw = 0;
+        raf = requestAnimationFrame(draw);
+      }).catch(() => setShowPoster(true));
     };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     if (video.readyState >= 2) start();
     else video.addEventListener('loadeddata', start, { once: true });
@@ -116,6 +132,8 @@ export default function NianNianAvatar({
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      video.pause();
     };
   }, [useCanvas, showPoster, displaySize, variant]);
 

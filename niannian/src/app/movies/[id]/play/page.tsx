@@ -9,9 +9,11 @@ import { useAppreciateMode } from '@/components/providers/appreciate-mode-provid
 import { buildMovieSlides, type StoryH5Input } from '@/lib/h5-story-slides';
 import { getSlideNarrationText } from '@/lib/slide-narration';
 import { sanitizeRenderError } from '@/lib/movie-render-error';
+import { primeAudioInUserGesture } from '@/lib/prime-audio-gesture';
 import type { MovieRenderProgress } from '@/lib/movie-render-progress';
 
 type RenderStatus = 'none' | 'queued' | 'rendering' | 'ready' | 'failed';
+type PlayMode = 'select' | 'h5' | 'mp4';
 
 export default function MoviePlayPage() {
   const params = useParams();
@@ -36,6 +38,7 @@ export default function MoviePlayPage() {
   >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [playMode, setPlayMode] = useState<PlayMode>('select');
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
 
   useEffect(() => {
@@ -94,7 +97,7 @@ export default function MoviePlayPage() {
   }, [movieId]);
 
   useEffect(() => {
-    if (loading || error) return;
+    if (loading || error || playMode !== 'select') return;
     if (renderStatus === 'ready' && mediaUrl) return;
 
     const poll = async () => {
@@ -132,7 +135,22 @@ export default function MoviePlayPage() {
     const intervalMs = renderStatus === 'failed' ? 8000 : 4000;
     const timer = setInterval(poll, intervalMs);
     return () => clearInterval(timer);
-  }, [movieId, loading, error, renderStatus, mediaUrl]);
+  }, [movieId, loading, error, playMode, renderStatus, mediaUrl]);
+
+  const mp4Ready = renderStatus === 'ready' && Boolean(mediaUrl);
+  const mp4Rendering = renderStatus === 'queued' || renderStatus === 'rendering';
+
+  const immersiveHint = useMemo(() => {
+    if (mp4Ready) return '视频完整版 · 含配乐与旁白';
+    if (mp4Rendering) {
+      const pct = renderProgress?.percent ? ` ${renderProgress.percent}%` : '';
+      return renderProgress?.message || `完整视频生成中${pct}…`;
+    }
+    if (renderStatus === 'failed') {
+      return renderError || '完整视频暂不可用，请稍后再试';
+    }
+    return '完整视频准备中，可先使用下方互动版播放';
+  }, [mp4Ready, mp4Rendering, renderProgress, renderStatus, renderError]);
 
   const slides = useMemo(() => {
     const base = buildMovieSlides(movieTitle, familyName, chapters);
@@ -161,7 +179,7 @@ export default function MoviePlayPage() {
     if (renderStatus === 'ready' && mediaUrl) return null;
     if (renderStatus === 'queued' || renderStatus === 'rendering') {
       const pct = renderProgress?.percent ? ` ${renderProgress.percent}%` : '';
-      return renderProgress?.message || `正在生成完整 MP4${pct}…`;
+      return renderProgress?.message || `正在生成完整视频${pct}…`;
     }
     if (renderStatus === 'failed' && renderError) {
       return renderError;
@@ -193,6 +211,10 @@ export default function MoviePlayPage() {
 
   const closeHref = appreciate ? '/movies?appreciate=1' : '/movies';
 
+  const handleBackFromPlayer = () => {
+    setPlayMode('select');
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center gap-3">
@@ -217,7 +239,7 @@ export default function MoviePlayPage() {
     );
   }
 
-  if (mediaUrl && renderStatus === 'ready') {
+  if (playMode === 'mp4' && mediaUrl) {
     return (
       <>
         {shareModal}
@@ -225,10 +247,45 @@ export default function MoviePlayPage() {
           mediaUrl={mediaUrl}
           title={movieTitle}
           subtitle={`${familyName} · ${chapters.length} 个故事章节`}
-          onClose={() => router.push(closeHref)}
+          onClose={handleBackFromPlayer}
           onShare={appreciate ? undefined : handleShare}
           shareLoading={shareLoading}
           appreciateMode={appreciate}
+          autoStart
+        />
+      </>
+    );
+  }
+
+  if (playMode === 'h5' && slides.length > 0) {
+    return (
+      <>
+        {shareModal}
+        {statusLine && (
+          <div
+            className={`fixed top-3 left-3 right-3 z-[210] px-3 py-2 rounded-xl text-[11px] leading-relaxed pointer-events-none ${
+              renderStatus === 'failed'
+                ? 'bg-amber-950/85 text-amber-100'
+                : 'bg-black/70 text-white/90'
+            }`}
+          >
+            {(renderStatus === 'queued' || renderStatus === 'rendering') && (
+              <span className="inline-block w-2 h-2 border border-white/40 border-t-white rounded-full animate-spin mr-1.5 align-middle" />
+            )}
+            {statusLine}
+          </div>
+        )}
+        <InteractiveStoryPlayer
+          slides={slides}
+          movieId={movieId}
+          onClose={handleBackFromPlayer}
+          onShare={appreciate ? undefined : handleShare}
+          shareLoading={shareLoading}
+          autoPlayMs={8000}
+          enableMusic
+          enableNarration
+          appreciateMode={appreciate}
+          initialStarted
         />
       </>
     );
@@ -249,35 +306,71 @@ export default function MoviePlayPage() {
     );
   }
 
+  const coverUrl = slides[0]?.photoUrl;
+
   return (
     <>
       {shareModal}
-      {statusLine && (
-        <div
-          className={`fixed top-3 left-3 right-3 z-[210] px-3 py-2 rounded-xl text-[11px] leading-relaxed pointer-events-none ${
-            renderStatus === 'failed'
-              ? 'bg-amber-950/85 text-amber-100'
-              : 'bg-black/70 text-white/90'
-          }`}
-        >
-          {(renderStatus === 'queued' || renderStatus === 'rendering') && (
-            <span className="inline-block w-2 h-2 border border-white/40 border-t-white rounded-full animate-spin mr-1.5 align-middle" />
-          )}
-          {statusLine}
+      <div className="fixed inset-0 z-[200] bg-black text-white">
+        {coverUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-35 blur-sm scale-105"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/70 to-black/90" />
+
+        <div className="relative z-10 flex flex-col min-h-full px-8 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={() => router.push(closeHref)}
+            className="self-start text-white/60 text-sm mb-8 hover:text-white/90 transition-colors"
+          >
+            ← 返回电影库
+          </button>
+
+          <div className="flex-1 flex flex-col items-center justify-center text-center max-w-sm mx-auto w-full">
+            <p className="text-xs tracking-[0.25em] text-[#D98A45] mb-3">人生电影</p>
+            <h1 className="text-2xl font-serif font-medium mb-2 leading-snug">{movieTitle}</h1>
+            <p className="text-sm text-white/55 mb-10">
+              {familyName} · {chapters.length} 个故事章节
+            </p>
+
+            <div className="w-full flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  primeAudioInUserGesture();
+                  if (mp4Ready) setPlayMode('mp4');
+                }}
+                disabled={!mp4Ready}
+                className="w-full py-4 rounded-2xl bg-[#D98A45] text-white font-medium text-base shadow-lg shadow-[#D98A45]/25 active:scale-[0.98] transition-transform disabled:opacity-55 disabled:shadow-none"
+              >
+                沉浸式欣赏
+              </button>
+              <p className="text-[11px] text-white/45 -mt-1 mb-1 px-2 leading-relaxed">
+                {immersiveHint}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => {
+                  primeAudioInUserGesture();
+                  setPlayMode('h5');
+                }}
+                className="w-full py-4 rounded-2xl border border-white/25 bg-white/10 text-white font-medium text-base backdrop-blur-sm active:scale-[0.98] transition-transform"
+              >
+                开始播放
+              </button>
+              <p className="text-[11px] text-white/45 px-2 leading-relaxed">
+                互动版 · 配乐 · 旁白 · 自动翻页
+              </p>
+            </div>
+          </div>
         </div>
-      )}
-      <InteractiveStoryPlayer
-        slides={slides}
-        movieId={movieId}
-        onClose={() => router.push(closeHref)}
-        onShare={appreciate ? undefined : handleShare}
-        shareLoading={shareLoading}
-        autoPlayMs={8000}
-        enableMusic
-        enableNarration
-        appreciateMode={appreciate}
-        autoStart
-      />
+      </div>
     </>
   );
 }

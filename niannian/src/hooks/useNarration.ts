@@ -214,11 +214,11 @@ export function useNarration({
         });
     };
 
-    // 有 movieId 时走服务端合成（命中磁盘缓存即秒回），避免 manifest 未刷新或静态 404
-    if (movieId && slideId && text) {
-      requestSynthesize();
-    } else if (audioUrl) {
+    // 优先播放已生成的旁白文件，失败再走服务端合成
+    if (audioUrl) {
       playUrl(audioUrl);
+    } else if (movieId && slideId && text) {
+      requestSynthesize();
     } else {
       requestSynthesize();
     }

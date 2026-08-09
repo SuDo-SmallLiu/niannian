@@ -22,53 +22,13 @@ export default function GlobalNianNianAgent() {
   const [pipeline, setPipeline] = useState<AgentPipeline | null>(null);
   const [bubbleVisible, setBubbleVisible] = useState(true);
 
-  const [analyzeProgress, setAnalyzeProgress] = useState<{
-    completed: number;
-    total: number;
-    active: number;
-    failed: number;
-  } | null>(null);
-
   const page = resolveAgentPage(pathname);
   const familyIdFromPath = pathname.match(/\/family\/([^/]+)/)?.[1];
-  const analyzeFamilyId = pathname.match(/\/family\/([^/]+)\/analyze/)?.[1];
 
   useEffect(() => {
     setHelpOpen(false);
     setBubbleVisible(true);
   }, [pathname]);
-
-  useEffect(() => {
-    if (!analyzeFamilyId || page !== 'analyze') {
-      setAnalyzeProgress(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/analyze?familyId=${analyzeFamilyId}`);
-        const data = await res.json();
-        if (cancelled || data.status === 'unknown') return;
-        setAnalyzeProgress({
-          completed: data.completed ?? 0,
-          total: data.total ?? 0,
-          active: data.active ?? 0,
-          failed: data.failed ?? 0,
-        });
-      } catch {
-        /* ignore */
-      }
-    };
-
-    poll();
-    const timer = setInterval(poll, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [analyzeFamilyId, page]);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,31 +52,6 @@ export default function GlobalNianNianAgent() {
     };
   }, [pathname, familyIdFromPath]);
 
-  // 解析完成后立即刷新该家庭的进度，避免仍显示第 2 步或误跳第 5 步
-  useEffect(() => {
-    if (!analyzeFamilyId || !analyzeProgress) return;
-    if (analyzeProgress.active > 0) return;
-    if (analyzeProgress.total <= 0) return;
-    if (analyzeProgress.completed + analyzeProgress.failed < analyzeProgress.total) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(
-          `/api/agent/context?familyId=${encodeURIComponent(analyzeFamilyId)}`
-        );
-        const data = await res.json();
-        if (!cancelled && data.pipeline) setPipeline(data.pipeline);
-      } catch {
-        /* ignore */
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [analyzeFamilyId, analyzeProgress]);
-
   const mergedPipeline = useMemo((): AgentPipeline | null => {
     if (!pipeline) return null;
     return {
@@ -139,25 +74,34 @@ export default function GlobalNianNianAgent() {
         needsSupplementCount: mergedPipeline?.needsSupplementCount,
         itemCompletion: agentCtx?.override.itemCompletion,
         itemLabel: agentCtx?.override.itemLabel,
-        analyzeProgress: page === 'analyze' ? analyzeProgress : null,
       }),
-    [mergedPipeline, page, appreciate, familyIdFromPath, analyzeProgress, agentCtx?.override]
+    [mergedPipeline, page, appreciate, familyIdFromPath, agentCtx?.override]
   );
 
   const bubbleText = useMemo(() => {
-    if (page === 'analyze' && analyzeProgress && !appreciate) {
-      return getAnalyzeProgressMessage(
-        analyzeProgress.completed,
-        analyzeProgress.total,
-        analyzeProgress.active,
-        analyzeProgress.failed
-      );
+    if (page === 'analyze' && !appreciate) {
+      const total = agentCtx?.override.photoCount ?? 0;
+      const completed = agentCtx?.override.analyzedCount ?? 0;
+      const active = agentCtx?.override.analyzeActive ?? 0;
+      const failed = agentCtx?.override.analyzeFailed ?? 0;
+      if (total > 0) {
+        return getAnalyzeProgressMessage(completed, total, active, failed);
+      }
     }
     return agentEvent.message;
-  }, [page, analyzeProgress, appreciate, agentEvent.message]);
+  }, [page, appreciate, agentEvent.message, agentCtx?.override]);
 
   const isFullscreen = page === 'display' || page === 'share';
   const avatarSize = appreciate ? 88 : 80;
+
+  /** 页面底部有固定操作栏时，抬高念念避免被遮挡 */
+  const hasBottomActionBar =
+    page === 'edit' || page === 'compose' || (page === 'memory' && pathname.includes('/photos'));
+  const floatBottomClass = isFullscreen
+    ? 'bottom-[max(5.5rem,env(safe-area-inset-bottom))]'
+    : hasBottomActionBar
+      ? 'bottom-44'
+      : 'bottom-24';
 
   if (pathname === '/' || pathname === '/profile') {
     return null;
@@ -194,19 +138,16 @@ export default function GlobalNianNianAgent() {
         onClose={() => setHelpOpen(false)}
         pipeline={mergedPipeline}
         currentStep={agentEvent.stepIndex}
-        agentRole={agentEvent.agentRole}
       />
 
       <div
-        className={`fixed right-4 z-30 flex flex-col items-end gap-2 pointer-events-none ${
-          isFullscreen ? 'bottom-[max(5.5rem,env(safe-area-inset-bottom))]' : 'bottom-20'
-        }`}
+        className={`niannian-agent-float fixed right-4 flex flex-col items-end gap-2 pointer-events-none ${floatBottomClass}`}
       >
         {bubbleVisible && bubbleText && (
           <button
             type="button"
             onClick={handleBubbleClick}
-            className="niannian-bubble-soft max-w-[260px] rounded-2xl rounded-br-md px-3.5 py-2.5 text-left pointer-events-auto active:scale-[0.98] transition-transform"
+            className="niannian-bubble-soft max-w-[260px] rounded-2xl rounded-br-md px-3.5 py-2.5 text-left pointer-events-auto active:scale-[0.98] transition-transform relative z-[1]"
           >
             <p className="text-[10px] text-[#D98A45] font-medium mb-1">
               第 {agentEvent.stepIndex} 步 · {agentEvent.stepTitle}
@@ -220,7 +161,7 @@ export default function GlobalNianNianAgent() {
           onClick={handleAvatarClick}
           size={avatarSize}
           ariaLabel={appreciate ? '点我去创造' : '念念帮助台'}
-          className="pointer-events-auto"
+          className="pointer-events-auto relative z-[2]"
         />
 
         {!appreciate && bubbleVisible && (

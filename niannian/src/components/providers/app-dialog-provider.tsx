@@ -93,7 +93,8 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
-              onClick={() => {
+              onClick={(event) => {
+                event.preventDefault();
                 confirmState?.resolve(false);
                 setConfirmState(null);
               }}
@@ -102,7 +103,8 @@ export function AppDialogProvider({ children }: { children: React.ReactNode }) {
             </AlertDialogCancel>
             <AlertDialogAction
               className={confirmState?.destructive ? 'bg-destructive hover:bg-[#A03030]' : undefined}
-              onClick={() => {
+              onClick={(event) => {
+                event.preventDefault();
                 confirmState?.resolve(true);
                 setConfirmState(null);
               }}

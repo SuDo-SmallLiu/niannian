@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import FamilySectionTabs from '@/components/FamilySectionTabs';
+import PageShell from '@/components/PageShell';
+import PageHero from '@/components/PageHero';
 import PipelineSteps from '@/components/PipelineSteps';
 
 interface FamilyInfo {
@@ -37,15 +39,12 @@ export default function FamilyPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F4ED]">
-      <main className="flex-1 px-6 pt-6 pb-24">
-        <FamilySectionTabs />
+    <PageShell>
+      <FamilySectionTabs />
 
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-serif text-[#4B3B2F] mb-2">我的主题</h1>
-          <p className="text-sm text-[#B8A898] mb-4">按家庭主题组织记忆卡</p>
-          <PipelineSteps active={1} compact />
-        </div>
+      <PageHero title="我的主题" subtitle="按家庭主题组织记忆卡">
+        <PipelineSteps active={1} compact />
+      </PageHero>
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -104,7 +103,6 @@ export default function FamilyPage() {
             </button>
           </>
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }

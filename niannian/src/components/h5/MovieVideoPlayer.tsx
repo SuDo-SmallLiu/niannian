@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, Pause, Play, Share2, Volume2, VolumeX, X } from 'lucide-react';
 
 interface MovieVideoPlayerProps {
@@ -12,6 +12,8 @@ interface MovieVideoPlayerProps {
   shareLoading?: boolean;
   showClose?: boolean;
   appreciateMode?: boolean;
+  /** 跳过片头「开始播放」遮罩并自动开播 */
+  autoStart?: boolean;
 }
 
 export default function MovieVideoPlayer({
@@ -23,11 +25,12 @@ export default function MovieVideoPlayer({
   shareLoading = false,
   showClose = true,
   appreciateMode = false,
+  autoStart = false,
 }: MovieVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(autoStart);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -48,6 +51,11 @@ export default function MovieVideoPlayer({
     setStarted(true);
     void v.play().then(() => setPlaying(true)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!autoStart) return;
+    handleStart();
+  }, [autoStart, handleStart, mediaUrl]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black flex flex-col">
@@ -74,9 +82,9 @@ export default function MovieVideoPlayer({
             onClick={handleStart}
             className="px-10 py-4 rounded-full bg-[#D98A45] text-white font-medium text-lg shadow-lg active:scale-95 transition-transform"
           >
-            ▶ 开始播放
+            开始播放
           </button>
-          <p className="text-white/40 text-xs mt-4">已混音完整版 · 含 BGM 与旁白</p>
+          <p className="text-white/40 text-xs mt-4">已混音完整版 · 含配乐与旁白</p>
         </div>
       )}
 

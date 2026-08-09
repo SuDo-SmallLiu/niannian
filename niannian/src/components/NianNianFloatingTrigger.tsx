@@ -20,9 +20,9 @@ export default function NianNianFloatingTrigger({
     <button
       type="button"
       onClick={onClick}
-      className={`bg-transparent border-0 p-0 shadow-none active:scale-95 transition-transform animate-breathe ${className}`}
+      className={`bg-transparent border-0 p-0 shadow-none active:scale-95 transition-transform animate-breathe touch-manipulation ${className}`}
       aria-label={ariaLabel}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, minWidth: 44, minHeight: 44 }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

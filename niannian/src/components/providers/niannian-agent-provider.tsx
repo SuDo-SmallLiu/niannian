@@ -23,7 +23,10 @@ type AgentOverride = Partial<
     | 'storyCount'
     | 'movieCount'
   >
->;
+> & {
+  analyzeActive?: number;
+  analyzeFailed?: number;
+};
 
 interface NianNianAgentContextValue {
   override: AgentOverride;
@@ -42,7 +45,9 @@ function overridesEqual(a: AgentOverride, b: AgentOverride): boolean {
     a.analyzedCount === b.analyzedCount &&
     a.photoCount === b.photoCount &&
     a.storyCount === b.storyCount &&
-    a.movieCount === b.movieCount
+    a.movieCount === b.movieCount &&
+    a.analyzeActive === b.analyzeActive &&
+    a.analyzeFailed === b.analyzeFailed
   );
 }
 
@@ -91,6 +96,8 @@ export function useNianNianAgentOverride(next: AgentOverride) {
     next.photoCount,
     next.storyCount,
     next.movieCount,
+    next.analyzeActive,
+    next.analyzeFailed,
   ]);
 }
 

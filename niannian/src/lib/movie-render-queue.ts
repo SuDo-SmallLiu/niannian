@@ -20,7 +20,7 @@ export function scheduleMovieRender(movieId: string, options: { retry?: boolean 
 
   const movie = getLifeMovie(movieId);
   if (!movie) return false;
-  if (movie.render_status === 'ready' && movie.media_url) return false;
+  if (movie.render_status === 'ready' && movie.media_url && !options.retry) return false;
   if (movie.render_status === 'failed' && !options.retry) return false;
 
   rendering.add(movieId);
@@ -29,7 +29,7 @@ export function scheduleMovieRender(movieId: string, options: { retry?: boolean 
     error: '',
     progress: createRenderProgress({
       phase: 'queued',
-      message: options.retry ? '正在重新生成 MP4…' : '渲染任务排队中，等待旁白生成…',
+      message: options.retry ? '正在重新生成完整视频…' : '渲染任务排队中，等待旁白生成…',
     }),
   });
 

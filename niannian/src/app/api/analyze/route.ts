@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPhotosByFamily, getFamily, getPhoto } from '@/lib/db';
-import {
-  clearAnalysisJob,
-  getAnalysisJob,
-  summarizeJob,
-} from '@/lib/photo-analysis-job';
+import { buildAnalysisStatusFromDb } from '@/lib/analysis-db-status';
+import { cleanupStaleAnalysisJobs, getAnalysisJob, summarizeJob } from '@/lib/photo-analysis-job';
 import { runFamilyPhotoAnalysis } from '@/services/photo-batch-analysis.service';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
@@ -56,11 +53,51 @@ export async function GET(request: NextRequest) {
 
     await requireFamilyAccess(request, familyId);
 
-  const job = getAnalysisJob(familyId);
+    cleanupStaleAnalysisJobs();
+    const job = getAnalysisJob(familyId);
 
-  if (!job) {
-    return NextResponse.json({ status: 'unknown' });
-  }
+    if (!job) {
+      const fromDb = buildAnalysisStatusFromDb(familyId);
+      if (!fromDb) {
+        return NextResponse.json({ status: 'unknown' });
+      }
+      if (fromDb.status === 'done') {
+        return NextResponse.json({
+          status: 'done',
+          redirectTo: fromDb.redirectTo,
+          total: fromDb.total,
+          completed: fromDb.completed,
+          failed: fromDb.failed,
+          active: fromDb.active,
+          pending: fromDb.pending,
+          progress: fromDb.progress,
+          photos: fromDb.photos,
+        });
+      }
+      if (fromDb.status === 'error') {
+        return NextResponse.json({
+          status: 'error',
+          message: '部分照片解析失败，可单独重试',
+          total: fromDb.total,
+          completed: fromDb.completed,
+          failed: fromDb.failed,
+          active: fromDb.active,
+          pending: fromDb.pending,
+          progress: fromDb.progress,
+          photos: fromDb.photos,
+        });
+      }
+      return NextResponse.json({
+        status: 'processing',
+        total: fromDb.total,
+        completed: fromDb.completed,
+        failed: fromDb.failed,
+        active: fromDb.active,
+        pending: fromDb.pending,
+        progress: fromDb.progress,
+        photos: fromDb.photos,
+      });
+    }
 
   const summary = summarizeJob(job);
   const photos = job.photos.map((task) => {
@@ -74,25 +111,21 @@ export async function GET(request: NextRequest) {
   });
 
   if (job.status === 'done') {
-    const payload = {
+    return NextResponse.json({
       status: 'done',
       redirectTo: `/family/${familyId}/photos`,
       ...summary,
       photos,
-    };
-    clearAnalysisJob(familyId);
-    return NextResponse.json(payload);
+    });
   }
 
   if (job.status === 'error') {
-    const payload = {
+    return NextResponse.json({
       status: 'error',
       message: '部分照片解析失败，可单独重试',
       ...summary,
       photos,
-    };
-    clearAnalysisJob(familyId);
-    return NextResponse.json(payload);
+    });
   }
 
   return NextResponse.json({

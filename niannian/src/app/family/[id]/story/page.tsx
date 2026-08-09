@@ -61,14 +61,13 @@ export default function StoryPage() {
   const [regenerateError, setRegenerateError] = useState('');
   const [regenerateSuccess, setRegenerateSuccess] = useState('');
   const [confirmStory, setConfirmStory] = useState<StoryItem | null>(null);
-  const [deleteStoryTarget, setDeleteStoryTarget] = useState<StoryItem | null>(null);
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
   const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
   const [editDetail, setEditDetail] = useState<StoryEditDetail | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [publishingStoryId, setPublishingStoryId] = useState<string | null>(null);
   const { openSharePoster, modal: shareModal } = useSharePoster();
-  const { showLoading, hideLoading } = useAppDialog();
+  const { showLoading, hideLoading, confirm, alert } = useAppDialog();
   const { generateStories, generating: autoGenerating, error: autoGenerateError } =
     useAutoGenerateFamilyStory(familyId);
 
@@ -211,6 +210,8 @@ export default function StoryPage() {
 
   const handleDeleteStory = async (story: StoryItem) => {
     setDeletingStoryId(story.id);
+    setRegenerateError('');
+    showLoading('正在删除', `移除「${story.title}」…`);
     try {
       const res = await fetch(`/api/story?storyId=${story.id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -218,13 +219,30 @@ export default function StoryPage() {
       setStories((prev) => prev.filter((s) => s.id !== story.id));
       if (storyId === story.id) {
         window.location.href = `/family/${familyId}/story`;
+        return;
       }
+      setRegenerateSuccess(`已删除「${story.title}」`);
+      window.setTimeout(() => setRegenerateSuccess(''), 4000);
     } catch (err) {
-      setRegenerateError(err instanceof Error ? err.message : '删除失败');
+      const message = err instanceof Error ? err.message : '删除失败';
+      setRegenerateError(message);
+      await alert({ title: '删除失败', description: message });
     } finally {
+      hideLoading();
       setDeletingStoryId(null);
-      setDeleteStoryTarget(null);
     }
+  };
+
+  const requestDeleteStory = async (story: StoryItem) => {
+    const ok = await confirm({
+      title: '删除这个故事？',
+      description: `将永久删除「${story.title}」，此操作不可恢复。`,
+      confirmText: '确认删除',
+      cancelText: '取消',
+      destructive: true,
+    });
+    if (!ok) return;
+    await handleDeleteStory(story);
   };
 
   const startEditStory = async (story: StoryItem) => {
@@ -347,31 +365,6 @@ export default function StoryPage() {
         </AlertDialog>
       )}
 
-      {deleteStoryTarget && (
-        <AlertDialog open onOpenChange={(open) => !open && setDeleteStoryTarget(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>删除这个故事？</AlertDialogTitle>
-              <AlertDialogDescription>
-                将永久删除「{deleteStoryTarget.title}」，此操作不可恢复。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeleteStoryTarget(null)}>取消</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-destructive hover:bg-[#A03030]"
-                onClick={() => {
-                  const target = deleteStoryTarget;
-                  void handleDeleteStory(target);
-                }}
-              >
-                确认删除
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-
       {/* 顶部 */}
       <div className="flex items-center justify-between mb-8">
         <Link
@@ -478,7 +471,7 @@ export default function StoryPage() {
                 onViewDetail={() => router.push(`/stories/${story.id}`)}
                 onPublish={() => handlePublishStory(story)}
                 onShare={() => handleSharePoster(story)}
-                onDelete={() => setDeleteStoryTarget(story)}
+                onDelete={() => void requestDeleteStory(story)}
                 deleting={deletingStoryId === story.id}
               />
             )}

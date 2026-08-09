@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import FamilySectionTabs from '@/components/FamilySectionTabs';
+import PageShell from '@/components/PageShell';
+import PageHero from '@/components/PageHero';
 import GlobalMemoryFilterBar, {
   defaultGlobalMemoryFilters,
   type GlobalMemoryFilters,
@@ -161,18 +163,16 @@ export default function AllMemoriesPage() {
   });
 
   return (
-    <div className={`min-h-screen bg-[#F8F4ED] px-6 pt-6 pb-24 ${appreciate ? 'text-lg' : ''}`}>
+    <PageShell className={appreciate ? 'text-lg' : ''} showHeader={!appreciate}>
       {!appreciate && <FamilySectionTabs />}
 
-      <div className="text-center mb-6 animate-fade-in-up">
-        <h1 className={`font-serif text-[#4B3B2F] mb-1 ${appreciate ? 'text-3xl' : 'text-2xl'}`}>
-          {appreciate ? '家庭照片' : '全部记忆'}
-        </h1>
-        <p className="text-sm text-[#B8A898] mb-3">
-          {appreciate ? '翻阅珍贵瞬间' : '跨主题浏览你的记忆卡'}
-        </p>
+      <PageHero
+        title={appreciate ? '家庭照片' : '全部记忆'}
+        subtitle={appreciate ? '翻阅珍贵瞬间' : '跨主题浏览你的记忆卡'}
+        large={appreciate}
+      >
         {!appreciate && <PipelineSteps active={1} compact />}
-      </div>
+      </PageHero>
 
       <GlobalMemoryFilterBar
         draft={draft}
@@ -310,6 +310,6 @@ export default function AllMemoriesPage() {
           </Link>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import NavShell from '@/components/NavShell';
 import AppProviders from '@/components/providers/app-providers';
+import { notoSansSC, notoSerifSC } from '@/lib/fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -14,19 +15,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="min-h-screen antialiased bg-[var(--bg-primary)]">
+    <html
+      lang="zh-CN"
+      className={`${notoSansSC.variable} ${notoSerifSC.variable}`}
+      suppressHydrationWarning
+    >
+      <body
+        className={`${notoSansSC.className} min-h-screen antialiased bg-[var(--bg-primary)] text-[var(--text-primary)]`}
+      >
         <AppProviders>
-          <div className="min-h-screen flex flex-col max-w-md mx-auto bg-[var(--bg-primary)] relative">
-            <main className="flex-1">{children}</main>
+          <div className="app-shell">
+            <main className="app-shell__main">{children}</main>
             <NavShell />
           </div>
         </AppProviders>

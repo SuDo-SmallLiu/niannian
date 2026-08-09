@@ -178,6 +178,27 @@ export function createArkClient(apiKey: string, baseURL: string): OpenAI {
   return new OpenAI({ apiKey, baseURL });
 }
 
+const AI_REQUEST_TIMEOUT_MS = 120_000;
+
+function withAiTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label}超时（${AI_REQUEST_TIMEOUT_MS / 1000} 秒），请稍后重试`)),
+      AI_REQUEST_TIMEOUT_MS
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 export async function chatWithModelFallback(
   client: OpenAI,
   models: string[],
@@ -192,7 +213,10 @@ export async function chatWithModelFallback(
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     try {
-      const response = await client.chat.completions.create({ ...params, model });
+      const response = await withAiTimeout(
+        client.chat.completions.create({ ...params, model }),
+        'AI 请求'
+      );
       if (i > 0) {
         console.warn(`⚠️ 主模型 ${models[0]} 不可用，已自动切换至 ${model}`);
       }

@@ -16,8 +16,20 @@ export interface FamilyAnalysisJob {
 }
 
 const jobs = new Map<string, FamilyAnalysisJob>();
+/** 完成后保留一段时间，避免多客户端轮询竞态导致 UI 卡在「解析中」 */
+const TTL_MS = 30 * 60 * 1000;
+
+export function cleanupStaleAnalysisJobs(): void {
+  const now = Date.now();
+  for (const [familyId, job] of jobs) {
+    if (now - job.updatedAt > TTL_MS) {
+      jobs.delete(familyId);
+    }
+  }
+}
 
 export function getAnalysisJob(familyId: string): FamilyAnalysisJob | undefined {
+  cleanupStaleAnalysisJobs();
   return jobs.get(familyId);
 }
 

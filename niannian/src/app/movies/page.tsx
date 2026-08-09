@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
+import PageShell from '@/components/PageShell';
+import PageHero from '@/components/PageHero';
 import PipelineSteps from '@/components/PipelineSteps';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import { useSharePoster } from '@/hooks/useSharePoster';
-import { Film, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 
 interface LifeMovie {
   id: string;
@@ -133,20 +135,15 @@ export default function MoviesPage() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col bg-[#1a1612] text-white ${appreciate ? 'text-lg' : ''}`}>
+    <PageShell dark className={appreciate ? 'text-lg' : ''}>
       {shareModal}
-      <Header dark />
-      <main className="flex-1 px-6 py-8 pb-24">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#D98A45]/20 mb-4">
-            <Film className="w-7 h-7 text-[#D98A45]" />
-          </div>
-          <h1 className={`font-serif mb-2 ${appreciate ? 'text-3xl' : 'text-2xl'}`}>人生电影</h1>
-          <p className="text-sm text-white/50 mb-3">
-            {appreciate ? '自动播放 · 配乐旁白' : 'Story → Movie · 配乐旁白自动播放'}
-          </p>
-          {!appreciate && <PipelineSteps active={3} compact dark />}
-        </div>
+      <PageHero
+        title="人生电影"
+        subtitle={appreciate ? '自动播放 · 配乐旁白' : '故事成片 · 配乐旁白自动播放'}
+        large={appreciate}
+      >
+        {!appreciate && <PipelineSteps active={3} compact dark />}
+      </PageHero>
 
         {loading ? (
           <div className="flex justify-center py-20">
@@ -233,8 +230,7 @@ export default function MoviesPage() {
             )}
           </div>
         )}
-      </main>
-    </div>
+    </PageShell>
   );
 }
 
