@@ -226,7 +226,8 @@ export default function MoviePlayPage() {
           title={movieTitle}
           subtitle={`${familyName} · ${chapters.length} 个故事章节`}
           onClose={() => router.push(closeHref)}
-          onShare={appreciate || shareLoading ? undefined : handleShare}
+          onShare={appreciate ? undefined : handleShare}
+          shareLoading={shareLoading}
           appreciateMode={appreciate}
         />
       </>
@@ -269,7 +270,8 @@ export default function MoviePlayPage() {
         slides={slides}
         movieId={movieId}
         onClose={() => router.push(closeHref)}
-        onShare={appreciate || shareLoading ? undefined : handleShare}
+        onShare={appreciate ? undefined : handleShare}
+        shareLoading={shareLoading}
         autoPlayMs={8000}
         enableMusic
         enableNarration

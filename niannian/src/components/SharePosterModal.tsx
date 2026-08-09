@@ -28,18 +28,19 @@ export default function SharePosterModal({ open, onClose, poster }: SharePosterM
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [saveHint, setSaveHint] = useState('');
-
-  const filename = poster ? posterFilename(poster.type) : '';
+  const [filename, setFilename] = useState('');
 
   const buildPoster = useCallback(async () => {
     if (!poster) return;
+    const fname = posterFilename(poster.type);
+    setFilename(fname);
     setGenerating(true);
     setError('');
     setSaveHint('');
     try {
       const url = await generateSharePoster(poster);
       setPosterUrl(url);
-      const result = await saveOrSharePoster(url, poster.title, filename);
+      const result = await saveOrSharePoster(url, poster.title, fname);
       if (result === 'shared') setSaveHint('已打开分享，请选择微信');
       else if (result === 'downloaded') setSaveHint('海报已自动保存');
       else setSaveHint('长按海报可保存到相册');
@@ -48,7 +49,7 @@ export default function SharePosterModal({ open, onClose, poster }: SharePosterM
     } finally {
       setGenerating(false);
     }
-  }, [poster, filename]);
+  }, [poster]);
 
   useEffect(() => {
     if (open && poster) {

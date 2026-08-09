@@ -9,6 +9,7 @@ interface MovieVideoPlayerProps {
   subtitle?: string;
   onClose?: () => void;
   onShare?: () => void;
+  shareLoading?: boolean;
   showClose?: boolean;
   appreciateMode?: boolean;
 }
@@ -19,6 +20,7 @@ export default function MovieVideoPlayer({
   subtitle,
   onClose,
   onShare,
+  shareLoading = false,
   showClose = true,
   appreciateMode = false,
 }: MovieVideoPlayerProps) {
@@ -104,10 +106,15 @@ export default function MovieVideoPlayer({
             <button
               type="button"
               onClick={onShare}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white"
+              disabled={shareLoading}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white disabled:opacity-50 touch-manipulation"
               aria-label="分享"
             >
-              <Share2 className="w-5 h-5" />
+              {shareLoading ? (
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Share2 className="w-5 h-5" />
+              )}
             </button>
           )}
         </div>

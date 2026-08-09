@@ -2,10 +2,10 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { PRESET_MEMBERS } from '@/lib/family-members';
 import PipelineSteps from '@/components/PipelineSteps';
 import HomeWelcomeHero from '@/components/HomeWelcomeHero';
+import HomeFeatureCards from '@/components/HomeFeatureCards';
 import HomeLoginPanel from '@/components/HomeLoginPanel';
 import NianNianHelpDesk from '@/components/NianNianHelpDesk';
 import { useAuth } from '@/components/providers/auth-provider';
@@ -109,16 +109,16 @@ function HomePageContent() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#F8F4ED] pb-8">
-        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} compact />
+      <div className="min-h-[100dvh] flex flex-col bg-[#F8F4ED] overflow-hidden">
+        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} compact showGuideTitle={false} />
         <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
-        <div className="w-full max-w-sm mx-auto px-5 -mt-2">
+        <div className="relative z-10 w-full max-w-sm mx-auto px-5 pb-6 shrink-0">
           {redirect !== '/' && (
-            <p className="text-center text-sm text-[#8B7355] mb-3 bg-[#FFF8F0] border border-[#E8DCC8] rounded-xl py-2.5">
+            <p className="text-center text-sm text-[#8B7355] mb-3 bg-[#FFF8F0]/90 border border-[#E8DCC8] rounded-xl py-2.5">
               登录后继续访问
             </p>
           )}
-          <div className="bg-white rounded-3xl border border-[#E8DCC8] shadow-sm p-1">
+          <div className="bg-white/95 rounded-3xl border border-[#E8DCC8] shadow-[0_4px_24px_rgba(75,59,47,0.06)] p-1 backdrop-blur-sm">
             <HomeLoginPanel redirect={redirect} compact />
           </div>
         </div>
@@ -211,27 +211,12 @@ function HomePageContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8F4ED] pb-28">
+    <div className="home-page h-[calc(100dvh-4rem)] max-h-[calc(844px-4rem)] flex flex-col bg-[#F8F4ED] overflow-hidden">
       <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
 
       <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} />
 
-      <div className="w-full max-w-xs mx-auto px-5 space-y-3 mt-auto pt-2">
-        <button
-          type="button"
-          onClick={() => setMode('create')}
-          className="w-full py-5 rounded-2xl bg-[#D98A45] text-white text-lg font-serif font-medium shadow-lg shadow-[#D98A45]/25 active:scale-[0.98] transition-transform"
-        >
-          我要创造
-        </button>
-
-        <Link
-          href="/appreciate"
-          className="block w-full py-5 rounded-2xl bg-white border border-[#E8DCC8] text-[#4B3B2F] text-lg font-serif font-medium text-center active:scale-[0.98] transition-transform"
-        >
-          我要欣赏
-        </Link>
-      </div>
+      <HomeFeatureCards onCreate={() => setMode('create')} />
     </div>
   );
 }

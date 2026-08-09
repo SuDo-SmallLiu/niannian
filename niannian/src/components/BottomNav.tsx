@@ -7,8 +7,8 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky bottom-0 bg-white/90 backdrop-blur-md border-t border-[#F0E8D8] safe-bottom z-50">
-      <div className="flex items-center justify-around h-16 px-2">
+    <nav className="home-bottom-nav sticky bottom-0 z-50 safe-bottom">
+      <div className="home-bottom-nav__inner flex items-center justify-around h-16 px-1">
         <NavItem icon="🏠" label="首页" href="/" pathname={pathname} />
         <NavItem icon="🃏" label="记忆" href="/family/memories" pathname={pathname} />
         <NavItem icon="📖" label="故事" href="/stories" pathname={pathname} />
@@ -40,12 +40,12 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-colors ${
-        isActive ? 'text-[#D98A45]' : 'text-[#B8A898] hover:text-[#8B7355]'
+      className={`home-bottom-nav__item flex flex-col items-center gap-0.5 px-2 py-1 min-w-[3.25rem] transition-all ${
+        isActive ? 'home-bottom-nav__item--active' : ''
       }`}
     >
-      <span className="text-xl">{icon}</span>
-      <span className={`text-[10px] ${isActive ? 'font-medium' : ''}`}>{label}</span>
+      <span className={`text-xl leading-none ${isActive ? 'scale-110' : 'opacity-80'}`}>{icon}</span>
+      <span className="text-[10px] leading-tight">{label}</span>
     </Link>
   );
 }

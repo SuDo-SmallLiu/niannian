@@ -12,6 +12,7 @@ interface InteractiveStoryPlayerProps {
   slides: H5Slide[];
   onClose?: () => void;
   onShare?: () => void;
+  shareLoading?: boolean;
   autoPlayMs?: number;
   showClose?: boolean;
   enableMusic?: boolean;
@@ -27,6 +28,7 @@ export default function InteractiveStoryPlayer({
   slides,
   onClose,
   onShare,
+  shareLoading = false,
   autoPlayMs = 6000,
   showClose = true,
   enableMusic = true,
@@ -330,15 +332,20 @@ export default function InteractiveStoryPlayer({
               {onShare && (
                 <button
                   type="button"
+                  disabled={shareLoading}
                   onClick={(e) => {
                     e.stopPropagation();
                     unlockAudio();
                     onShare();
                   }}
-                  className="w-11 h-11 rounded-full bg-black/40 flex items-center justify-center touch-manipulation"
+                  className="w-11 h-11 rounded-full bg-black/40 flex items-center justify-center touch-manipulation disabled:opacity-50"
                   aria-label="分享"
                 >
-                  <Share2 className="w-4 h-4" />
+                  {shareLoading ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Share2 className="w-4 h-4" />
+                  )}
                 </button>
               )}
             </>
