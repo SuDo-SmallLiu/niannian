@@ -15,19 +15,21 @@ async function waitForNarrationPrefetch(movieId: string, maxWaitMs = 600_000): P
 }
 
 /** 后台渲染人生电影 MP4（幂等；旁白 prefetch 进行中时会等待；全局同时仅 1 个） */
-export function scheduleMovieRender(movieId: string): boolean {
+export function scheduleMovieRender(movieId: string, options: { retry?: boolean } = {}): boolean {
   if (rendering.has(movieId) || globalRenderActive) return false;
 
   const movie = getLifeMovie(movieId);
   if (!movie) return false;
   if (movie.render_status === 'ready' && movie.media_url) return false;
+  if (movie.render_status === 'failed' && !options.retry) return false;
 
   rendering.add(movieId);
   globalRenderActive = true;
   updateMovieRenderStatus(movieId, 'queued', {
+    error: '',
     progress: createRenderProgress({
       phase: 'queued',
-      message: '渲染任务排队中，等待旁白生成…',
+      message: options.retry ? '正在重新生成 MP4…' : '渲染任务排队中，等待旁白生成…',
     }),
   });
 
@@ -53,5 +55,9 @@ export function isMovieRendering(movieId: string): boolean {
 
 /** 旁白预生成完成后链式触发渲染 */
 export function scheduleMovieRenderAfterNarration(movieId: string): void {
-  scheduleMovieRender(movieId);
+  scheduleMovieRender(movieId, { retry: false });
+}
+
+export function retryMovieRender(movieId: string): boolean {
+  return scheduleMovieRender(movieId, { retry: true });
 }

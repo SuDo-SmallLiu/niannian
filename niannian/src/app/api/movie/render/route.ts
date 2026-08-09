@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLifeMovie } from '@/lib/db';
 import { prepareMovieAudioPlan } from '@/lib/movie-render';
-import { scheduleMovieRender, isMovieRendering } from '@/lib/movie-render-queue';
+import { scheduleMovieRender, retryMovieRender, isMovieRendering } from '@/lib/movie-render-queue';
 import { parseMovieAudioPlan } from '@/lib/movie-audio-plan';
 import { parseMovieRenderProgress } from '@/lib/movie-render-progress';
 import { requireMovieAccess, familyAccessErrorResponse } from '@/lib/family-access';
@@ -61,9 +61,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { movieId, preparePlanOnly } = body as {
+    const { movieId, preparePlanOnly, retry } = body as {
       movieId?: string;
       preparePlanOnly?: boolean;
+      retry?: boolean;
     };
 
     if (!movieId) {
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const started = scheduleMovieRender(movieId);
+    const started = retry ? retryMovieRender(movieId) : scheduleMovieRender(movieId, { retry: movie.render_status === 'failed' });
     return NextResponse.json({
       success: true,
       renderStatus: started ? 'queued' : movie.render_status,

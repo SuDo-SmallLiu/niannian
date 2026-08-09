@@ -24,6 +24,7 @@ import {
 } from '@/lib/db';
 import { generateMovieNarrations } from '@/lib/narration-tts';
 import { createRenderProgress } from '@/lib/movie-render-progress';
+import { sanitizeRenderError } from '@/lib/movie-render-error';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,7 +34,9 @@ const RENDER_TMP = path.join(PROJECT_ROOT, '.cache', 'movie-render');
 
 const OUTPUT_WIDTH = 1080;
 const OUTPUT_HEIGHT = 1920;
-const FPS = 30;
+const FPS = 24;
+const MAX_SEGMENT_SEC = 45;
+const MIN_SEGMENT_SEC = 3.5;
 
 export type MovieRenderStatus = 'none' | 'queued' | 'rendering' | 'ready' | 'failed';
 
@@ -61,17 +64,25 @@ function getSlideImagePath(slide: H5Slide): string | null {
   return fs.existsSync(filePath) ? filePath : null;
 }
 
-async function runFfmpeg(args: string[], timeoutMs = 600_000): Promise<void> {
+async function runFfmpeg(args: string[], timeoutMs = 120_000): Promise<void> {
   try {
     await execFileAsync('ffmpeg', args, {
       timeout: timeoutMs,
-      maxBuffer: 8 * 1024 * 1024,
+      maxBuffer: 2 * 1024 * 1024,
     });
   } catch (err: unknown) {
-    const execErr = err as { stderr?: string; message?: string };
+    const execErr = err as { stderr?: string; message?: string; killed?: boolean };
     const detail = (execErr.stderr || execErr.message || 'ffmpeg failed').trim();
-    throw new Error(detail.slice(-600));
+    if (execErr.killed || /SIGTERM|timed out/i.test(detail)) {
+      throw new Error('FFmpeg 渲染超时');
+    }
+    throw new Error(detail.slice(-400));
   }
+}
+
+function clampSegmentSec(durationMs: number): number {
+  const sec = durationMs / 1000;
+  return Math.min(MAX_SEGMENT_SEC, Math.max(MIN_SEGMENT_SEC, sec));
 }
 
 /** 单张幻灯片 → 带 Ken Burns + BGM + 旁白 amix 的 MP4 片段 */
@@ -83,11 +94,11 @@ async function renderSlideSegment(
 ): Promise<void> {
   ensureDir(path.dirname(outputPath));
 
-  const durationSec = segment.durationMs / 1000;
+  const durationSec = clampSegmentSec(segment.durationMs);
   const fadeInSec = segment.fadeInMs / 1000;
   const fadeOutSec = segment.fadeOutMs / 1000;
   const fadeOutStart = Math.max(0, durationSec - fadeOutSec);
-  const frames = Math.min(Math.max(1, Math.round(durationSec * FPS)), FPS * 45);
+  const frameCount = Math.max(1, Math.round(durationSec * FPS));
   const bgmVol = segment.hasNarration ? segment.duckVolume : segment.volume;
 
   const imagePath = getSlideImagePath(slide);
@@ -102,9 +113,9 @@ async function renderSlideSegment(
   const filterParts: string[] = [];
 
   if (imagePath) {
+    // 静态缩放（不用 zoompan，1080p 下快 10–50 倍且时长可控）
     filterParts.push(
-      `[0:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},` +
-        `zoompan=z='min(zoom+0.0015,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${OUTPUT_WIDTH}x${OUTPUT_HEIGHT}:fps=${FPS}[vout]`
+      `[0:v]scale=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,crop=${OUTPUT_WIDTH}:${OUTPUT_HEIGHT},fps=${FPS}[vout]`
     );
   } else {
     filterParts.push(
@@ -120,7 +131,7 @@ async function renderSlideSegment(
   let audioMap = '[bgm]';
   if (hasNarFile) {
     filterParts.push(
-      `[2:a]apad,atrim=0:${durationSec},asetpts=PTS-STARTPTS,volume=1[nar]`,
+      `[2:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=0:${durationSec},asetpts=PTS-STARTPTS,volume=1.8[nar]`,
       `[bgm][nar]amix=inputs=2:duration=first:dropout_transition=2[aout]`
     );
     audioMap = '[aout]';
@@ -157,14 +168,16 @@ async function renderSlideSegment(
     '[vout]',
     '-map',
     audioMap,
+    '-frames:v',
+    String(frameCount),
     '-t',
     String(durationSec),
     '-c:v',
     'libx264',
     '-preset',
-    'fast',
+    'ultrafast',
     '-crf',
-    '23',
+    '26',
     '-pix_fmt',
     'yuv420p',
     '-c:a',
@@ -176,7 +189,8 @@ async function renderSlideSegment(
     outputPath
   );
 
-  await runFfmpeg(args);
+  const segmentTimeoutMs = Math.min(180_000, Math.max(45_000, Math.round(durationSec * 4000 + 20_000)));
+  await runFfmpeg(args, segmentTimeoutMs);
 }
 
 async function concatSegments(segmentPaths: string[], outputPath: string): Promise<void> {
@@ -343,7 +357,7 @@ export async function renderMovieToMp4(movieId: string): Promise<MovieRenderResu
       segmentCount: segmentPaths.length,
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : '渲染失败';
+    const message = sanitizeRenderError(err instanceof Error ? err.message : '渲染失败');
     updateMovieRenderStatus(movieId, 'failed', {
       error: message,
       progress: createRenderProgress({

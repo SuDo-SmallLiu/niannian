@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import InteractiveStoryPlayer from '@/components/h5/InteractiveStoryPlayer';
 import MovieVideoPlayer from '@/components/h5/MovieVideoPlayer';
@@ -8,6 +8,7 @@ import { useSharePoster } from '@/hooks/useSharePoster';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { buildMovieSlides, type StoryH5Input } from '@/lib/h5-story-slides';
 import { getSlideNarrationText } from '@/lib/slide-narration';
+import { sanitizeRenderError } from '@/lib/movie-render-error';
 import type { MovieRenderProgress } from '@/lib/movie-render-progress';
 
 type RenderStatus = 'none' | 'queued' | 'rendering' | 'ready' | 'failed';
@@ -17,6 +18,7 @@ export default function MoviePlayPage() {
   const router = useRouter();
   const movieId = params.id as string;
   const appreciate = useAppreciateMode();
+  const renderRetrySent = useRef(false);
 
   const [movieTitle, setMovieTitle] = useState('');
   const [familyName, setFamilyName] = useState('');
@@ -34,7 +36,6 @@ export default function MoviePlayPage() {
   >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [narrationPrepDone, setNarrationPrepDone] = useState(false);
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
 
   useEffect(() => {
@@ -52,8 +53,9 @@ export default function MoviePlayPage() {
         setChapters(data.chapters || []);
         setNarration(data.narration || {});
         setMediaUrl(data.movie.media_url || null);
-        setRenderStatus((data.movie.render_status as RenderStatus) || 'none');
-        setRenderError(data.movie.render_error || '');
+        const status = (data.movie.render_status as RenderStatus) || 'none';
+        setRenderStatus(status);
+        setRenderError(sanitizeRenderError(data.movie.render_error));
 
         const urls: string[] = [];
         for (const ch of data.chapters || []) {
@@ -63,14 +65,25 @@ export default function MoviePlayPage() {
         }
         setPhotoUrls(urls);
 
-        // 无 MP4：旁白预生成完成后自动链式触发 FFmpeg（不要并行重复触发 render）
-        if (!data.movie.media_url && data.movie.render_status !== 'ready') {
-          void fetch('/api/movie/prefetch-narration', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ movieId, renderVideo: true }),
-          });
-        }
+        // 延迟触发后台任务，优先保证 H5 播放流畅
+        window.setTimeout(() => {
+          if (status === 'failed' && !renderRetrySent.current) {
+            renderRetrySent.current = true;
+            void fetch('/api/movie/render', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ movieId, retry: true }),
+            });
+            return;
+          }
+          if (!data.movie.media_url && status !== 'ready' && status !== 'rendering' && status !== 'queued') {
+            void fetch('/api/movie/prefetch-narration', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ movieId, renderVideo: true }),
+            });
+          }
+        }, 2500);
       } catch {
         setError('加载失败');
       } finally {
@@ -80,9 +93,9 @@ export default function MoviePlayPage() {
     load();
   }, [movieId]);
 
-  // 轮询渲染状态 + 旁白 manifest
   useEffect(() => {
     if (loading || error) return;
+    if (renderStatus === 'ready' && mediaUrl) return;
 
     const poll = async () => {
       try {
@@ -99,24 +112,25 @@ export default function MoviePlayPage() {
           if (movieData.movie?.render_status) {
             setRenderStatus(movieData.movie.render_status);
           }
-          if (movieData.movie?.render_error) {
-            setRenderError(movieData.movie.render_error);
+          if (movieData.movie?.render_error !== undefined) {
+            setRenderError(sanitizeRenderError(movieData.movie.render_error));
           }
         }
         if (renderRes.ok) {
           if (renderData.mediaUrl) setMediaUrl(renderData.mediaUrl);
           if (renderData.renderStatus) setRenderStatus(renderData.renderStatus);
-          if (renderData.renderError) setRenderError(renderData.renderError);
+          if (renderData.renderError !== undefined) {
+            setRenderError(sanitizeRenderError(renderData.renderError));
+          }
           if (renderData.renderProgress) setRenderProgress(renderData.renderProgress);
         }
       } catch {
-        // ignore
+        /* ignore */
       }
     };
 
-    if (renderStatus === 'ready' && mediaUrl) return;
-
-    const timer = setInterval(poll, 2000);
+    const intervalMs = renderStatus === 'failed' ? 8000 : 4000;
+    const timer = setInterval(poll, intervalMs);
     return () => clearInterval(timer);
   }, [movieId, loading, error, renderStatus, mediaUrl]);
 
@@ -143,17 +157,27 @@ export default function MoviePlayPage() {
     [slides, narration]
   );
 
-  const narrationPrepComplete =
-    narrationNeeded === 0 || narrationReadyCount >= narrationNeeded || narrationPrepDone;
-
-  // 旁白预生成：最多等 3 分钟，避免无限阻塞
-  useEffect(() => {
-    if (loading || error || narrationNeeded === 0) return;
-    if (narrationReadyCount >= narrationNeeded) return;
-
-    const timeout = setTimeout(() => setNarrationPrepDone(true), 180_000);
-    return () => clearTimeout(timeout);
-  }, [loading, error, narrationNeeded, narrationReadyCount]);
+  const statusLine = useMemo(() => {
+    if (renderStatus === 'ready' && mediaUrl) return null;
+    if (renderStatus === 'queued' || renderStatus === 'rendering') {
+      const pct = renderProgress?.percent ? ` ${renderProgress.percent}%` : '';
+      return renderProgress?.message || `正在生成完整 MP4${pct}…`;
+    }
+    if (renderStatus === 'failed' && renderError) {
+      return renderError;
+    }
+    if (narrationNeeded > 0 && narrationReadyCount < narrationNeeded) {
+      return `旁白加载中 ${narrationReadyCount}/${narrationNeeded}（可先点击播放）`;
+    }
+    return null;
+  }, [
+    renderStatus,
+    mediaUrl,
+    renderProgress,
+    renderError,
+    narrationNeeded,
+    narrationReadyCount,
+  ]);
 
   const handleShare = async () => {
     await openSharePoster({
@@ -193,7 +217,6 @@ export default function MoviePlayPage() {
     );
   }
 
-  // 优先：服务端 FFmpeg 混音完整 MP4（两种播放入口共用）
   if (mediaUrl && renderStatus === 'ready') {
     return (
       <>
@@ -228,44 +251,18 @@ export default function MoviePlayPage() {
   return (
     <>
       {shareModal}
-      {(renderStatus === 'queued' || renderStatus === 'rendering') && (
-        <div className="fixed top-4 left-4 right-4 z-[210] px-4 py-3 rounded-2xl bg-black/75 text-white text-xs">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin shrink-0" />
-            <span>{renderProgress?.message || '正在生成完整 MP4（FFmpeg 混音）…'}</span>
-          </div>
-          {renderProgress && renderProgress.segmentTotal > 0 && (
-            <div className="h-1 rounded-full bg-white/20 overflow-hidden mb-1">
-              <div
-                className="h-full bg-[#D98A45] transition-all duration-500"
-                style={{ width: `${renderProgress.percent}%` }}
-              />
-            </div>
+      {statusLine && (
+        <div
+          className={`fixed top-3 left-3 right-3 z-[210] px-3 py-2 rounded-xl text-[11px] leading-relaxed pointer-events-none ${
+            renderStatus === 'failed'
+              ? 'bg-amber-950/85 text-amber-100'
+              : 'bg-black/70 text-white/90'
+          }`}
+        >
+          {(renderStatus === 'queued' || renderStatus === 'rendering') && (
+            <span className="inline-block w-2 h-2 border border-white/40 border-t-white rounded-full animate-spin mr-1.5 align-middle" />
           )}
-          <p className="text-white/50 text-[10px]">
-            {renderProgress?.phase === 'narration' && '第 1 步：旁白生成完成后开始 FFmpeg'}
-            {renderProgress?.phase === 'segments' &&
-              `第 2 步：逐片段混音 ${renderProgress.segmentDone}/${renderProgress.segmentTotal}${renderProgress.currentMusicId ? ` · 当前 BGM: ${renderProgress.currentMusicId}` : ''}`}
-            {renderProgress?.phase === 'concat' && '第 3 步：拼接完整 MP4…'}
-            {renderProgress?.phase === 'queued' && '排队中，可先预览下方 H5 版'}
-            {!renderProgress && '渲染完成后将自动切换到完整音视频'}
-          </p>
-        </div>
-      )}
-      {renderStatus === 'failed' && renderError && (
-        <div className="fixed top-4 left-4 right-4 z-[210] px-4 py-2 rounded-xl bg-amber-900/80 text-amber-100 text-xs">
-          视频渲染失败：{renderError.slice(0, 120)}（当前为 H5 实时播放）
-        </div>
-      )}
-      {!narrationPrepComplete && narrationNeeded > 0 && (
-        <div className="fixed top-4 left-4 right-4 z-[210] px-4 py-3 rounded-2xl bg-black/75 text-white text-xs">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin shrink-0" />
-            <span>
-              旁白准备中 {narrationReadyCount}/{narrationNeeded}
-            </span>
-          </div>
-          <p className="text-white/50 text-[10px]">首次生成约需 1–2 分钟，完成后自动开始播放</p>
+          {statusLine}
         </div>
       )}
       <InteractiveStoryPlayer
@@ -277,7 +274,7 @@ export default function MoviePlayPage() {
         enableMusic
         enableNarration
         appreciateMode={appreciate}
-        autoStart={narrationPrepComplete}
+        autoStart
       />
     </>
   );
