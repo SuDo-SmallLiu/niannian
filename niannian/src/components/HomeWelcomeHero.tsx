@@ -26,15 +26,15 @@ export default function HomeWelcomeHero({
   return (
     <div className={`home-hero relative flex flex-col z-[1] ${compact ? 'home-hero--compact' : ''}`}>
 
-      {/* 顶部 Logo — 扣图缩小 */}
-      <header className="relative z-10 flex justify-center pt-2 pb-0 px-4 shrink-0">
+      {/* 顶部 Logo — 透明抠图，含「岁岁年年，念念不忘」 */}
+      <header className="relative z-10 flex justify-center pt-2.5 pb-0 px-4 shrink-0">
         <Image
           src="/niannian/brand-banner.png"
-          alt="念念年年 NianNian"
-          width={1024}
-          height={422}
+          alt="NianNian · 岁岁年年，念念不忘"
+          width={875}
+          height={288}
           priority
-          className={`h-auto w-auto object-contain ${compact ? 'max-w-[120px]' : 'max-w-[148px]'}`}
+          className={`home-brand-banner w-auto ${compact ? 'max-w-[132px]' : 'max-w-[168px]'}`}
         />
       </header>
 
