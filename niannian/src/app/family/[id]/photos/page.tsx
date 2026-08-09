@@ -72,6 +72,13 @@ export default function PhotoLibraryPage() {
     loadPhotos();
   }, [loadPhotos]);
 
+  const closeGenerateSheet = useCallback(() => {
+    setShowGenerateSheet(false);
+    if (searchParams.get('generateStory') === '1') {
+      router.replace(`/family/${familyId}/photos`, { scroll: false });
+    }
+  }, [searchParams, router, familyId]);
+
   useEffect(() => {
     if (searchParams.get('generateStory') === '1') {
       setShowGenerateSheet(true);
@@ -452,7 +459,7 @@ export default function PhotoLibraryPage() {
         </div>
       )}
 
-      {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount === photos.length && (
+      {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount === photos.length && !showGenerateSheet && (
         <div className="fixed bottom-20 left-0 right-0 px-6 z-50">
           <div className="max-w-md mx-auto">
             <button
@@ -469,18 +476,19 @@ export default function PhotoLibraryPage() {
 
       <StoryGenerateSheet
         open={showGenerateSheet}
-        onClose={() => setShowGenerateSheet(false)}
+        onClose={closeGenerateSheet}
         onManual={() => {
-          setShowGenerateSheet(false);
+          closeGenerateSheet();
           router.push(`/family/${familyId}/story/compose`);
         }}
         onAuto={() => {
           void generateStories({ existingCount: storyCount }).then((ok) => {
-            if (ok) setShowGenerateSheet(false);
+            if (ok) closeGenerateSheet();
           });
         }}
         autoLoading={generatingStory}
         autoDisabled={!canGenerateStory}
+        existingStoryCount={storyCount}
         completionHint={
           storyQualityHint
             ? `补充记忆卡细节后，故事会更生动（当前平均完成度 ${completionAvg}%）`
