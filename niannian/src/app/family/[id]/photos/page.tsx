@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import MemoryCardFilter from '@/components/MemoryCardFilter';
 import MemoryCardStatusBadge from '@/components/MemoryCardStatusBadge';
@@ -21,10 +21,12 @@ import {
   defaultFilters,
 } from '@/lib/memory-card-filter';
 import { useAutoGenerateFamilyStory } from '@/hooks/useAutoGenerateFamilyStory';
+import StoryGenerateSheet from '@/components/StoryGenerateSheet';
 
 export default function PhotoLibraryPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const familyId = params.id as string;
   const { confirm, showLoading, hideLoading, alert } = useAppDialog();
 
@@ -38,6 +40,7 @@ export default function PhotoLibraryPage() {
   const [storyPickMode, setStoryPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [showGenerateSheet, setShowGenerateSheet] = useState(false);
   const { generateStories, generating: generatingStory, error: generateStoryError } =
     useAutoGenerateFamilyStory(familyId);
 
@@ -68,6 +71,12 @@ export default function PhotoLibraryPage() {
   useEffect(() => {
     loadPhotos();
   }, [loadPhotos]);
+
+  useEffect(() => {
+    if (searchParams.get('generateStory') === '1') {
+      setShowGenerateSheet(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!loading) {
@@ -445,46 +454,39 @@ export default function PhotoLibraryPage() {
 
       {!selectMode && !storyPickMode && photos.length > 0 && analyzedCount === photos.length && (
         <div className="fixed bottom-20 left-0 right-0 px-6 z-50">
-          <div className="max-w-md mx-auto space-y-2">
+          <div className="max-w-md mx-auto">
             <button
               type="button"
-              onClick={() => generateStories({ existingCount: storyCount })}
-              disabled={generatingStory || !canGenerateStory}
+              onClick={() => setShowGenerateSheet(true)}
+              disabled={!canGenerateStory}
               className="block w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg text-center shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
             >
-              {generatingStory ? '念念撰写中…' : '✨ 念念自动生成故事'}
+              去生成故事
             </button>
-            <Link
-              href={`/family/${familyId}/story/compose`}
-              className="block w-full py-4 rounded-2xl bg-white border-2 border-[#D98A45] text-[#D98A45] font-serif text-lg text-center hover:bg-[#FFF8F0] transition-all"
-            >
-              🧩 人工组合故事
-            </Link>
-            {storyCount > 0 && (
-              <Link
-                href={`/family/${familyId}/story`}
-                className="block w-full py-3 rounded-2xl bg-white border border-[#E8DCC8] text-[#8B7355] text-sm text-center hover:border-[#D98A45]/30 transition-all"
-              >
-                📖 查看故事草稿箱（{storyCount}）
-              </Link>
-            )}
-            <Link
-              href={`/family/${familyId}`}
-              className="block w-full py-3 rounded-2xl bg-white border border-[#E8DCC8] text-[#8B7355] text-sm text-center hover:border-[#D98A45]/30 transition-all"
-            >
-              主题管理 · 家庭故事
-            </Link>
-            {storyQualityHint && (
-              <p className="text-[10px] text-center text-[#B8A898] px-2">
-                补充记忆卡细节后，故事会更生动（当前平均完成度 {completionAvg}%）
-              </p>
-            )}
-            {generateStoryError && (
-              <p className="text-xs text-center text-red-500 px-2">{generateStoryError}</p>
-            )}
           </div>
         </div>
       )}
+
+      <StoryGenerateSheet
+        open={showGenerateSheet}
+        onClose={() => setShowGenerateSheet(false)}
+        onManual={() => {
+          setShowGenerateSheet(false);
+          router.push(`/family/${familyId}/story/compose`);
+        }}
+        onAuto={() => {
+          void generateStories({ existingCount: storyCount }).then((ok) => {
+            if (ok) setShowGenerateSheet(false);
+          });
+        }}
+        autoLoading={generatingStory}
+        autoDisabled={!canGenerateStory}
+        completionHint={
+          storyQualityHint
+            ? `补充记忆卡细节后，故事会更生动（当前平均完成度 ${completionAvg}%）`
+            : generateStoryError || undefined
+        }
+      />
 
     </div>
   );

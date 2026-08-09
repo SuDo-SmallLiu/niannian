@@ -32,7 +32,9 @@ export const AGENT_STEPS: AgentStepDef[] = [
     title: '去生成故事',
     desc: '念念为你生成一篇温暖的家庭故事',
     href: ({ firstFamilyId }) =>
-      firstFamilyId ? `/family/${firstFamilyId}/story/compose` : '/family',
+      firstFamilyId
+        ? `/family/${firstFamilyId}/photos?generateStory=1`
+        : '/family',
   },
   {
     id: 4,
