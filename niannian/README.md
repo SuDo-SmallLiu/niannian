@@ -39,6 +39,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 > ⚠️ 本项目**不适合纯静态托管（如 Vercel / 纯静态导出）**：它使用 `better-sqlite3`（原生模块 + 本地文件数据库 `data/niannian.db`），必须在**支持 Node.js 运行时且有可写文件系统**的环境里运行。
 
+**开发文档：** 见 [`docs/README.md`](docs/README.md)（架构、数据库 ER 图、开发历程）
+
 ### 运行前提
 - Node.js 20+（含 `npm`）
 - 能访问 GitHub 仓库（拉取代码）

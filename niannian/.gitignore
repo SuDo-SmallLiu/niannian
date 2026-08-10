@@ -48,3 +48,5 @@ next-env.d.ts
 /public/video/movies/
 /services/narration/.venv/
 /services/narration/output/
+/services/mcp-niannian/.venv/
+/services/mcp-niannian/__pycache__/

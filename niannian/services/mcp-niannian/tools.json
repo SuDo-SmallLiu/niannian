@@ -1,0 +1,82 @@
+{
+  "name": "niannian",
+  "description": "念念年年家庭记忆助手 — 搜索记忆、家庭/故事/电影进度",
+  "transport": "streamable-http",
+  "tools": [
+    {
+      "name": "search_memories",
+      "description": "搜索家庭记忆卡，支持关键词、地点、人物、时间筛选",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": { "type": "string", "description": "搜索关键词" },
+          "family_id": { "type": "string", "description": "家庭 ID" },
+          "location": { "type": "string", "description": "地点" },
+          "people": { "type": "string", "description": "人物" },
+          "time": { "type": "string", "description": "时间范围描述" },
+          "analysis_status": { "type": "string", "enum": ["all", "pending", "analyzed"], "default": "all" },
+          "limit": { "type": "integer", "default": 20, "maximum": 100 }
+        }
+      }
+    },
+    {
+      "name": "list_families",
+      "description": "列出当前用户的全部家庭空间",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "get_pipeline_progress",
+      "description": "获取念念 5 步流水线进度",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "family_id": { "type": "string", "description": "可选，指定家庭 ID" }
+        }
+      }
+    },
+    {
+      "name": "list_stories",
+      "description": "列出家庭下的故事",
+      "inputSchema": {
+        "type": "object",
+        "required": ["family_id"],
+        "properties": {
+          "family_id": { "type": "string" },
+          "published_only": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    {
+      "name": "get_story",
+      "description": "获取单个故事详情",
+      "inputSchema": {
+        "type": "object",
+        "required": ["story_id"],
+        "properties": { "story_id": { "type": "string" } }
+      }
+    },
+    {
+      "name": "list_movies",
+      "description": "列出家庭下的人生电影",
+      "inputSchema": {
+        "type": "object",
+        "required": ["family_id"],
+        "properties": { "family_id": { "type": "string" } }
+      }
+    },
+    {
+      "name": "get_movie",
+      "description": "获取人生电影详情与渲染状态",
+      "inputSchema": {
+        "type": "object",
+        "required": ["movie_id"],
+        "properties": { "movie_id": { "type": "string" } }
+      }
+    },
+    {
+      "name": "get_ai_status",
+      "description": "查看 AI 模型配置（无需登录）",
+      "inputSchema": { "type": "object", "properties": {} }
+    }
+  ]
+}
