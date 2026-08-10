@@ -940,7 +940,9 @@ export function getShareByCode(shareCode: string) {
     for (const ch of chapterRows.slice(0, 4)) {
       const story = getStory(ch.story_id);
       if (!story) continue;
-      const photoIds = JSON.parse(story.photos || '[]') as string[];
+      const photoIds = Array.isArray(story.photos)
+        ? story.photos
+        : (JSON.parse(String(story.photos || '[]')) as string[]);
       if (photoIds.length === 0) continue;
       const photo = database
         .prepare('SELECT url FROM photos WHERE id = ?')
