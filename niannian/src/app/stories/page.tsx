@@ -216,6 +216,13 @@ export default function StoriesPage() {
                   summary={story.summary || story.description}
                   familyName={story.family_name || ''}
                   photoUrls={photoUrlsByStory[story.id] || []}
+                  onClick={() =>
+                    router.push(
+                      appreciate
+                        ? `/stories/${story.id}?appreciate=1`
+                        : `/stories/${story.id}`
+                    )
+                  }
                 />
 
                 <div className="mt-3 flex flex-wrap gap-2">

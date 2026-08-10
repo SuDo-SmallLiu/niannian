@@ -7,7 +7,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="home-bottom-nav sticky bottom-0 z-50 safe-bottom">
+    <nav className="home-bottom-nav sticky bottom-0 z-[60] safe-bottom">
       <div className="home-bottom-nav__inner flex items-center justify-around h-16 px-1">
         <NavItem icon="🏠" label="首页" href="/" pathname={pathname} />
         <NavItem icon="🃏" label="记忆" href="/family/memories" pathname={pathname} />

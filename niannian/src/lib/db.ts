@@ -1505,6 +1505,27 @@ export function getMovieChapters(movieId: string) {
   }>;
 }
 
+/** 电影列表卡片：章节数来自 DB 行数，封面取自各章关联故事的首图 */
+export function getMovieListMeta(movieId: string): {
+  chapter_count: number;
+  photo_urls: string[];
+} {
+  const database = getDb();
+  const chapterRows = getMovieChapters(movieId);
+  const photo_urls: string[] = [];
+  for (const ch of chapterRows.slice(0, 4)) {
+    const story = getStory(ch.story_id);
+    if (!story) continue;
+    const photoIds = story.photos as string[];
+    if (photoIds.length === 0) continue;
+    const photo = database
+      .prepare('SELECT url FROM photos WHERE id = ?')
+      .get(photoIds[0]) as { url: string } | undefined;
+    if (photo?.url) photo_urls.push(photo.url);
+  }
+  return { chapter_count: chapterRows.length, photo_urls };
+}
+
 export function saveMovieAudioPlan(movieId: string, plan: unknown): void {
   const database = getDb();
   database

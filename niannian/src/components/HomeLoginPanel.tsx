@@ -11,7 +11,7 @@ interface HomeLoginPanelProps {
 
 export default function HomeLoginPanel({ redirect = '/', compact = false }: HomeLoginPanelProps) {
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { refresh, setUserFromLogin } = useAuth();
 
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -19,12 +19,37 @@ export default function HomeLoginPanel({ redirect = '/', compact = false }: Home
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const afterLogin = async () => {
-    await refresh();
+  const afterLogin = async (loggedInUser?: {
+    id: string;
+    phone: string;
+    name: string;
+    avatar: string;
+  }) => {
+    if (loggedInUser) {
+      setUserFromLogin(loggedInUser);
+      // 后台同步 session，失败时不覆盖刚登录的用户态
+      void authFetch('/api/auth/me')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.user) setUserFromLogin(data.user);
+        })
+        .catch(() => undefined);
+    } else {
+      await refresh();
+    }
     if (redirect && redirect !== '/') {
       router.replace(redirect);
+    } else {
+      router.refresh();
     }
   };
+
+  const authFetch = (url: string, init?: RequestInit) =>
+    fetch(url, {
+      ...init,
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
 
   const handleQuickLogin = async () => {
     setError('');
@@ -35,7 +60,7 @@ export default function HomeLoginPanel({ redirect = '/', compact = false }: Home
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/quick-login', {
+      const res = await authFetch('/api/auth/quick-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
@@ -49,7 +74,7 @@ export default function HomeLoginPanel({ redirect = '/', compact = false }: Home
         setDisplayCode(data.code);
         setCode(data.code);
       }
-      await afterLogin();
+      await afterLogin(data.user);
     } catch {
       setError('网络错误，请重试');
     } finally {
@@ -66,7 +91,7 @@ export default function HomeLoginPanel({ redirect = '/', compact = false }: Home
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/send-code', {
+      const res = await authFetch('/api/auth/send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
@@ -96,7 +121,7 @@ export default function HomeLoginPanel({ redirect = '/', compact = false }: Home
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await authFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, code }),
@@ -106,7 +131,7 @@ export default function HomeLoginPanel({ redirect = '/', compact = false }: Home
         setError(data.error || '登录失败');
         return;
       }
-      await afterLogin();
+      await afterLogin(data.user);
     } catch {
       setError('网络错误，请重试');
     } finally {

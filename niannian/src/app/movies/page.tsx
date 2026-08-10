@@ -47,18 +47,11 @@ export default function MoviesPage() {
         const res = await fetch(`/api/movie?familyId=${family.id}`);
         const data = await res.json();
         for (const m of data.movies || []) {
-          const chRes = await fetch(`/api/movie?movieId=${m.id}`);
-          const chData = await chRes.json();
           all.push({
             ...m,
             family_name: family.name,
-            chapter_count: chData.chapters?.length || 0,
-            photo_urls: (chData.chapters || [])
-              .map((ch: { story?: { photosDetail?: Array<{ url: string }> } }) =>
-                ch.story?.photosDetail?.[0]?.url
-              )
-              .filter(Boolean)
-              .slice(0, 4),
+            chapter_count: m.chapter_count ?? 0,
+            photo_urls: m.photo_urls || [],
           });
         }
       }

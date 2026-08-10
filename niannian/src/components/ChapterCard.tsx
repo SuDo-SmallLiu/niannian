@@ -64,6 +64,7 @@ export default function ChapterCard({
         summary={summary}
         familyName={familyName}
         photoUrls={photoUrls}
+        onClick={onViewDetail}
       />
 
       <div className="mt-4 flex flex-col gap-3">

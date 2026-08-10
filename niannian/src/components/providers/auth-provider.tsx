@@ -21,10 +21,16 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   refresh: () => Promise<void>;
+  setUserFromLogin: (user: Omit<AuthUser, 'phoneMasked'> & { phoneMasked?: string }) => void;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function maskPhoneClient(phone: string): string {
+  if (phone.length !== 11) return phone;
+  return `${phone.slice(0, 3)}****${phone.slice(7)}`;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -32,7 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -45,6 +54,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  const setUserFromLogin = useCallback(
+    (loggedIn: Omit<AuthUser, 'phoneMasked'> & { phoneMasked?: string }) => {
+      setUser({
+        ...loggedIn,
+        phoneMasked: loggedIn.phoneMasked ?? maskPhoneClient(loggedIn.phone),
+      });
+      setLoading(false);
+    },
+    []
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -65,8 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const value = useMemo(
-    () => ({ user, loading, refresh, logout }),
-    [user, loading, refresh, logout]
+    () => ({ user, loading, refresh, setUserFromLogin, logout }),
+    [user, loading, refresh, setUserFromLogin, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

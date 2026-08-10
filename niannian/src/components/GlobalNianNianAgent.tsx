@@ -101,7 +101,7 @@ export default function GlobalNianNianAgent() {
     ? 'bottom-[max(5.5rem,env(safe-area-inset-bottom))]'
     : hasBottomActionBar
       ? 'bottom-44'
-      : 'bottom-24';
+      : 'bottom-[max(5.5rem,calc(4.25rem+env(safe-area-inset-bottom)))]';
 
   if (pathname === '/' || pathname === '/profile') {
     return null;
@@ -167,8 +167,11 @@ export default function GlobalNianNianAgent() {
         {!appreciate && bubbleVisible && (
           <button
             type="button"
-            onClick={() => setBubbleVisible(false)}
-            className="text-[10px] text-[#C8B8A8] pointer-events-auto pr-1"
+            onClick={(event) => {
+              event.stopPropagation();
+              setBubbleVisible(false);
+            }}
+            className="text-[10px] text-[#C8B8A8] pointer-events-auto pr-1 mt-1 min-h-[44px] min-w-[44px] flex items-center justify-end"
           >
             收起提示
           </button>

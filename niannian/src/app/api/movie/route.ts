@@ -5,6 +5,7 @@ import {
   getLifeMovie,
   getLifeMoviesByFamily,
   getMovieChapters,
+  getMovieListMeta,
   getStory,
 } from '@/lib/db';
 import { getStoryPhotosDetail, getStorySegments } from '@/lib/story-segments';
@@ -103,7 +104,14 @@ export async function GET(request: NextRequest) {
 
     if (familyId) {
       await requireFamilyAccess(request, familyId);
-      const movies = getLifeMoviesByFamily(familyId);
+      const movies = getLifeMoviesByFamily(familyId).map((movie) => {
+        const meta = getMovieListMeta(movie.id);
+        return {
+          ...movie,
+          chapter_count: meta.chapter_count,
+          photo_urls: meta.photo_urls,
+        };
+      });
       return NextResponse.json({ movies });
     }
 

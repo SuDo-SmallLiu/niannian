@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveVerifyCode } from '@/lib/db';
+import { createUser, findUserByPhone } from '@/lib/db';
 import {
   createSessionToken,
   generateVerifyCode,
   isLocalCodeAuth,
-  loginWithPhone,
   normalizePhone,
   setSessionCookie,
 } from '@/lib/auth';
 
-/** 本地模式：输入手机号 → 生成随机验证码 → 直接登录（不发短信） */
+/** 本地模式：输入手机号 → 直接登录（不发短信） */
 export async function POST(request: NextRequest) {
   try {
     if (!isLocalCodeAuth()) {
@@ -23,14 +22,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请输入有效的手机号' }, { status: 400 });
     }
 
-    const code = generateVerifyCode();
-    saveVerifyCode(phone, code);
-
-    const user = await loginWithPhone(phone, code);
-    if (!user) {
+    let row = findUserByPhone(phone);
+    if (!row) {
+      createUser(phone);
+      row = findUserByPhone(phone);
+    }
+    if (!row) {
       return NextResponse.json({ error: '登录失败，请重试' }, { status: 500 });
     }
 
+    const user = {
+      id: row.id,
+      phone: row.phone,
+      name: row.name,
+      avatar: row.avatar,
+    };
+
+    const code = generateVerifyCode();
     const token = await createSessionToken(user.id, user.phone);
     const response = NextResponse.json({ user, code });
     setSessionCookie(response, token, request);

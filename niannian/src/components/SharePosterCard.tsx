@@ -10,6 +10,8 @@ export type SharePosterCardProps = Pick<
 > & {
   showQr?: boolean;
   className?: string;
+  /** 点击海报进入详情（故事库 / 草稿箱） */
+  onClick?: () => void;
 };
 
 function PhotoGrid({
@@ -75,6 +77,7 @@ export default function SharePosterCard({
   shareUrl,
   showQr = false,
   className = '',
+  onClick,
 }: SharePosterCardProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
@@ -92,9 +95,24 @@ export default function SharePosterCard({
       .catch(() => setQrDataUrl(null));
   }, [showQr, shareUrl]);
 
+  const interactive = Boolean(onClick);
+
   return (
     <article
-      className={`bg-gradient-to-b from-[#FFF8F0] to-[#F8F4ED] rounded-3xl overflow-hidden border-2 border-[#E8DCC8] shadow-sm ${className}`}
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={
+        interactive
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+      className={`bg-gradient-to-b from-[#FFF8F0] to-[#F8F4ED] rounded-3xl overflow-hidden border-2 border-[#E8DCC8] shadow-sm ${interactive ? 'cursor-pointer hover:border-[#D98A45]/40 active:scale-[0.99] transition-all touch-manipulation' : ''} ${className}`}
     >
       <div className="pt-6 pb-3 text-center">
         <p className="text-[#D98A45] font-serif text-base font-medium">念念年年</p>
