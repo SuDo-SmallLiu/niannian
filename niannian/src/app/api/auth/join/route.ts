@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, AuthError, unauthorizedResponse } from '@/lib/auth';
-import { useInvitation } from '@/lib/db';
+import { consumeInvitation } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请输入邀请码' }, { status: 400 });
     }
 
-    const result = useInvitation(code.trim().toUpperCase(), user.id);
+    const result = consumeInvitation(code.trim().toUpperCase(), user.id);
     if (!result.success) {
       return NextResponse.json({ error: '邀请码无效或已过期' }, { status: 400 });
     }

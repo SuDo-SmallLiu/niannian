@@ -17,8 +17,8 @@ async function main() {
   process.env.MELO_PYTHON =
     process.env.MELO_PYTHON || path.join(process.cwd(), 'services/narration/.venv/bin/python3');
 
-  const { renderMovieToMp4 } = await import('../src/lib/movie-render/index.ts');
-  const { updateMovieRenderStatus } = await import('../src/lib/db.ts');
+  const { renderMovieToMp4 } = await import('../src/lib/movie-render/index');
+  const { updateMovieRenderStatus } = await import('../src/lib/db');
 
   console.log('==> 重新渲染人生电影:', movieId);
   updateMovieRenderStatus(movieId, 'queued', { error: '' });

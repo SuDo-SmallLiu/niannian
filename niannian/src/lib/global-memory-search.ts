@@ -38,7 +38,7 @@ export interface GlobalMemorySearchParams {
   offset?: number;
 }
 
-export interface GlobalMemorySearchResult extends GlobalMemorySearchRow {}
+export type GlobalMemorySearchResult = GlobalMemorySearchRow;
 
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean)));

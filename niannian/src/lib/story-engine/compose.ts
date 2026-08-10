@@ -123,9 +123,10 @@ ${photoSummaries}
           }))
         : [];
 
+      type ComposedSegment = { photoId: string; memorySnippet: string; narrative: string };
       const cardIds = new Set(cards.map((c) => c.photoId));
-      const validSegments = segments.filter((s) => cardIds.has(s.photoId));
-      const used = new Set(validSegments.map((s) => s.photoId));
+      const validSegments = segments.filter((s: ComposedSegment) => cardIds.has(s.photoId));
+      const used = new Set(validSegments.map((s: ComposedSegment) => s.photoId));
       for (const card of cards) {
         if (!used.has(card.photoId)) {
           validSegments.push({

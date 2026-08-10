@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- SQLite row shapes typed incrementally in db-rows.ts */
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -1066,6 +1067,21 @@ export function saveVerifyCode(phone: string, code: string): void {
   ).run(phone, code, String(expiresAt));
 }
 
+/** 统计窗口内已发送验证码次数（依据 expires_at 反推发送时间，TTL 30 分钟） */
+export function countRecentVerifyCodesForPhone(phone: string, windowSec: number): number {
+  const database = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const ttlSec = 30 * 60;
+  const minExpiresAt = now + ttlSec - windowSec;
+  const row = database
+    .prepare(
+      `SELECT COUNT(*) as count FROM verify_codes
+       WHERE phone = ? AND CAST(expires_at AS INTEGER) > ?`
+    )
+    .get(phone, minExpiresAt) as { count: number } | undefined;
+  return row?.count ?? 0;
+}
+
 export function verifyCode(phone: string, code: string): boolean {
   const database = getDb();
   const now = Math.floor(Date.now() / 1000);
@@ -1135,7 +1151,7 @@ export function createInvitation(familyId: string, createdBy: string): { id: str
   return { id, code };
 }
 
-export function useInvitation(code: string, userId: string): { familyId: string; success: boolean } {
+export function consumeInvitation(code: string, userId: string): { familyId: string; success: boolean } {
   const database = getDb();
   const inv = database.prepare(
     `SELECT * FROM invitations WHERE code = ? AND used_by IS NULL

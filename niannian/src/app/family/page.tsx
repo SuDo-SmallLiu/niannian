@@ -23,20 +23,22 @@ export default function FamilyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFamilies();
+    let active = true;
+    void (async () => {
+      try {
+        const res = await fetch('/api/family');
+        const data = await res.json();
+        if (active) setFamilies(data.families || []);
+      } catch {
+        // 静默处理
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
-
-  const fetchFamilies = async () => {
-    try {
-      const res = await fetch('/api/family');
-      const data = await res.json();
-      setFamilies(data.families || []);
-    } catch {
-      // 静默处理
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <PageShell>

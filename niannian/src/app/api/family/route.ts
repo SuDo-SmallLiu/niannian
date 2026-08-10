@@ -5,7 +5,7 @@ import { requireAuth, AuthError, unauthorizedResponse } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request);
-    const families = getUserFamilies(user.id).map((f: any) => ({
+    const families = getUserFamilies(user.id).map((f) => ({
       ...f,
       members: JSON.parse(f.members || '[]'),
     }));

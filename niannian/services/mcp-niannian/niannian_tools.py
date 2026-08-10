@@ -9,8 +9,11 @@ from typing import Any
 
 import httpx
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 logger = logging.getLogger("niannian-mcp")
+
+MCP_TIMEOUT_SEC = float(os.environ.get("MCP_UPSTREAM_TIMEOUT", "30"))
 
 mcp = MCPServer(
     name="niannian",
@@ -30,19 +33,9 @@ def _session_cookie() -> str | None:
     return token or None
 
 
-def _error(
-    code: str,
-    *,
-    status: int | None = None,
-    detail: str | None = None,
-    trace_id: str | None = None,
-) -> dict[str, Any]:
-    return {
-        "error": code,
-        "status": status,
-        "detail": detail,
-        "trace_id": trace_id,
-    }
+def _tool_error(code: str, detail: str, *, trace_id: str | None = None) -> ToolError:
+    suffix = f" trace_id={trace_id}" if trace_id else ""
+    return ToolError(f"{code}: {detail}{suffix}")
 
 
 async def _request(
@@ -51,7 +44,7 @@ async def _request(
     *,
     params: dict[str, Any] | None = None,
     json_body: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> Any:
     trace_id = uuid.uuid4().hex[:12]
     url = f"{_base_url()}{path}"
     headers: dict[str, str] = {"Accept": "application/json"}
@@ -61,7 +54,7 @@ async def _request(
 
     started = time.perf_counter()
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=MCP_TIMEOUT_SEC) as client:
             resp = await client.request(method, url, params=params, json=json_body, headers=headers)
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
@@ -78,16 +71,12 @@ async def _request(
             data = {"raw": resp.text[:500]}
 
         if resp.status_code >= 400:
-            return _error(
-                "upstream_error",
-                status=resp.status_code,
-                detail=str(data.get("error") or data),
-                trace_id=trace_id,
-            )
-        return {"success": True, "trace_id": trace_id, "data": data}
+            detail = str(data.get("error") if isinstance(data, dict) else data)
+            raise _tool_error("upstream_error", detail, trace_id=trace_id)
+        return data
     except httpx.HTTPError as exc:
         logger.warning("upstream_failed trace_id=%s path=%s err=%s", trace_id, path, exc)
-        return _error("network_error", detail=str(exc), trace_id=trace_id)
+        raise _tool_error("network_error", str(exc), trace_id=trace_id) from exc
 
 
 @mcp.tool()
@@ -136,7 +125,7 @@ async def get_pipeline_progress(family_id: str = "") -> dict[str, Any]:
 async def list_stories(family_id: str, published_only: bool = False) -> dict[str, Any]:
     """列出指定家庭下的所有故事。family_id 必填。"""
     if not family_id.strip():
-        return _error("invalid_input", detail="family_id 不能为空")
+        raise _tool_error("invalid_input", "family_id 不能为空")
     params: dict[str, Any] = {"familyId": family_id.strip()}
     if published_only:
         params["publishedOnly"] = "1"
@@ -147,7 +136,7 @@ async def list_stories(family_id: str, published_only: bool = False) -> dict[str
 async def get_story(story_id: str) -> dict[str, Any]:
     """获取单个故事详情，含章节段落与关联记忆卡。"""
     if not story_id.strip():
-        return _error("invalid_input", detail="story_id 不能为空")
+        raise _tool_error("invalid_input", "story_id 不能为空")
     return await _request("GET", "/api/story", params={"storyId": story_id.strip()})
 
 
@@ -155,7 +144,7 @@ async def get_story(story_id: str) -> dict[str, Any]:
 async def list_movies(family_id: str) -> dict[str, Any]:
     """列出指定家庭下的人生电影。"""
     if not family_id.strip():
-        return _error("invalid_input", detail="family_id 不能为空")
+        raise _tool_error("invalid_input", "family_id 不能为空")
     return await _request("GET", "/api/movie", params={"familyId": family_id.strip()})
 
 
@@ -163,7 +152,7 @@ async def list_movies(family_id: str) -> dict[str, Any]:
 async def get_movie(movie_id: str) -> dict[str, Any]:
     """获取人生电影详情（章节、渲染状态、旁白 manifest）。"""
     if not movie_id.strip():
-        return _error("invalid_input", detail="movie_id 不能为空")
+        raise _tool_error("invalid_input", "movie_id 不能为空")
     return await _request("GET", "/api/movie", params={"movieId": movie_id.strip()})
 
 

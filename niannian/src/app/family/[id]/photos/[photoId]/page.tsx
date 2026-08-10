@@ -573,20 +573,24 @@ export default function MemoryCardPage() {
               )}
 
               <div className="space-y-2">
-                {(memoryCard.change_detail?.transitions || memoryCard.changes.map((c) => ({ type: c, marker: c }))).map((t, i) => (
+                {(
+                  memoryCard.change_detail?.transitions?.length
+                    ? memoryCard.change_detail.transitions
+                    : memoryCard.changes.map((c) => ({ type: c, marker: c }))
+                ).map((t: { type?: string; marker: string; lifePhase?: string; affectShift?: string }, i) => (
                   <div key={`${t.marker}-${i}`} className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-purple-50/50">
-                    {t.type && (
+                    {t.type ? (
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
                         {t.type}
                       </span>
-                    )}
+                    ) : null}
                     <span className="text-sm text-[#4B3B2F]">{t.marker}</span>
-                    {'lifePhase' in t && t.lifePhase && (
+                    {t.lifePhase ? (
                       <span className="text-xs text-[#B8A898]">· {t.lifePhase}</span>
-                    )}
-                    {'affectShift' in t && t.affectShift && (
+                    ) : null}
+                    {t.affectShift ? (
                       <span className="text-xs text-purple-600 ml-auto">{t.affectShift}</span>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>

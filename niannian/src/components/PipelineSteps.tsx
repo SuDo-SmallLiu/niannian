@@ -11,14 +11,15 @@ interface PipelineStepsProps {
   active?: 0 | 1 | 2 | 3;
   compact?: boolean;
   dark?: boolean;
+  className?: string;
 }
 
-export default function PipelineSteps({ active = 1, compact, dark }: PipelineStepsProps) {
+export default function PipelineSteps({ active = 1, compact, dark, className = '' }: PipelineStepsProps) {
   return (
     <div
       className={`flex items-center justify-center gap-1 ${compact ? 'text-[10px]' : 'text-xs'} ${
         dark ? 'text-white/50' : 'text-[#B8A898]'
-      }`}
+      } ${className}`}
     >
       {STEPS.map((step, i) => (
         <span key={step.label} className="flex items-center gap-1">

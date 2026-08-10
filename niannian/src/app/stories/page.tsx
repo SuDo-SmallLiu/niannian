@@ -43,45 +43,49 @@ export default function StoriesPage() {
   const appreciate = useAppreciateMode();
 
   useEffect(() => {
-    fetchStories();
-  }, []);
+    let active = true;
+    void (async () => {
+      try {
+        const familyRes = await fetch('/api/family');
+        const familyData = await familyRes.json();
+        const familyList: FamilyOption[] = familyData.families || [];
+        if (!active) return;
+        setFamilies(familyList);
 
-  const fetchStories = async () => {
-    try {
-      const familyRes = await fetch('/api/family');
-      const familyData = await familyRes.json();
-      const familyList: FamilyOption[] = familyData.families || [];
-      setFamilies(familyList);
+        const allStories: Story[] = [];
+        const urlsMap: Record<string, string[]> = {};
 
-      const allStories: Story[] = [];
-      const urlsMap: Record<string, string[]> = {};
+        for (const family of familyList) {
+          const [storyRes, photosRes] = await Promise.all([
+            fetch(`/api/story?familyId=${family.id}&publishedOnly=1`),
+            fetch(`/api/photos?familyId=${family.id}`),
+          ]);
+          const storyData = await storyRes.json();
+          const photosData = await photosRes.json();
+          const photoMap = new Map(
+            (photosData.photos || []).map((p: { id: string; url: string }) => [p.id, p.url])
+          );
 
-      for (const family of familyList) {
-        const [storyRes, photosRes] = await Promise.all([
-          fetch(`/api/story?familyId=${family.id}&publishedOnly=1`),
-          fetch(`/api/photos?familyId=${family.id}`),
-        ]);
-        const storyData = await storyRes.json();
-        const photosData = await photosRes.json();
-        const photoMap = new Map(
-          (photosData.photos || []).map((p: { id: string; url: string }) => [p.id, p.url])
-        );
-
-        for (const s of storyData.stories || []) {
-          allStories.push({ ...s, family_name: family.name });
-          urlsMap[s.id] = (s.photos || [])
-            .map((id: string) => photoMap.get(id))
-            .filter(Boolean) as string[];
+          for (const s of storyData.stories || []) {
+            allStories.push({ ...s, family_name: family.name });
+            urlsMap[s.id] = (s.photos || [])
+              .map((id: string) => photoMap.get(id))
+              .filter(Boolean) as string[];
+          }
         }
+        if (!active) return;
+        setStories(allStories);
+        setPhotoUrlsByStory(urlsMap);
+      } catch {
+        // 静默处理
+      } finally {
+        if (active) setLoading(false);
       }
-      setStories(allStories);
-      setPhotoUrlsByStory(urlsMap);
-    } catch {
-      // 静默处理
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredStories =
     themeFilter === 'all'

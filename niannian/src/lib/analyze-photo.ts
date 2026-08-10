@@ -132,14 +132,17 @@ export async function analyzeAndSavePhoto(
     const hasContent =
       existingCard.user_notes ||
       existingCard.voice_transcript ||
-      (existingCard.ai_questions || []).some((q) => q.answer);
+      (existingCard.ai_questions || []).some((q: { answer?: string }) => q.answer);
     if (hasContent) {
       supplement = {
         userNotes: existingCard.user_notes || '',
         voiceTranscript: existingCard.voice_transcript || '',
         questions: (existingCard.ai_questions || [])
-          .filter((q) => q.answer)
-          .map((q) => ({ question: q.question, answer: q.answer })),
+          .filter((q: { answer?: string }) => q.answer)
+          .map((q: { question: string; answer?: string }) => ({
+            question: q.question,
+            answer: q.answer!,
+          })),
       };
     }
   }

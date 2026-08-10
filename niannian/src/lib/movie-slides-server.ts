@@ -42,7 +42,7 @@ export async function buildMovieSlidesForServer(movieId: string) {
             theme: story.theme,
             connectionAction: story.connection_action,
             segments,
-            photosDetail: photos,
+            photosDetail: photos.filter((p): p is NonNullable<(typeof photos)[number]> => p != null),
           } satisfies StoryH5Input,
         };
       })

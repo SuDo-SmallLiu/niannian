@@ -9,14 +9,7 @@ import {
   getShareByCode,
   incrementStoryReadCount,
 } from '@/lib/db';
-
-function buildShareUrl(request: NextRequest, shareCode: string) {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    request.headers.get('origin') ||
-    'http://localhost:3000';
-  return `${baseUrl}/share/${shareCode}`;
-}
+import { buildSharePlayUrl } from '@/lib/public-base-url';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +23,7 @@ export async function POST(request: NextRequest) {
       const shareCode = getOrCreateMovieShare(movieId);
       return NextResponse.json({
         shareCode,
-        shareUrl: buildShareUrl(request, shareCode),
+        shareUrl: buildSharePlayUrl(request, shareCode),
         shareType: 'movie',
       });
     }
@@ -43,7 +36,7 @@ export async function POST(request: NextRequest) {
       const shareCode = getOrCreatePhotoShare(photoId);
       return NextResponse.json({
         shareCode,
-        shareUrl: buildShareUrl(request, shareCode),
+        shareUrl: buildSharePlayUrl(request, shareCode),
         shareType: 'memory',
       });
     }
@@ -56,7 +49,7 @@ export async function POST(request: NextRequest) {
       const shareCode = getOrCreateStoryShare(storyId);
       return NextResponse.json({
         shareCode,
-        shareUrl: buildShareUrl(request, shareCode),
+        shareUrl: buildSharePlayUrl(request, shareCode),
         shareType: 'story',
       });
     }

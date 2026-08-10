@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createUser, findUserByPhone } from '@/lib/db';
+import { isProductionRuntime } from '@/lib/auth-config';
 import {
   createSessionToken,
-  generateVerifyCode,
   isLocalCodeAuth,
   normalizePhone,
   setSessionCookie,
@@ -11,6 +11,10 @@ import {
 /** 本地模式：输入手机号 → 直接登录（不发短信） */
 export async function POST(request: NextRequest) {
   try {
+    if (isProductionRuntime() && process.env.ALLOW_DEV_AUTH !== 'true') {
+      return NextResponse.json({ error: '生产环境已禁用快速登录' }, { status: 403 });
+    }
+
     if (!isLocalCodeAuth()) {
       return NextResponse.json({ error: '当前环境需使用短信验证码登录' }, { status: 403 });
     }
@@ -38,9 +42,8 @@ export async function POST(request: NextRequest) {
       avatar: row.avatar,
     };
 
-    const code = generateVerifyCode();
     const token = await createSessionToken(user.id, user.phone);
-    const response = NextResponse.json({ user, code });
+    const response = NextResponse.json({ user });
     setSessionCookie(response, token, request);
     return response;
   } catch (error) {

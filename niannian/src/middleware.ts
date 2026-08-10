@@ -13,6 +13,7 @@ function isPublicApi(pathname: string, method: string): boolean {
   if (pathname.startsWith('/api/uploads/')) return true;
   if (pathname.startsWith('/api/audio/narration/')) return true;
   if (pathname.startsWith('/api/video/movies/')) return true;
+  if (pathname === '/api/ai/status') return true;
   if (pathname === '/api/share/play') return true;
   if (pathname === '/api/share' && method === 'GET') return true;
   return false;

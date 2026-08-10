@@ -32,11 +32,7 @@ export default function MoviesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const appreciate = useAppreciateMode();
 
-  useEffect(() => {
-    loadMovies();
-  }, []);
-
-  async function loadMovies() {
+  const reloadMovies = async () => {
     try {
       const familyRes = await fetch('/api/family');
       const familyData = await familyRes.json();
@@ -58,10 +54,41 @@ export default function MoviesPage() {
       setMovies(all);
     } catch {
       // ignore
-    } finally {
-      setLoading(false);
     }
-  }
+  };
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const familyRes = await fetch('/api/family');
+        const familyData = await familyRes.json();
+        const families = familyData.families || [];
+
+        const all: LifeMovie[] = [];
+        for (const family of families) {
+          const res = await fetch(`/api/movie?familyId=${family.id}`);
+          const data = await res.json();
+          for (const m of data.movies || []) {
+            all.push({
+              ...m,
+              family_name: family.name,
+              chapter_count: m.chapter_count ?? 0,
+              photo_urls: m.photo_urls || [],
+            });
+          }
+        }
+        if (active) setMovies(all);
+      } catch {
+        // ignore
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleGenerate(familyId: string) {
     setGeneratingFamilyId(familyId);
@@ -83,7 +110,7 @@ export default function MoviesPage() {
     } finally {
       hideLoading();
       setGeneratingFamilyId(null);
-      loadMovies();
+      void reloadMovies();
     }
   }
 

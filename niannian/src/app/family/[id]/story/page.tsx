@@ -218,7 +218,7 @@ export default function StoryPage() {
       if (!res.ok) throw new Error(data.error || '删除失败');
       setStories((prev) => prev.filter((s) => s.id !== story.id));
       if (storyId === story.id) {
-        window.location.href = `/family/${familyId}/story`;
+        router.replace(`/family/${familyId}/story`);
         return;
       }
       setRegenerateSuccess(`已删除「${story.title}」`);

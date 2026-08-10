@@ -6,8 +6,9 @@ import type { PosterInput } from '@/lib/share-poster';
 
 export type SharePosterCardProps = Pick<
   PosterInput,
-  'type' | 'title' | 'subtitle' | 'summary' | 'familyName' | 'photoUrls' | 'shareUrl'
+  'type' | 'title' | 'subtitle' | 'summary' | 'familyName' | 'photoUrls'
 > & {
+  shareUrl?: string;
   showQr?: boolean;
   className?: string;
   /** 点击海报进入详情（故事库 / 草稿箱） */
@@ -18,7 +19,7 @@ function PhotoGrid({
   type,
   photoUrls,
 }: {
-  type: 'story' | 'memory';
+  type: 'story' | 'memory' | 'movie';
   photoUrls: string[];
 }) {
   const urls = photoUrls.filter(Boolean);
@@ -82,17 +83,22 @@ export default function SharePosterCard({
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!showQr || !shareUrl) {
-      setQrDataUrl(null);
-      return;
-    }
+    if (!showQr || !shareUrl) return;
+    let active = true;
     QRCode.toDataURL(shareUrl, {
       width: 140,
       margin: 1,
       color: { dark: '#4B3B2F', light: '#FFFFFF' },
     })
-      .then(setQrDataUrl)
-      .catch(() => setQrDataUrl(null));
+      .then((url) => {
+        if (active) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (active) setQrDataUrl(null);
+      });
+    return () => {
+      active = false;
+    };
   }, [showQr, shareUrl]);
 
   const interactive = Boolean(onClick);
@@ -117,7 +123,7 @@ export default function SharePosterCard({
       <div className="pt-6 pb-3 text-center">
         <p className="text-[#D98A45] font-serif text-base font-medium">念念年年</p>
         <p className="text-[#B8A898] text-xs mt-1">
-          {type === 'story' ? '家庭记忆故事' : '家庭记忆卡'}
+          {type === 'story' ? '家庭记忆故事' : type === 'movie' ? '人生电影' : '家庭记忆卡'}
         </p>
       </div>
 
