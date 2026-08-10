@@ -1,87 +1,151 @@
 {
-  "version": 1,
-  "licenseNote": "MVP 使用项目内占位曲；正式环境请从 SoundSafari/CC0-1.0-Music 人工精选并替换 source/license 字段",
+  "version": 2,
+  "licenseNote": "BGM 按 10 个情动构型分类，来源：BGM（按情动构型分类）.zip",
   "tracks": [
     {
-      "id": "warm-01",
+      "id": "arch-warm-togetherness",
       "title": "温暖相依",
-      "file": "/audio/music/warm/01.mp3",
+      "file": "/audio/music/archetype/warm_togetherness.mp3",
       "mood": ["温暖", "陪伴", "家庭"],
       "category": "warm",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
+      "archetype": "温暖相依",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
     },
     {
-      "id": "warm-02",
-      "title": "家的温度",
-      "file": "/audio/music/warm/02.mp3",
-      "mood": ["温暖", "团圆", "爱"],
+      "id": "arch-celebration-joy",
+      "title": "欢聚庆典",
+      "file": "/audio/music/archetype/celebration_joy.mp3",
+      "mood": ["欢庆", "庆祝", "喜悦"],
+      "category": "happy",
+      "archetype": "欢聚庆典",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-curious-adventure",
+      "title": "探索新奇",
+      "file": "/audio/music/archetype/curious_adventure.mp3",
+      "mood": ["探索", "梦想", "尝试"],
+      "category": "happy",
+      "archetype": "探索新奇",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-peaceful-serenity",
+      "title": "宁静安放",
+      "file": "/audio/music/archetype/peaceful_serenity.mp3",
+      "mood": ["平静", "安心", "满足"],
+      "category": "calm",
+      "archetype": "宁静安放",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-growth-witness",
+      "title": "成长见证",
+      "file": "/audio/music/archetype/growth_witness.mp3",
+      "mood": ["成长", "勇气", "第一次"],
+      "category": "emotional",
+      "archetype": "成长见证",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-separation-longing",
+      "title": "暂别思念",
+      "file": "/audio/music/archetype/separation_longing.mp3",
+      "mood": ["思念", "告别", "牵挂"],
+      "category": "nostalgic",
+      "archetype": "暂别思念",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-challenge-breakthrough",
+      "title": "挑战突破",
+      "file": "/audio/music/archetype/challenge_breakthrough.mp3",
+      "mood": ["紧张", "突破", "勇敢"],
+      "category": "emotional",
+      "archetype": "挑战突破",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-ritual-legacy",
+      "title": "仪式传承",
+      "file": "/audio/music/archetype/ritual_legacy.mp3",
+      "mood": ["传承", "年节", "根"],
+      "category": "nostalgic",
+      "archetype": "仪式传承",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-time-echo",
+      "title": "岁月回响",
+      "file": "/audio/music/archetype/time_echo.mp3",
+      "mood": ["怀旧", "时光", "感怀"],
+      "category": "nostalgic",
+      "archetype": "岁月回响",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "arch-daily-warmth",
+      "title": "日常烟火",
+      "file": "/audio/music/archetype/daily_warmth.mp3",
+      "mood": ["日常", "烟火", "细水长流"],
+      "category": "calm",
+      "archetype": "日常烟火",
+      "source": "niannian-affect-bgm",
+      "license": "internal"
+    },
+    {
+      "id": "warm-01",
+      "title": "温暖相依（分类兜底）",
+      "file": "/audio/music/archetype/warm_togetherness.mp3",
+      "mood": ["温暖", "陪伴"],
       "category": "warm",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
+      "source": "niannian-affect-bgm",
+      "license": "internal"
     },
     {
       "id": "nostalgic-01",
-      "title": "岁月回响",
-      "file": "/audio/music/nostalgic/01.mp3",
-      "mood": ["怀旧", "思念", "告别"],
+      "title": "岁月回响（分类兜底）",
+      "file": "/audio/music/archetype/time_echo.mp3",
+      "mood": ["怀旧", "思念"],
       "category": "nostalgic",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
-    },
-    {
-      "id": "nostalgic-02",
-      "title": "旧日时光",
-      "file": "/audio/music/nostalgic/02.mp3",
-      "mood": ["怀旧", "传承"],
-      "category": "nostalgic",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
+      "source": "niannian-affect-bgm",
+      "license": "internal"
     },
     {
       "id": "happy-01",
-      "title": "欢聚时刻",
-      "file": "/audio/music/happy/01.mp3",
-      "mood": ["欢庆", "庆祝", "喜悦"],
+      "title": "欢聚时刻（分类兜底）",
+      "file": "/audio/music/archetype/celebration_joy.mp3",
+      "mood": ["欢庆", "庆祝"],
       "category": "happy",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
-    },
-    {
-      "id": "happy-02",
-      "title": "探索新奇",
-      "file": "/audio/music/happy/02.mp3",
-      "mood": ["探索", "梦想", "尝试"],
-      "category": "happy",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
+      "source": "niannian-affect-bgm",
+      "license": "internal"
     },
     {
       "id": "emotional-01",
-      "title": "成长见证",
-      "file": "/audio/music/emotional/01.mp3",
-      "mood": ["成长", "勇气", "第一次"],
+      "title": "成长见证（分类兜底）",
+      "file": "/audio/music/archetype/growth_witness.mp3",
+      "mood": ["成长", "勇气"],
       "category": "emotional",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
-    },
-    {
-      "id": "emotional-02",
-      "title": "仪式传承",
-      "file": "/audio/music/emotional/02.mp3",
-      "mood": ["传承", "责任", "heritage"],
-      "category": "emotional",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
+      "source": "niannian-affect-bgm",
+      "license": "internal"
     },
     {
       "id": "calm-01",
-      "title": "日常烟火",
-      "file": "/audio/music/calm/01.mp3",
-      "mood": ["日常", "平静", "default"],
+      "title": "日常烟火（分类兜底）",
+      "file": "/audio/music/archetype/daily_warmth.mp3",
+      "mood": ["日常", "平静"],
       "category": "calm",
-      "source": "niannian-mvp-placeholder",
-      "license": "internal-mvp"
+      "source": "niannian-affect-bgm",
+      "license": "internal"
     }
   ]
 }

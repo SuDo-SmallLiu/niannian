@@ -6,6 +6,7 @@
 import type { Valence, Arousal } from '@/lib/affect-theory';
 import {
   pickTrackForCategory,
+  pickTrackForArchetype,
   pickTrackForTheme,
   type MusicLibraryTrack,
 } from '@/lib/music-library';
@@ -108,6 +109,12 @@ export function pickTrackFromAffect(
   input: AffectMusicInput,
   variantSeed?: string
 ): MusicLibraryTrack {
+  const archetype = input.archetype?.trim();
+  if (archetype) {
+    const byArchetype = pickTrackForArchetype(archetype, variantSeed);
+    if (byArchetype) return byArchetype;
+  }
+
   const category = pickMusicCategoryFromAffect(input);
   return pickTrackForCategory(category, variantSeed);
 }

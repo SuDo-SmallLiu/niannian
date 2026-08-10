@@ -4,6 +4,8 @@ export interface MusicLibraryTrack {
   file: string;
   mood: string[];
   category: 'warm' | 'nostalgic' | 'happy' | 'emotional' | 'calm';
+  /** 情动构型名称（10 构型直选 BGM） */
+  archetype?: string;
   source: string;
   license: string;
 }
@@ -13,6 +15,9 @@ import libraryData from '@/data/music-library.json';
 const tracks = (libraryData as { tracks: MusicLibraryTrack[] }).tracks;
 
 const trackById = new Map(tracks.map((t) => [t.id, t]));
+const trackByArchetype = new Map(
+  tracks.filter((t) => t.archetype).map((t) => [t.archetype as string, t])
+);
 
 /** 故事主题 → 音乐分类 */
 export const THEME_TO_CATEGORY: Record<string, MusicLibraryTrack['category']> = {
@@ -39,6 +44,16 @@ export function getAllMusicTracks(): MusicLibraryTrack[] {
 
 export function getMusicTrackById(id: string): MusicLibraryTrack | undefined {
   return trackById.get(id);
+}
+
+/** 按情动构型直选 BGM（优先于五类分类） */
+export function pickTrackForArchetype(
+  archetype: string,
+  _variantSeed?: string
+): MusicLibraryTrack | undefined {
+  const name = archetype.trim();
+  if (!name) return undefined;
+  return trackByArchetype.get(name);
 }
 
 export function pickTrackForTheme(theme?: string): MusicLibraryTrack {
