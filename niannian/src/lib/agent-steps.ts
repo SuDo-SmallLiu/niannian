@@ -82,7 +82,7 @@ export function getStepBubbleMessage(
   const step = AGENT_STEPS[current - 1]!;
 
   if (current === 2 && stats && stats.pendingCount > 0) {
-    return `第 2 步 · ${step.title}：还有 ${stats.pendingCount} 张待解析，点我开始 AI 读懂照片。`;
+    return `第 2 步 · ${step.title}：还有 ${stats.pendingCount} 张待解析，点我开始让念念读懂照片。`;
   }
 
   if (current === 3 && stats) {

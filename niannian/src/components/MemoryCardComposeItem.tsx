@@ -43,7 +43,7 @@ export function MemoryCardComposeHintsView({
             compact ? 'text-[10px] line-clamp-2' : 'text-xs line-clamp-2'
           }`}
         >
-          <span className="text-[#D98A45]">AI · </span>
+          <span className="text-[#D98A45]">念念 · </span>
           {hints.aiHint}
         </p>
       )}

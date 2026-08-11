@@ -72,7 +72,7 @@ export default function FamilyPage() {
                   className="block bg-white rounded-2xl p-5 shadow-sm border border-[#E8DCC8] hover:shadow-md hover:border-[#D98A45]/30 transition-all active:scale-[0.99]"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-serif text-[#4B3B2F] font-medium">
+                    <h3 className="text-lg font-serif font-bold text-[#4B3B2F]">
                       {family.name}
                     </h3>
                     <span className="text-[#D98A45] text-xl">→</span>

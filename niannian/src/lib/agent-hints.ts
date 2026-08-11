@@ -117,7 +117,7 @@ export function getAgentHint(ctx: AgentHintContext): string {
   }
 
   if (page === 'analyze') {
-    return `${progress} AI 正在读懂照片，完成后记得补充你的记忆。`;
+    return `${progress} 念念正在读懂照片，完成后记得补充你的记忆。`;
   }
 
   switch (page) {
@@ -132,7 +132,7 @@ export function getAgentHint(ctx: AgentHintContext): string {
       return `${progress} 建议一次上传 5–20 张有故事的照片；也可以问问家里人有没有老照片。`;
     case 'memory':
       if (pendingCount > 0) {
-        return `${progress} 还有 ${pendingCount} 张待解析，先让 AI 读懂它们。`;
+        return `${progress} 还有 ${pendingCount} 张待解析，先让念念读懂它们。`;
       }
       if (completionAvg >= 70) {
         return `${progress} 记忆已经比较完整，可以试着生成故事啦。`;
@@ -140,7 +140,7 @@ export function getAgentHint(ctx: AgentHintContext): string {
       if (analyzedCount > 0) {
         return `${progress} 点击记忆卡补充细节，或者打电话问问家人当时怎么回事。`;
       }
-      return `${progress} 每张照片都会变成一张 Memory Card。`;
+      return `${progress} 每张照片都会变成一张记忆卡。`;
     case 'story':
       if (storyCount === 0) {
         return `${progress} 故事来自记忆卡。先完善记忆，再回来生成故事。`;

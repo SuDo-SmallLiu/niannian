@@ -116,7 +116,7 @@ export default function NianNianHelpDesk({
         >
           ‹
         </button>
-        <h1 className="text-base font-serif font-medium text-[#4B3B2F]">念念帮助台</h1>
+        <h1 className="text-base font-serif font-bold text-[#4B3B2F]">念念帮助台</h1>
         <div className="w-10" />
       </header>
 

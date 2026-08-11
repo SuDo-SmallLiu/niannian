@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PRESET_MEMBERS } from '@/lib/family-members';
-import PipelineSteps from '@/components/PipelineSteps';
 import HomeWelcomeHero from '@/components/HomeWelcomeHero';
 import HomeFeatureCards from '@/components/HomeFeatureCards';
 import HomeBackgroundDecor from '@/components/HomeBackgroundDecor';
@@ -140,11 +139,9 @@ function HomePageContent() {
 
         <div className="text-center mb-6">
           <p className="text-xs tracking-[0.25em] text-[#D98A45] mb-2">我要创造</p>
-          <p className="text-2xl font-serif text-[#4B3B2F] mb-1">创建家庭记忆</p>
+          <p className="text-2xl font-serif font-bold text-[#4B3B2F] mb-1">创建家庭记忆</p>
           <p className="text-sm text-[#B8A898]">先建主题，再上传 5–20 张有故事的照片</p>
         </div>
-
-        <PipelineSteps active={0} compact className="mb-8" />
 
         <div className="mb-6">
           <label className="block text-sm text-[#8B7355] mb-2 font-medium">家庭主题</label>

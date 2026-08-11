@@ -266,7 +266,7 @@ export default function PhotoLibraryPage() {
       </div>
 
       <div className="text-center mb-6 animate-fade-in-up">
-        <h1 className="text-2xl font-serif text-[#4B3B2F] mb-1">记忆卡</h1>
+        <h1 className="text-2xl font-serif font-bold text-[#4B3B2F] mb-1">记忆卡</h1>
         <p className="text-sm text-[#B8A898] mb-3">
           {selectMode
             ? selectedCount > 0

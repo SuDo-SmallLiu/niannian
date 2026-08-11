@@ -147,8 +147,8 @@ export default function SharePosterCard({
       {/* ① 品牌 */}
       <div className="pt-5 pb-2 text-center">
         <Image
-          src="/niannian/brand-logo.png"
-          alt="NianNian"
+          src="/niannian/brand-banner.png"
+          alt="念念年年"
           width={88}
           height={88}
           unoptimized

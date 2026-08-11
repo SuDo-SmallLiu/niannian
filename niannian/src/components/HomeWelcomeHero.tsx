@@ -18,7 +18,7 @@ export default function HomeWelcomeHero({
     <div className={`home-hero relative flex flex-col z-[1] ${compact ? 'home-hero--compact' : ''}`}>
       <header className="home-brand-header relative z-10 shrink-0">
         <Image
-          src="/niannian/brand-logo.png"
+          src="/niannian/brand-banner.png"
           alt="NianNian · 岁岁年年，念念不忘"
           width={220}
           height={96}

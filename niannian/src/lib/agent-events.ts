@@ -173,7 +173,7 @@ export function resolveAgentEvent(
     return {
       agentRole: 'memory-assistant',
       taskStatus: 'attention',
-      message: `还有 ${stats.pendingCount} 张照片待 AI 解析，点我去开始读懂它们～`,
+      message: `还有 ${stats.pendingCount} 张照片待念念解析，点我去开始读懂它们～`,
       expression: 'curious',
       animation: 'raise-hand',
       stepIndex,

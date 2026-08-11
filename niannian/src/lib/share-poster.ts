@@ -386,16 +386,16 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
   drawDecorations(ctx);
 
   try {
-    const logo = await loadImage(assetUrl('/niannian/brand-logo.png'));
-    const logoH = 96;
+    const logo = await loadImage(assetUrl('/niannian/brand-banner.png'));
+    const logoH = 88;
     const logoW = (logo.width / logo.height) * logoH;
-    ctx.drawImage(logo, (W - logoW) / 2, 28, logoW, logoH);
+    ctx.drawImage(logo, (W - logoW) / 2, 32, logoW, logoH);
   } catch {
     try {
-      const banner = await loadImage(assetUrl('/niannian/brand-banner.png'));
-      const logoH = 88;
+      const banner = await loadImage(assetUrl('/niannian/brand-logo.png'));
+      const logoH = 96;
       const logoW = (banner.width / banner.height) * logoH;
-      ctx.drawImage(banner, (W - logoW) / 2, 32, logoW, logoH);
+      ctx.drawImage(banner, (W - logoW) / 2, 28, logoW, logoH);
     } catch {
       /* skip logo */
     }

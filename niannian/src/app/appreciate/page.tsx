@@ -15,7 +15,7 @@ const ITEMS: Array<{
     href: '/family/memories?appreciate=1',
     Icon: NavMemoryIcon,
     title: '照片记忆',
-    desc: '浏览所有 Memory Card',
+    desc: '浏览所有记忆卡',
     color: 'from-[#FFF8F0] to-[#F0E8D8]',
   },
   {
