@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   type MemoryCardFilters,
   type AnalysisFilter,
-  LAYER_LABELS,
   defaultFilters,
 } from '@/lib/memory-card-filter';
 
@@ -56,7 +55,6 @@ export default function MemoryCardFilter({
 }: MemoryCardFilterProps) {
   const [listening, setListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
-  const [showTags, setShowTags] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
@@ -67,13 +65,6 @@ export default function MemoryCardFilter({
     (patch: Partial<MemoryCardFilters>) => onChange({ ...filters, ...patch }),
     [filters, onChange]
   );
-
-  const toggleTag = (value: string) => {
-    const next = filters.tagValues.includes(value)
-      ? filters.tagValues.filter((v) => v !== value)
-      : [...filters.tagValues, value];
-    update({ tagValues: next });
-  };
 
   const startVoiceSearch = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -172,16 +163,6 @@ export default function MemoryCardFilter({
             {opt.label}
           </button>
         ))}
-        <button
-          onClick={() => setShowTags(!showTags)}
-          className={`shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-            showTags || filters.tagValues.length > 0
-              ? 'bg-[#FFF8F0] border border-[#D98A45]/40 text-[#D98A45]'
-              : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
-          }`}
-        >
-          标签筛选 {filters.tagValues.length > 0 && `(${filters.tagValues.length})`}
-        </button>
       </div>
 
       {/* 时间 / 人物 / 地点 标签检索 */}
@@ -251,94 +232,6 @@ export default function MemoryCardFilter({
                     }`}
                   >
                     {loc}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 标签层筛选 */}
-      {showTags && (
-        <div className="bg-white rounded-2xl p-4 border border-[#E8DCC8] space-y-3">
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => update({ layer: null })}
-              className={`px-2.5 py-1 rounded-full text-xs ${
-                filters.layer === null
-                  ? 'bg-[#D98A45] text-white'
-                  : 'bg-[#F8F4ED] text-[#8B7355]'
-              }`}
-            >
-              全部层级
-            </button>
-            {Object.entries(LAYER_LABELS).map(([layer, label]) => (
-              <button
-                key={layer}
-                onClick={() => update({ layer: filters.layer === Number(layer) ? null : Number(layer) })}
-                className={`px-2.5 py-1 rounded-full text-xs ${
-                  filters.layer === Number(layer)
-                    ? 'bg-[#D98A45] text-white'
-                    : 'bg-[#F8F4ED] text-[#8B7355]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {options.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-              {options.tags
-                .filter((t) => filters.layer === null || t.layer === filters.layer)
-                .map((tag) => (
-                  <button
-                    key={`${tag.layer}-${tag.value}`}
-                    onClick={() => toggleTag(tag.value)}
-                    className={`px-2.5 py-1 rounded-full text-xs transition-all ${
-                      filters.tagValues.includes(tag.value)
-                        ? 'bg-[#D98A45] text-white'
-                        : 'bg-[#FFF8F0] text-[#8B7355] border border-[#F0DCC8]'
-                    }`}
-                  >
-                    {tag.value}
-                    <span className="ml-1 opacity-60">{tag.count}</span>
-                  </button>
-                ))}
-            </div>
-          ) : (
-            <p className="text-xs text-[#B8A898]">暂无标签，请先完成念念解析</p>
-          )}
-
-          {/* 快捷：人物 & 情绪 */}
-          {options.people.length > 0 && (
-            <div>
-              <p className="text-[10px] text-[#B8A898] mb-1.5">人物</p>
-              <div className="flex flex-wrap gap-1.5">
-                {options.people.slice(0, 8).map(([name]) => (
-                  <button
-                    key={name}
-                    onClick={() => update({ query: name })}
-                    className="px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {options.emotions.length > 0 && (
-            <div>
-              <p className="text-[10px] text-[#B8A898] mb-1.5">情绪</p>
-              <div className="flex flex-wrap gap-1.5">
-                {options.emotions.slice(0, 8).map(([emotion]) => (
-                  <button
-                    key={emotion}
-                    onClick={() => update({ query: emotion })}
-                    className="px-2.5 py-1 rounded-full text-xs bg-amber-50 text-amber-700"
-                  >
-                    {emotion}
                   </button>
                 ))}
               </div>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { isGooglePhotosJsonFile, isImageFile, matchJsonToPhoto } from '@/lib/google-photos-metadata';
+import { CameraIcon, NianNianIconBox } from '@/components/icons/NianNianIcons';
 
 interface PhotoUploaderProps {
   onUploadComplete: (result: {
@@ -296,13 +297,13 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
           onChange={(e) => handleFiles(e.target.files)}
         />
 
-        <div className="text-4xl mb-3">📸</div>
+        <NianNianIconBox icon={CameraIcon} className="mb-3 mx-auto" />
         <p className="text-[#4B3B2F] font-medium mb-1">点击或拖拽上传照片</p>
         <p className="text-sm text-[#B8A898] mb-2">
           支持 JPG / PNG / HEIC，建议 10–50 张，单张不超过 20MB
         </p>
         <p className="text-xs text-[#D98A45]">
-          📦 Google Photos 导出包：请同时选中照片 + .json 侧车文件
+          Google Photos 导出包：请同时选中照片 + .json 侧车文件
         </p>
       </div>
 

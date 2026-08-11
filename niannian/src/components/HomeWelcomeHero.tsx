@@ -3,50 +3,39 @@
 import Image from 'next/image';
 import NianNianAvatar from '@/components/NianNianAvatar';
 
-const LEFT_BUBBLE = `我是你的记忆助手念念
-别看我软乎乎的，我们海兔可是诺贝尔奖级记忆研究里的「记忆专家」哦～`;
-
-const RIGHT_BUBBLE = `或许游得不快，
-但我擅长留住记忆。`;
-
 interface HomeWelcomeHeroProps {
   onOpenHelp: () => void;
   compact?: boolean;
-  /** 是否显示主标题与功能卡之间的引导标题 */
-  showGuideTitle?: boolean;
 }
 
 export default function HomeWelcomeHero({
   onOpenHelp,
   compact = false,
-  showGuideTitle = true,
 }: HomeWelcomeHeroProps) {
-  const mascotSize = compact ? 200 : 308;
+  const mascotSize = compact ? 200 : 272;
 
   return (
     <div className={`home-hero relative flex flex-col z-[1] ${compact ? 'home-hero--compact' : ''}`}>
-
-      {/* 顶部 Logo — 透明抠图嵌入背景，居中 */}
       <header className="home-brand-header relative z-10 shrink-0">
         <Image
-          src="/niannian/brand-banner.png"
+          src="/niannian/brand-logo.png"
           alt="NianNian · 岁岁年年，念念不忘"
-          width={875}
-          height={288}
+          width={220}
+          height={96}
           priority
           unoptimized
           className="home-brand-banner"
         />
       </header>
 
-      {/* 念念 + 左右不对称气泡 */}
       <div className={`relative z-10 flex-1 min-h-0 ${compact ? 'home-hero__stage--compact' : 'home-hero__stage'}`}>
-        {/* 左侧大气泡 — 念念左上方 */}
         <div className="home-speech-bubble home-speech-bubble--left">
-          <p className="whitespace-pre-line">{LEFT_BUBBLE}</p>
+          <p className="text-[14px] leading-[1.55]">
+            <span className="text-[#4A3326]">我是你的记忆助手</span>
+            <span className="text-[#DF8B3A] font-medium">念念</span>
+          </p>
         </div>
 
-        {/* 念念主体 — 视觉中心 */}
         <button
           type="button"
           onClick={onOpenHelp}
@@ -57,18 +46,14 @@ export default function HomeWelcomeHero({
           <NianNianAvatar variant="hero" size={mascotSize} animate edgeSoft />
         </button>
 
-        {/* 右侧小气泡 — 念念右下 */}
         <div className="home-speech-bubble home-speech-bubble--right">
-          <p className="whitespace-pre-line">{RIGHT_BUBBLE}</p>
+          <p className="text-[14px] leading-[1.55]">
+            <span className="text-[#4A3326]">别看我软乎乎的，我们海兔可是诺贝尔奖研究里的</span>
+            <span className="text-[#DF8B3A] font-medium">「记忆专家」</span>
+            <span className="text-[#4A3326]">哦~</span>
+          </p>
         </div>
       </div>
-
-      {/* 引导主标题 */}
-      {showGuideTitle && (
-        <h2 className="home-guide-title relative z-10 shrink-0">
-          今天，我们的镜头要对准哪里呢？
-        </h2>
-      )}
     </div>
   );
 }

@@ -185,7 +185,7 @@ export default function ManualStoryComposePage() {
             >
               <span className="text-sm text-[#4B3B2F] block truncate">{story.title}</span>
               <span className="text-xs text-[#D98A45]">
-                {regeneratingId === story.id ? '念念重新生成中…' : '🔄 重新生成故事'}
+                {regeneratingId === story.id ? '念念重新生成中…' : '重新生成故事'}
               </span>
             </button>
           ))}

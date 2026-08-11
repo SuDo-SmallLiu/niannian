@@ -3,8 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import {
+  NavMemoryIcon,
+  NavMovieIcon,
+  NavStoryIcon,
+  type NianNianIconProps,
+} from '@/components/icons/NianNianIcons';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useAuth } from '@/components/providers/auth-provider';
+import type { ComponentType } from 'react';
 
 export default function NavShell() {
   const appreciate = useAppreciateMode();
@@ -23,9 +30,9 @@ export default function NavShell() {
     return (
       <nav className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-[#F0E8D8] safe-bottom z-50">
         <div className="flex items-center justify-around h-20 px-2">
-          <AppreciateNavItem icon="🃏" label="照片" href="/family/memories?appreciate=1" pathname={pathname} />
-          <AppreciateNavItem icon="📖" label="故事" href="/stories?appreciate=1" pathname={pathname} />
-          <AppreciateNavItem icon="🎬" label="电影" href="/movies?appreciate=1" pathname={pathname} />
+          <AppreciateNavItem icon={NavMemoryIcon} label="照片" href="/family/memories?appreciate=1" pathname={pathname} />
+          <AppreciateNavItem icon={NavStoryIcon} label="故事" href="/stories?appreciate=1" pathname={pathname} />
+          <AppreciateNavItem icon={NavMovieIcon} label="电影" href="/movies?appreciate=1" pathname={pathname} />
         </div>
       </nav>
     );
@@ -35,12 +42,12 @@ export default function NavShell() {
 }
 
 function AppreciateNavItem({
-  icon,
+  icon: Icon,
   label,
   href,
   pathname,
 }: {
-  icon: string;
+  icon: ComponentType<NianNianIconProps>;
   label: string;
   href: string;
   pathname: string;
@@ -51,11 +58,11 @@ function AppreciateNavItem({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center gap-1 px-4 py-2 transition-colors ${
-        isActive ? 'text-[#D98A45]' : 'text-[#8B7355]'
+      className={`flex flex-col items-center gap-1.5 px-4 py-2 transition-colors ${
+        isActive ? 'text-[#DF8B3A]' : 'text-[#8E7B6B]'
       }`}
     >
-      <span className="text-3xl">{icon}</span>
+      <Icon size={28} />
       <span className="text-sm font-medium">{label}</span>
     </Link>
   );

@@ -170,7 +170,8 @@ export default function StoryChapterTimeline({
 
       {connectionAction && (
         <div className="mt-12 bg-[#FFF8F0] rounded-2xl p-5 border border-[#F0DCC8]">
-          <p className="text-sm text-[#8B7355] leading-relaxed">💡 {connectionAction}</p>
+          <p className="text-xs font-medium text-[#D98A45] mb-2 tracking-wide">连接建议</p>
+          <p className="text-sm text-[#8B7355] leading-relaxed">{connectionAction}</p>
         </div>
       )}
     </article>

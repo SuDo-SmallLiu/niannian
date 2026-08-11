@@ -13,16 +13,6 @@
       "license": "internal"
     },
     {
-      "id": "arch-celebration-joy",
-      "title": "欢聚庆典",
-      "file": "/audio/music/archetype/celebration_joy.mp3",
-      "mood": ["欢庆", "庆祝", "喜悦"],
-      "category": "happy",
-      "archetype": "欢聚庆典",
-      "source": "niannian-affect-bgm",
-      "license": "internal"
-    },
-    {
       "id": "arch-curious-adventure",
       "title": "探索新奇",
       "file": "/audio/music/archetype/curious_adventure.mp3",
@@ -73,16 +63,6 @@
       "license": "internal"
     },
     {
-      "id": "arch-ritual-legacy",
-      "title": "仪式传承",
-      "file": "/audio/music/archetype/ritual_legacy.mp3",
-      "mood": ["传承", "年节", "根"],
-      "category": "nostalgic",
-      "archetype": "仪式传承",
-      "source": "niannian-affect-bgm",
-      "license": "internal"
-    },
-    {
       "id": "arch-time-echo",
       "title": "岁月回响",
       "file": "/audio/music/archetype/time_echo.mp3",
@@ -122,8 +102,8 @@
     },
     {
       "id": "happy-01",
-      "title": "欢聚时刻（分类兜底）",
-      "file": "/audio/music/archetype/celebration_joy.mp3",
+      "title": "探索新奇（分类兜底）",
+      "file": "/audio/music/archetype/curious_adventure.mp3",
       "mood": ["欢庆", "庆祝"],
       "category": "happy",
       "source": "niannian-affect-bgm",

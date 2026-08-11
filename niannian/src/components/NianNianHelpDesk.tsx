@@ -6,6 +6,8 @@ import NianNianAvatar from '@/components/NianNianAvatar';
 import type { PipelineStats } from '@/lib/agent-types';
 import { formatPipelineProgress } from '@/lib/agent-types';
 import { AGENT_STEPS, stepLabel, getCurrentStepIndex } from '@/lib/agent-steps';
+import { CheckIcon, SparklesIcon, type NianNianIconProps } from '@/components/icons/NianNianIcons';
+import type { ComponentType } from 'react';
 
 interface FamilyBrief {
   id: string;
@@ -14,7 +16,7 @@ interface FamilyBrief {
 
 interface HelpStep {
   id: number;
-  icon: string;
+  Icon: ComponentType<NianNianIconProps>;
   title: string;
   desc: string;
   href: string;
@@ -33,7 +35,7 @@ function buildSteps(families: FamilyBrief[]): HelpStep[] {
   const firstFamilyId = families[0]?.id;
   return AGENT_STEPS.map((step) => ({
     id: step.id,
-    icon: step.icon,
+    Icon: step.Icon,
     title: step.title,
     desc: step.desc,
     href: step.href({ firstFamilyId }),
@@ -155,16 +157,17 @@ export default function NianNianHelpDesk({
           继续第 {activeStep} 步 · {AGENT_STEPS[activeStep - 1]?.title}
         </button>
 
-        <p className="text-center text-sm text-[#8B7355] mb-5">
-          <span className="text-[#D98A45]">✨</span>
-          {' '}5 步，珍藏属于你们的家庭记忆{' '}
-          <span className="text-[#D98A45]">✨</span>
+        <p className="text-center text-sm text-[#8B7355] mb-5 inline-flex items-center justify-center gap-2 w-full">
+          <SparklesIcon size={14} className="text-[#D98A45]" />
+          5 步，珍藏属于你们的家庭记忆
+          <SparklesIcon size={14} className="text-[#D98A45]" />
         </p>
 
         <div className="space-y-3">
           {steps.map((step) => {
             const isActive = step.id === activeStep;
             const isDone = step.id < activeStep;
+            const StepIcon = step.Icon;
             return (
               <button
                 key={step.id}
@@ -179,11 +182,11 @@ export default function NianNianHelpDesk({
                 }`}
               >
                 <span
-                  className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-xl ${
-                    isActive ? 'bg-[#D98A45]/10' : 'bg-[#FFF8F0]'
+                  className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center ${
+                    isActive ? 'bg-[#D98A45]/10 text-[#D98A45]' : 'bg-[#FFF8F0] text-[#8B7355]'
                   }`}
                 >
-                  {isDone ? '✓' : step.icon}
+                  {isDone ? <CheckIcon size={20} /> : <StepIcon size={22} />}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#4B3B2F]">

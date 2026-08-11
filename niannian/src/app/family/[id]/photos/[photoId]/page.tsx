@@ -288,7 +288,7 @@ export default function MemoryCardPage() {
               disabled={shareLoading}
               className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm text-[#D98A45] border border-[#F0DCC8] bg-white hover:bg-[#FFF8F0] disabled:opacity-50 transition-colors"
             >
-              {shareLoading ? '…' : '💬 分享'}
+              {shareLoading ? '…' : '分享'}
             </button>
           )}
         </div>
@@ -315,7 +315,7 @@ export default function MemoryCardPage() {
           {source && (
             <section className="bg-[#F0F7FF] rounded-2xl p-5 border border-blue-100 shadow-sm">
               <h2 className="text-xs tracking-wider text-blue-600 font-medium mb-3">
-                📦 Google Photos 原始信息
+                Google Photos 原始信息
               </h2>
               <div className="space-y-2 text-sm">
                 {source.takenAtFormatted && (
@@ -354,7 +354,7 @@ export default function MemoryCardPage() {
 
           {/* 事实层 */}
           <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-            <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-3">事实层</h2>
+            <h2 className="text-sm font-semibold text-[#4A3326] mb-3">事实层 · 客观信息</h2>
             <div className="space-y-2 text-sm">
               <div className="flex">
                 <span className="text-[#B8A898] w-12 shrink-0">时间</span>
@@ -377,7 +377,7 @@ export default function MemoryCardPage() {
 
           {/* 理解层 */}
           <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-            <h2 className="text-xs tracking-wider text-[#D98A45] font-medium mb-3">理解层 · 情动推测</h2>
+            <h2 className="text-sm font-semibold text-[#4A3326] mb-3">理解层 · 情动推测</h2>
 
             {memoryCard.understanding?.archetype && (
               <div className="mb-4">
@@ -481,7 +481,7 @@ export default function MemoryCardPage() {
             (memoryCard.narrative_frame.storyline ||
               memoryCard.narrative_frame.shotType ||
               memoryCard.narrative_frame.shotNote) && (
-            <CollapsibleSection title="叙事层 · 故事线与镜头" titleClassName="text-xs tracking-wider text-rose-600 font-medium">
+            <CollapsibleSection title="叙事层" titleClassName="text-sm font-semibold text-[#4A3326]">
 
               <div className="flex flex-wrap gap-2 mb-3">
                 {memoryCard.narrative_frame.storyline && (
@@ -530,7 +530,7 @@ export default function MemoryCardPage() {
             (memoryCard.story_layer.meaning ||
               memoryCard.story_layer.scene_type ||
               memoryCard.story_layer.relationship) && (
-            <CollapsibleSection title="聚类语义层" titleClassName="text-xs tracking-wider text-indigo-600 font-medium">
+            <CollapsibleSection title="聚类语义层" titleClassName="text-sm font-semibold text-[#4A3326]">
               <div className="flex flex-wrap gap-2 mb-3">
                 {memoryCard.story_layer.meaning && (
                   <span className="px-3 py-1.5 rounded-full bg-indigo-500 text-white text-sm font-medium">
@@ -564,7 +564,7 @@ export default function MemoryCardPage() {
 
           {/* 变化层 */}
           {(memoryCard.change_detail?.transitions?.length || memoryCard.changes.length > 0) && (
-            <CollapsibleSection title="变化层 · 人生节点" titleClassName="text-xs tracking-wider text-purple-600 font-medium">
+            <CollapsibleSection title="变化层" titleClassName="text-sm font-semibold text-[#4A3326]">
 
               {memoryCard.change_detail?.summary && (
                 <p className="text-sm text-[#8B7355] mb-3 leading-relaxed">
@@ -599,7 +599,7 @@ export default function MemoryCardPage() {
 
           {/* 四层标签 */}
           {Object.keys(tagsByLayer).length > 0 && (
-            <CollapsibleSection title="标签系统">
+            <CollapsibleSection title="标签系统" titleClassName="text-sm font-semibold text-[#4A3326]">
               <div className="space-y-3">
                 {Object.entries(tagsByLayer).map(([layer, layerTags]) => {
                   const info = LAYER_NAMES[Number(layer)];
@@ -640,18 +640,18 @@ export default function MemoryCardPage() {
                 念念解析中…
               </>
             ) : memoryCard ? (
-              '🔄 重新解析'
+              '重新解析'
             ) : (
-              '✨ 开始念念解析'
+              '开始念念解析'
             )}
           </button>
           <button
             type="button"
             onClick={handleDelete}
             disabled={deleting || reanalyzing}
-            className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
+            className="w-full py-3 rounded-2xl border border-red-200 bg-white text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
           >
-            {deleting ? '删除中…' : '🗑 删除记忆卡'}
+            {deleting ? '删除中…' : '删除记忆卡'}
           </button>
         </div>
       </div>

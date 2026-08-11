@@ -13,7 +13,6 @@ import MemoryCardStatusBadge from '@/components/MemoryCardStatusBadge';
 import MemoryCardCompletionBar from '@/components/MemoryCardCompletionBar';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
-import PipelineSteps from '@/components/PipelineSteps';
 import { aggregateCompletion } from '@/lib/memory-card-completion';
 import type { GlobalMemoryFacets } from '@/lib/global-memory-search';
 
@@ -170,9 +169,7 @@ export default function AllMemoriesPage() {
         title={appreciate ? '家庭照片' : '全部记忆'}
         subtitle={appreciate ? '翻阅珍贵瞬间' : '跨主题浏览你的记忆卡'}
         large={appreciate}
-      >
-        {!appreciate && <PipelineSteps active={1} compact />}
-      </PageHero>
+      />
 
       <GlobalMemoryFilterBar
         draft={draft}

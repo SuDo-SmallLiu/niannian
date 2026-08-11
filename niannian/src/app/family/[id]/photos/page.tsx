@@ -9,6 +9,8 @@ import MemoryCardCompletionBar from '@/components/MemoryCardCompletionBar';
 import PipelineSteps from '@/components/PipelineSteps';
 import PageShell from '@/components/PageShell';
 import PageHero from '@/components/PageHero';
+import EmptyStateIcon from '@/components/EmptyStateIcon';
+import { NavMemoryIcon } from '@/components/icons/NianNianIcons';
 import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
 import {
   aggregateCompletion,
@@ -294,19 +296,20 @@ export default function PhotoLibraryPage() {
           )}
         </div>
       ) : photos.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-4xl mb-4">🃏</p>
-          {loadError ? (
-            <p className="text-red-500 text-sm mb-4">{loadError}</p>
-          ) : (
-            <p className="text-[#B8A898] mb-4">还没有照片</p>
-          )}
-          <Link
-            href={`/family/${familyId}/upload`}
-            className="inline-block px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium"
-          >
-            去上传照片
-          </Link>
+        <div className="py-16">
+          <EmptyStateIcon
+            icon={NavMemoryIcon}
+            title={loadError ? '加载失败' : '还没有照片'}
+            description={loadError || undefined}
+          />
+          <div className="text-center">
+            <Link
+              href={`/family/${familyId}/upload`}
+              className="inline-block mt-6 px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium"
+            >
+              去上传照片
+            </Link>
+          </div>
         </div>
       ) : (
         <>

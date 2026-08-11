@@ -112,7 +112,7 @@ function HomePageContent() {
     return (
       <div className="home-page min-h-[100dvh] flex flex-col bg-[#F8F4ED] overflow-hidden relative">
         <HomeBackgroundDecor />
-        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} compact showGuideTitle={false} />
+        <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} compact />
         <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
         <div className="relative z-10 w-full max-w-sm mx-auto px-5 pb-6 shrink-0">
           {redirect !== '/' && (

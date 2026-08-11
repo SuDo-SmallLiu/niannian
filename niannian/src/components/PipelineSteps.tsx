@@ -1,11 +1,20 @@
 'use client';
 
-const STEPS = [
-  { icon: '📷', label: '照片' },
-  { icon: '🃏', label: '记忆卡' },
-  { icon: '📖', label: '故事' },
-  { icon: '🎬', label: '电影' },
-] as const;
+import {
+  CameraIcon,
+  NavMemoryIcon,
+  NavMovieIcon,
+  NavStoryIcon,
+  type NianNianIconProps,
+} from '@/components/icons/NianNianIcons';
+import type { ComponentType } from 'react';
+
+const STEPS: Array<{ Icon: ComponentType<NianNianIconProps>; label: string }> = [
+  { Icon: CameraIcon, label: '照片' },
+  { Icon: NavMemoryIcon, label: '记忆卡' },
+  { Icon: NavStoryIcon, label: '故事' },
+  { Icon: NavMovieIcon, label: '电影' },
+];
 
 interface PipelineStepsProps {
   active?: 0 | 1 | 2 | 3;
@@ -25,19 +34,19 @@ export default function PipelineSteps({ active = 1, compact, dark, className = '
         <span key={step.label} className="flex items-center gap-1">
           {i > 0 && <span className="text-[#E8DCC8]">→</span>}
           <span
-            className={`inline-flex items-center gap-0.5 px-2 py-1 rounded-full transition-colors ${
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
               i === active
                 ? dark
-                  ? 'bg-white/10 text-[#D98A45] font-medium'
-                  : 'bg-[#FFF8F0] text-[#D98A45] font-medium'
+                  ? 'bg-white/10 text-[#DF8B3A] font-medium'
+                  : 'bg-[#FFF8F0] text-[#DF8B3A] font-medium'
                 : i < active
                   ? dark
                     ? 'text-white/70'
-                    : 'text-[#8B7355]'
+                    : 'text-[#8E7B6B]'
                   : ''
             }`}
           >
-            <span>{step.icon}</span>
+            <step.Icon size={compact ? 14 : 16} />
             {!compact && <span>{step.label}</span>}
           </span>
         </span>

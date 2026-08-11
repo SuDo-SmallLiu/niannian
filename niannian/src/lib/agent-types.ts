@@ -20,10 +20,10 @@ export function formatPipelineProgress(stats: PipelineStats): string {
       : `记忆 ${stats.completionAvg}%`;
 
   const parts = [
-    `📷 ${stats.photoCount} 张照片`,
-    `🃏 ${memoryPart}`,
-    stats.storyCount > 0 ? `📖 ${stats.storyCount} 个故事` : '📖 故事待生成',
-    stats.movieCount > 0 ? `🎬 ${stats.movieCount} 部电影` : '🎬 电影待生成',
+    `${stats.photoCount} 张照片`,
+    memoryPart,
+    stats.storyCount > 0 ? `${stats.storyCount} 个故事` : '故事待生成',
+    stats.movieCount > 0 ? `${stats.movieCount} 部电影` : '电影待生成',
   ];
 
   return `你的作品进度（${stats.pipelineProgress}%）：${parts.join(' → ')}。`;

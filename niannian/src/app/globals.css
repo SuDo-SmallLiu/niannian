@@ -469,8 +469,8 @@ body {
 
 .home-brand-banner {
   display: block;
-  width: 128px;
-  height: auto;
+  width: auto;
+  height: 96px;
   margin: 0 auto;
   object-fit: contain;
   object-position: center center;
@@ -644,39 +644,40 @@ body {
   z-index: 1;
   flex-shrink: 0;
   margin-top: auto;
-  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  padding: 8px 20px max(16px, env(safe-area-inset-bottom, 0px));
 }
 .home-hero {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
 }
 
 .home-hero__stage {
   position: relative;
-  flex: 1;
-  min-height: 0;
-  max-height: 380px;
+  flex: 0 0 auto;
+  height: clamp(248px, 36vh, 320px);
   margin: 0 auto;
   width: 100%;
   max-width: 390px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .home-hero__stage--compact {
   position: relative;
-  flex: 1;
-  min-height: 0;
-  max-height: 280px;
+  flex: 0 0 auto;
+  height: clamp(200px, 28vh, 260px);
   margin: 0 auto;
   width: 100%;
   max-width: 390px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .home-hero__mascot {
@@ -694,34 +695,56 @@ body {
   z-index: 20;
   font-family: var(--font-body);
   font-weight: 400;
-  letter-spacing: 0.02em;
-  background: rgba(255, 252, 248, 0.94);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow:
-    0 2px 12px rgba(75, 59, 47, 0.07),
-    0 1px 0 rgba(255, 255, 255, 0.8) inset;
-  color: var(--text-primary);
+  letter-spacing: 0.01em;
+  background: rgba(255, 253, 249, 0.96);
+  border: 1px solid rgba(125, 92, 57, 0.1);
+  box-shadow: 0 6px 20px rgba(74, 51, 38, 0.06);
+  color: #4a3326;
   line-height: 1.55;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .home-speech-bubble--left {
   top: 2%;
-  left: 8px;
-  max-width: 168px;
-  padding: 10px 12px;
+  left: 12px;
+  max-width: 172px;
+  padding: 12px 14px;
   border-radius: 18px 18px 18px 6px;
 }
 
+.home-speech-bubble--left::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 28px;
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 253, 249, 0.96);
+  border-right: 1px solid rgba(125, 92, 57, 0.1);
+  border-bottom: 1px solid rgba(125, 92, 57, 0.1);
+  transform: rotate(45deg);
+}
+
 .home-speech-bubble--right {
-  right: 6px;
-  bottom: 14%;
-  max-width: 118px;
-  padding: 8px 10px;
-  border-radius: 16px 16px 6px 16px;
-  font-size: 10.5px;
+  right: 10px;
+  bottom: 8%;
+  max-width: 168px;
+  padding: 12px 14px;
+  border-radius: 18px 18px 6px 18px;
   z-index: 15;
+}
+
+.home-speech-bubble--right::after {
+  content: '';
+  position: absolute;
+  bottom: 10px;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  background: rgba(255, 253, 249, 0.96);
+  border-right: 1px solid rgba(125, 92, 57, 0.1);
+  border-bottom: 1px solid rgba(125, 92, 57, 0.1);
+  transform: rotate(-45deg);
 }
 
 .home-hero--compact .home-speech-bubble--left {
@@ -736,35 +759,47 @@ body {
   bottom: 10%;
 }
 
-/* 引导主标题 */
+/* 引导主标题 — 位于功能卡片上方，与海兔区域分离 */
+.home-guide-block {
+  text-align: center;
+  padding: 0 12px 12px;
+}
+
 .home-guide-title {
   position: relative;
   z-index: 1;
   font-family: var(--font-display);
   text-align: center;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0.04em;
-  padding: 6px 20px 10px;
-  line-height: 1.5;
+  color: #4a3326;
+  letter-spacing: 0.02em;
+  padding: 0 8px 4px;
+  line-height: 1.4;
 }
+
+.home-guide-decor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #b8a999;
+  margin-bottom: 12px;
+}
+
 
 .home-feature-card {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
-  padding: 14px 12px 12px;
+  padding: 16px;
   border-radius: 20px;
-  border: 1px solid rgba(232, 220, 200, 0.9);
-  background: linear-gradient(165deg, #fffefb 0%, #fff8f0 100%);
-  box-shadow:
-    0 4px 16px rgba(75, 59, 47, 0.06),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 132px;
+  min-height: 156px;
   touch-action: manipulation;
+  transition: transform 0.14s ease;
+  box-shadow: 0 6px 20px rgba(74, 51, 38, 0.055);
 }
 
 .home-feature-card:active {
@@ -772,24 +807,19 @@ body {
 }
 
 .home-feature-card--create {
-  border-color: rgba(217, 138, 69, 0.22);
-  background: linear-gradient(165deg, #fffcf8 0%, #fff3e6 100%);
-  box-shadow:
-    0 6px 20px rgba(217, 138, 69, 0.12),
-    0 1px 0 rgba(255, 255, 255, 0.95) inset;
+  border: 1px solid rgba(223, 139, 58, 0.16);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 239, 222, 0.82));
 }
 
 .home-feature-card--appreciate {
-  opacity: 0.96;
-  box-shadow:
-    0 3px 14px rgba(75, 59, 47, 0.05),
-    0 1px 0 rgba(255, 255, 255, 0.85) inset;
+  border: 1px solid rgba(125, 92, 57, 0.12);
+  background: #fffdf9;
 }
 
 .home-feature-card__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -797,8 +827,8 @@ body {
 }
 
 .home-feature-card__icon--create {
-  background: rgba(217, 138, 69, 0.12);
-  color: #c47a3a;
+  background: rgba(223, 139, 58, 0.1);
+  color: #df8b3a;
 }
 
 .home-feature-card__icon--appreciate {
@@ -807,32 +837,32 @@ body {
 }
 
 .home-feature-card__title {
-  font-family: var(--font-display);
-  font-size: 15px;
+  font-family: var(--font-body);
+  font-size: 19px;
   font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: 0.03em;
-  margin-bottom: 4px;
+  color: #4a3326;
+  letter-spacing: 0.01em;
+  margin-bottom: 6px;
   line-height: 1.3;
 }
 
 .home-feature-card__desc {
   font-family: var(--font-body);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 400;
-  color: var(--text-secondary);
-  letter-spacing: 0.01em;
-  line-height: 1.5;
+  color: #8e7b6b;
+  letter-spacing: 0;
+  line-height: 1.45;
   margin-bottom: 8px;
   flex: 1;
 }
 
 .home-feature-card__cta {
   font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--accent);
-  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 600;
+  color: #df8b3a;
+  letter-spacing: 0.01em;
 }
 
 .home-feature-card--appreciate .home-feature-card__cta {

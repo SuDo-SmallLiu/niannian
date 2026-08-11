@@ -6,7 +6,8 @@ import Header from '@/components/Header';
 import PageShell from '@/components/PageShell';
 import PageHero from '@/components/PageHero';
 import SharePosterCard from '@/components/SharePosterCard';
-import PipelineSteps from '@/components/PipelineSteps';
+import EmptyStateIcon from '@/components/EmptyStateIcon';
+import { NavStoryIcon } from '@/components/icons/NianNianIcons';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useSharePoster } from '@/hooks/useSharePoster';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
@@ -156,9 +157,7 @@ export default function StoriesPage() {
         title="家庭故事"
         subtitle="来自记忆卡，不是你的相册流水账"
         large={appreciate}
-      >
-        <PipelineSteps active={2} compact />
-      </PageHero>
+      />
 
         {families.length > 1 && (
           <div className="max-w-md mx-auto mb-6">
@@ -198,17 +197,21 @@ export default function StoriesPage() {
             <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
           </div>
         ) : filteredStories.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-4xl mb-4">📖</p>
-            <p className="text-[#B8A898] mb-2">还没有已发布的故事</p>
-            <p className="text-sm text-[#D8CCB8]">在主题管理的草稿箱里编辑并发布后，会出现在这里</p>
-            <button
-              type="button"
-              onClick={() => router.push('/family')}
-              className="mt-6 px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
-            >
-              去我的主题
-            </button>
+          <div className="py-16">
+            <EmptyStateIcon
+              icon={NavStoryIcon}
+              title="还没有已发布的故事"
+              description="在主题管理的草稿箱里编辑并发布后，会出现在这里"
+            />
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => router.push('/family')}
+                className="mt-6 px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
+              >
+                去我的主题
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-8 max-w-md mx-auto">
@@ -262,7 +265,7 @@ export default function StoriesPage() {
                         disabled={sharingId === story.id}
                         className="flex-1 min-w-[120px] py-3 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all"
                       >
-                        {sharingId === story.id ? '生成中…' : '💬 分享'}
+                        {sharingId === story.id ? '生成中…' : '分享'}
                       </button>
                       <button
                         type="button"

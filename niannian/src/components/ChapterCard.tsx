@@ -1,6 +1,7 @@
 'use client';
 
 import SharePosterCard from '@/components/SharePosterCard';
+import { EditIcon, RefreshIcon, ShareIcon } from '@/components/icons/NianNianIcons';
 
 interface ChapterCardProps {
   chapter: number;
@@ -97,7 +98,11 @@ export default function ChapterCard({
             disabled={sharing || regenerating || deleting || editing}
             className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-[#D98A45] text-[#D98A45] text-sm font-medium hover:bg-[#FFF8F0] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
-            {editing ? '编辑中…' : '✏️ 编辑故事'}
+            {editing ? '编辑中…' : (
+              <>
+                <EditIcon size={16} /> 编辑故事
+              </>
+            )}
           </button>
         )}
 
@@ -114,7 +119,9 @@ export default function ChapterCard({
                 念念重新生成中…
               </>
             ) : (
-              '🔄 重新生成故事'
+              <>
+                <RefreshIcon size={16} /> 重新生成故事
+              </>
             )}
           </button>
         )}
@@ -125,7 +132,11 @@ export default function ChapterCard({
           disabled={sharing || regenerating || deleting}
           className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98] shadow-sm touch-manipulation"
         >
-          {sharing ? '生成海报中…' : '💬 分享给家人'}
+          {sharing ? '生成海报中…' : (
+            <>
+              <ShareIcon size={16} /> 分享给家人
+            </>
+          )}
         </button>
 
         {onDelete && (

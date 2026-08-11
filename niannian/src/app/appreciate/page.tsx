@@ -1,30 +1,38 @@
 'use client';
 
 import Link from 'next/link';
+import { NianNianIconBox, NavMemoryIcon, NavMovieIcon, NavStoryIcon, type NianNianIconProps } from '@/components/icons/NianNianIcons';
+import type { ComponentType } from 'react';
 
-const ITEMS = [
+const ITEMS: Array<{
+  href: string;
+  Icon: ComponentType<NianNianIconProps>;
+  title: string;
+  desc: string;
+  color: string;
+}> = [
   {
     href: '/family/memories?appreciate=1',
-    icon: '🃏',
+    Icon: NavMemoryIcon,
     title: '照片记忆',
     desc: '浏览所有 Memory Card',
     color: 'from-[#FFF8F0] to-[#F0E8D8]',
   },
   {
     href: '/stories?appreciate=1',
-    icon: '📖',
+    Icon: NavStoryIcon,
     title: '家庭故事',
     desc: '图文与故事电影',
     color: 'from-[#FFFBF5] to-[#F0E8D8]',
   },
   {
     href: '/movies?appreciate=1',
-    icon: '🎬',
+    Icon: NavMovieIcon,
     title: '人生电影',
     desc: '配乐旁白，自动播放',
     color: 'from-[#FFF8F0] to-[#E8DCC8]',
   },
-] as const;
+];
 
 export default function AppreciatePage() {
   return (
@@ -46,7 +54,7 @@ export default function AppreciatePage() {
             href={item.href}
             className={`block rounded-3xl p-8 bg-gradient-to-br ${item.color} border border-[#E8DCC8] active:scale-[0.98] transition-transform shadow-sm`}
           >
-            <span className="text-5xl block mb-4">{item.icon}</span>
+            <NianNianIconBox icon={item.Icon} className="mb-4" />
             <h2 className="text-2xl font-serif font-bold text-[#4B3B2F] mb-2">{item.title}</h2>
             <p className="text-base text-[#8B7355]">{item.desc}</p>
           </Link>

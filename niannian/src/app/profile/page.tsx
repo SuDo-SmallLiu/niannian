@@ -2,19 +2,20 @@
 
 import Link from 'next/link';
 import { useState, type ComponentType } from 'react';
-import {
-  Bell,
-  BookOpen,
-  ChevronRight,
-  Clapperboard,
-  Heart,
-  Images,
-  Info,
-  Sparkles,
-  Tag,
-} from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import NianNianAvatar from '@/components/NianNianAvatar';
 import Header from '@/components/Header';
+import {
+  BellIcon,
+  HeartIcon,
+  InfoIcon,
+  NavMemoryIcon,
+  NavMovieIcon,
+  NavStoryIcon,
+  SparklesIcon,
+  TagIcon,
+  type NianNianIconProps,
+} from '@/components/icons/NianNianIcons';
 import { useAuth } from '@/components/providers/auth-provider';
 
 export default function ProfilePage() {
@@ -53,9 +54,9 @@ export default function ProfilePage() {
 
         {/* 3. 快速入口 */}
         <section className="profile-quick-panel">
-          <QuickEntry href="/family/memories" icon={Images} label="我的记忆" />
-          <QuickEntry href="/stories" icon={BookOpen} label="我的故事" />
-          <QuickEntry href="/movies" icon={Clapperboard} label="我的电影" />
+          <QuickEntry href="/family/memories" icon={NavMemoryIcon} label="我的记忆" />
+          <QuickEntry href="/stories" icon={NavStoryIcon} label="我的故事" />
+          <QuickEntry href="/movies" icon={NavMovieIcon} label="我的电影" />
         </section>
 
         {/* 4. 主题与管理 */}
@@ -63,20 +64,20 @@ export default function ProfilePage() {
           <h2 className="profile-card__heading">主题与管理</h2>
           <MenuRow
             href="/family"
-            icon={Tag}
+            icon={TagIcon}
             title="我的主题"
             subtitle="按季节、旅行等主题管理记忆"
           />
           <MenuDivider />
           <MenuRow
             href="/appreciate"
-            icon={Sparkles}
+            icon={SparklesIcon}
             title="欣赏模式"
             subtitle="大字号浏览，适合与家人一起看"
           />
           <MenuDivider />
           <MenuRow
-            icon={Bell}
+            icon={BellIcon}
             title="提醒设置"
             subtitle="纪念日与家庭助手"
             badge="即将上线"
@@ -86,9 +87,9 @@ export default function ProfilePage() {
         {/* 5. 更多 */}
         <section className="profile-card">
           <h2 className="profile-card__heading">更多</h2>
-          <MenuRow icon={Info} title="关于念念年年" subtitle="MVP V3 · 家庭故事流水线" />
+          <MenuRow icon={InfoIcon} title="关于念念年年" subtitle="MVP V3 · 家庭故事流水线" />
           <MenuDivider />
-          <MenuRow icon={Heart} title="让每一张照片都成为回家的理由" titleWrap tall />
+          <MenuRow icon={HeartIcon} title="让每一张照片都成为回家的理由" titleWrap tall />
         </section>
 
         {/* 6. 退出登录 */}
@@ -119,13 +120,13 @@ function QuickEntry({
   label,
 }: {
   href: string;
-  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: ComponentType<NianNianIconProps>;
   label: string;
 }) {
   return (
     <Link href={href} className="profile-quick-entry">
       <span className="profile-quick-entry__icon">
-        <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+        <Icon size={18} />
       </span>
       <span className="profile-quick-entry__label">{label}</span>
     </Link>
@@ -141,7 +142,7 @@ function MenuRow({
   titleWrap,
   tall,
 }: {
-  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: ComponentType<NianNianIconProps>;
   title: string;
   subtitle?: string;
   badge?: string;
@@ -154,7 +155,7 @@ function MenuRow({
   const inner = (
     <>
       <span className="profile-menu-row__icon">
-        <Icon className="w-[17px] h-[17px]" strokeWidth={1.75} />
+        <Icon size={17} />
       </span>
       <div className="profile-menu-row__text">
         <div className="profile-menu-row__title-line">

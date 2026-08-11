@@ -6,7 +6,7 @@ import Link from 'next/link';
 import FamilySectionTabs from '@/components/FamilySectionTabs';
 import PageShell from '@/components/PageShell';
 import PageHero from '@/components/PageHero';
-import PipelineSteps from '@/components/PipelineSteps';
+import { NavStoryIcon, PhotoIcon } from '@/components/icons/NianNianIcons';
 
 interface FamilyInfo {
   id: string;
@@ -44,9 +44,7 @@ export default function FamilyPage() {
     <PageShell>
       <FamilySectionTabs />
 
-      <PageHero title="我的主题" subtitle="按家庭主题组织记忆卡">
-        <PipelineSteps active={1} compact />
-      </PageHero>
+      <PageHero title="我的主题" subtitle="按家庭主题组织记忆卡" />
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -90,8 +88,12 @@ export default function FamilyPage() {
                     ))}
                   </div>
                   <div className="flex items-center gap-4 text-xs text-[#B8A898]">
-                    <span>📷 {family.photo_count || 0} 张照片</span>
-                    <span>📖 {family.story_count || 0} 个故事</span>
+                    <span className="inline-flex items-center gap-1">
+                      <PhotoIcon size={14} /> {family.photo_count || 0} 张照片
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <NavStoryIcon size={14} /> {family.story_count || 0} 个故事
+                    </span>
                   </div>
                 </Link>
               ))}

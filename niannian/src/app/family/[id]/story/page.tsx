@@ -18,6 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import EmptyStateIcon from '@/components/EmptyStateIcon';
+import { NavStoryIcon, PhotoIcon } from '@/components/icons/NianNianIcons';
 
 interface StoryItem {
   id: string;
@@ -303,7 +305,7 @@ export default function StoryPage() {
           ← 返回
         </Link>
         <div className="text-center mb-10">
-          <div className="text-5xl mb-4">📖</div>
+          <EmptyStateIcon icon={NavStoryIcon} className="mb-6" />
           <h1 className="text-xl font-serif text-[#4B3B2F] mb-2">
             {familyName ? `${familyName}的故事` : '家庭故事'}
           </h1>
@@ -314,14 +316,14 @@ export default function StoryPage() {
             href={`/family/${familyId}/story/compose`}
             className="block w-full py-4 px-5 rounded-2xl bg-white border-2 border-[#D98A45] text-center shadow-sm"
           >
-            <p className="text-[#D98A45] font-medium mb-1">🧩 人工组合排列</p>
+            <p className="text-[#D98A45] font-medium mb-1">人工组合排列</p>
             <p className="text-xs text-[#B8A898]">自选照片、调整顺序，生成一个故事</p>
           </Link>
           <Link
             href={`/family/${familyId}`}
             className="block w-full py-4 px-5 rounded-2xl bg-[#D98A45] text-white text-center shadow-sm"
           >
-            <p className="font-medium mb-1">✨ 念念自动发现故事</p>
+            <p className="font-medium mb-1">念念自动发现故事</p>
             <p className="text-xs text-white/80">从全部记忆卡聚类生成 3–5 个主题故事</p>
           </Link>
           <Link
@@ -410,14 +412,14 @@ export default function StoryPage() {
           disabled={autoGenerating}
           className="w-full py-4 px-5 rounded-2xl bg-[#D98A45] text-white font-medium shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
         >
-          {autoGenerating ? '念念撰写中…' : '✨ 念念自动生成故事'}
+          {autoGenerating ? '念念撰写中…' : '念念自动生成故事'}
         </button>
         <Link
           href={`/family/${familyId}/story/compose`}
           className="flex items-center justify-between w-full py-4 px-5 rounded-2xl bg-white border border-[#E8DCC8] hover:border-[#D98A45]/40 transition-all shadow-sm"
         >
           <div className="text-left">
-            <p className="text-sm font-medium text-[#4B3B2F]">🧩 人工组合排列</p>
+            <p className="text-sm font-medium text-[#4B3B2F]">人工组合排列</p>
             <p className="text-xs text-[#B8A898] mt-0.5">自选照片顺序，手动编排后生成故事</p>
           </div>
           <span className="text-[#D98A45] text-lg">→</span>
@@ -486,7 +488,7 @@ export default function StoryPage() {
             href={`/family/${familyId}/upload`}
             className="inline-flex items-center gap-1.5 text-sm text-[#B8A898] hover:text-[#D98A45] transition-colors"
           >
-            <span>📷</span>
+            <PhotoIcon size={16} className="text-[#B8A898]" />
             上传更多，发现更多故事
           </Link>
         </div>

@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { H5Slide } from '@/lib/h5-story-slides';
-import { getMusicFromSlide } from '@/lib/theme-music';
+import { getMusicFromSlide, getWorkMusicFromSlides } from '@/lib/theme-music';
 import { estimateNarrationMs, getSlideNarrationText } from '@/lib/slide-narration';
 import { useThemeMusic } from '@/hooks/useThemeMusic';
 import { useNarration } from '@/hooks/useNarration';
-import { ChevronLeft, Mic, MicOff, Pause, Play, Share2, Volume2, VolumeX, X } from 'lucide-react';
+import { ChevronLeft, Mic, MicOff, Pause, Play, Share2, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
 
 interface InteractiveStoryPlayerProps {
   slides: H5Slide[];
@@ -82,7 +82,7 @@ export default function InteractiveStoryPlayer({
     setNarrationDurationMs(null);
   }, [index, narrationKey]);
 
-  const activeMusic = useMemo(() => getMusicFromSlide(slide), [slide]);
+  const activeMusic = useMemo(() => getWorkMusicFromSlides(slides), [slides]);
 
   const { prime: primeMusic } = useThemeMusic({
     src: activeMusic.file,
@@ -533,14 +533,15 @@ function SlideContent({ slide }: { slide: H5Slide }) {
 
   return (
     <div className="relative w-full h-full bg-gradient-to-br from-[#4B3B2F] via-[#6B5A48] to-[#D98A45] flex flex-col items-center justify-center px-8 text-center">
-      <p className="text-4xl mb-6 h5-text-enter">✦</p>
+      <Sparkles size={32} className="mb-6 text-white/80 h5-text-enter" strokeWidth={1.5} />
       <h2 className="text-2xl font-serif font-bold mb-4 h5-text-enter h5-delay-1">{slide.title}</h2>
       {slide.summary && (
         <p className="text-base text-white/80 mb-6 h5-text-enter h5-delay-2">{slide.summary}</p>
       )}
       {slide.connectionAction && (
         <div className="bg-white/10 rounded-2xl p-5 max-w-sm h5-text-enter h5-delay-3">
-          <p className="text-sm leading-relaxed text-white/90">💡 {slide.connectionAction}</p>
+          <p className="text-xs font-medium text-white/70 mb-2 tracking-wide">连接建议</p>
+          <p className="text-sm leading-relaxed text-white/90">{slide.connectionAction}</p>
         </div>
       )}
       {slide.familyName && (

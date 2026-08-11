@@ -76,4 +76,10 @@ export function getMusicFromSlide(slide: H5Slide | undefined): ThemeMusicTrack {
   return getMusicForTheme(theme);
 }
 
+export function getWorkMusicFromSlides(slides: H5Slide[]): ThemeMusicTrack {
+  const anchor =
+    slides.find((s) => s.type === 'chapter' || s.type === 'cover') || slides[0];
+  return getMusicFromSlide(anchor);
+}
+
 export type { MusicLibraryTrack };

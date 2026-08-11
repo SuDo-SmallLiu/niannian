@@ -1,9 +1,18 @@
+import type { ComponentType } from 'react';
+import {
+  FolderIcon,
+  HeartIcon,
+  NavMemoryIcon,
+  NavMovieIcon,
+  NavStoryIcon,
+  type NianNianIconProps,
+} from '@/components/icons/NianNianIcons';
 import type { PipelineStats } from '@/lib/agent-types';
 import type { AgentPage } from '@/lib/agent-hints';
 
 export interface AgentStepDef {
   id: number;
-  icon: string;
+  Icon: ComponentType<NianNianIconProps>;
   title: string;
   desc: string;
   href: (ctx: { firstFamilyId?: string }) => string;
@@ -12,7 +21,7 @@ export interface AgentStepDef {
 export const AGENT_STEPS: AgentStepDef[] = [
   {
     id: 1,
-    icon: '📁',
+    Icon: FolderIcon,
     title: '创建主题记忆',
     desc: '上传照片或片段，创建专属的主题记忆',
     href: ({ firstFamilyId }) =>
@@ -20,7 +29,7 @@ export const AGENT_STEPS: AgentStepDef[] = [
   },
   {
     id: 2,
-    icon: '🪪',
+    Icon: NavMemoryIcon,
     title: '完善记忆卡',
     desc: '补充更多细节，让念念更懂你的故事',
     href: ({ firstFamilyId }) =>
@@ -28,7 +37,7 @@ export const AGENT_STEPS: AgentStepDef[] = [
   },
   {
     id: 3,
-    icon: '📖',
+    Icon: NavStoryIcon,
     title: '去生成故事',
     desc: '念念为你生成一篇温暖的家庭故事',
     href: ({ firstFamilyId }) =>
@@ -38,7 +47,7 @@ export const AGENT_STEPS: AgentStepDef[] = [
   },
   {
     id: 4,
-    icon: '🎬',
+    Icon: NavMovieIcon,
     title: '去生成电影',
     desc: '把故事变成一部专属家庭电影',
     href: ({ firstFamilyId }) =>
@@ -46,7 +55,7 @@ export const AGENT_STEPS: AgentStepDef[] = [
   },
   {
     id: 5,
-    icon: '✈️',
+    Icon: HeartIcon,
     title: '欣赏故事 / 电影作品',
     desc: '随时回味美好时光，一键分享给家人',
     href: () => '/appreciate',
@@ -55,9 +64,7 @@ export const AGENT_STEPS: AgentStepDef[] = [
 
 export function getCurrentStepIndex(stats: PipelineStats | null | undefined): number {
   if (!stats || stats.photoCount === 0) return 1;
-  // 第二步：仍有待解析 / 尚未产生任何记忆卡
   if (stats.pendingCount > 0 || stats.analyzedCount === 0) return 2;
-  // 完成度不阻断进度——解析完即可进入「生成故事」
   if (stats.storyCount === 0) return 3;
   if (stats.movieCount === 0) return 4;
   return 5;

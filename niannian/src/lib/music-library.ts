@@ -46,6 +46,12 @@ export function getMusicTrackById(id: string): MusicLibraryTrack | undefined {
   return trackById.get(id);
 }
 
+/** 已下架构型 → 替代 BGM */
+const ARCHETYPE_REDIRECT: Record<string, string> = {
+  欢聚庆典: '温暖相依',
+  仪式传承: '岁月回响',
+};
+
 /** 按情动构型直选 BGM（优先于五类分类） */
 export function pickTrackForArchetype(
   archetype: string,
@@ -53,7 +59,11 @@ export function pickTrackForArchetype(
 ): MusicLibraryTrack | undefined {
   const name = archetype.trim();
   if (!name) return undefined;
-  return trackByArchetype.get(name);
+  const direct = trackByArchetype.get(name);
+  if (direct) return direct;
+  const redirect = ARCHETYPE_REDIRECT[name];
+  if (redirect) return trackByArchetype.get(redirect);
+  return undefined;
 }
 
 export function pickTrackForTheme(theme?: string): MusicLibraryTrack {
@@ -84,5 +94,5 @@ export function getMusicSrcForTheme(theme?: string): string {
 }
 
 export function getMusicVolumeForTheme(_theme?: string): number {
-  return 0.32;
+  return 0.18;
 }

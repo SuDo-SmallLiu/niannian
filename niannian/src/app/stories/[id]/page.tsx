@@ -237,7 +237,7 @@ export default function StoryDetailPage() {
               disabled={sharing}
               className="px-4 py-2 rounded-xl bg-[#07C160] text-white text-sm font-medium disabled:opacity-50"
             >
-              {sharing ? '…' : '💬 分享'}
+              {sharing ? '…' : '分享'}
             </button>
           )}
         </div>
@@ -256,7 +256,7 @@ export default function StoryDetailPage() {
             onClick={() => setEditing(true)}
             className="flex-1 py-2.5 rounded-xl bg-white border border-[#E8DCC8] text-sm text-[#8B7355]"
           >
-            ✏️ 编辑故事
+            编辑故事
           </button>
         </div>
       )}

@@ -32,10 +32,23 @@ interface HomeFeatureCardsProps {
 export default function HomeFeatureCards({ onCreate }: HomeFeatureCardsProps) {
   return (
     <div className="home-feature-cards px-4 pb-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="home-guide-block max-w-[390px] mx-auto">
+        <h2 className="home-guide-title">
+          今天，我们的镜头
+          <br className="sm:hidden" />
+          要对准哪里呢？
+        </h2>
+        <div className="home-guide-decor" aria-hidden>
+          <span>——</span>
+          <span className="text-[#F6B51B]">♥</span>
+          <span>——</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 max-w-[390px] mx-auto">
         <button type="button" onClick={onCreate} className="home-feature-card home-feature-card--create">
           <div className="home-feature-card__icon home-feature-card__icon--create">
-            <VintageCameraIcon className="w-7 h-7" />
+            <VintageCameraIcon className="w-[34px] h-[34px]" />
           </div>
           <h3 className="home-feature-card__title">我要创造</h3>
           <p className="home-feature-card__desc">让照片变成故事与人生电影</p>
@@ -44,7 +57,7 @@ export default function HomeFeatureCards({ onCreate }: HomeFeatureCardsProps) {
 
         <Link href="/appreciate" className="home-feature-card home-feature-card--appreciate">
           <div className="home-feature-card__icon home-feature-card__icon--appreciate">
-            <FilmReelIcon className="w-7 h-7" />
+            <FilmReelIcon className="w-[34px] h-[34px]" />
           </div>
           <h3 className="home-feature-card__title">我要欣赏</h3>
           <p className="home-feature-card__desc">重温那些被念念珍藏的时光</p>

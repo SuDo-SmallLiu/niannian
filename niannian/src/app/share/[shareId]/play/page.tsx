@@ -11,6 +11,8 @@ import {
   type StoryH5Input,
 } from '@/lib/h5-story-slides';
 import { getSlideNarrationText } from '@/lib/slide-narration';
+import EmptyStateIcon from '@/components/EmptyStateIcon';
+import { HeartIcon } from '@/components/icons/NianNianIcons';
 
 type SharePlayPayload =
   | {
@@ -124,8 +126,7 @@ export default function SharePlayPage() {
   if (error || !payload) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F4ED] px-8 text-center">
-        <div className="text-5xl mb-4">💌</div>
-        <p className="text-[#8B7355] mb-2">{error || '内容不存在'}</p>
+        <EmptyStateIcon icon={HeartIcon} title={error || '内容不存在'} className="mb-4" />
         <Link href="/" className="text-sm text-[#D98A45] underline underline-offset-2">
           回到首页
         </Link>

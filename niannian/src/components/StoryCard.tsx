@@ -1,6 +1,7 @@
 'use client';
 
 import Timeline from './Timeline';
+import { HeartIcon, NavStoryIcon, ShareIcon, SparklesIcon, TimeIcon } from '@/components/icons/NianNianIcons';
 
 interface StoryCardProps {
   title: string;
@@ -28,7 +29,7 @@ export default function StoryCard({
       {/* 标题区 */}
       <div className="p-8 pb-6 border-b border-[#f0ebe4]">
         <div className="flex items-center gap-2 text-xs text-[#d4786e] font-medium tracking-wider mb-3">
-          <span>📖</span>
+          <NavStoryIcon size={14} />
           <span>念念生成的家庭记忆</span>
           <span className="text-[#b8afa6]">· 基于 {photoCount} 张照片</span>
         </div>
@@ -41,7 +42,7 @@ export default function StoryCard({
       {/* 时间线 */}
       <div className="p-8 pb-6 border-b border-[#f0ebe4]">
         <h2 className="text-sm font-medium text-[#8b8178] mb-4 flex items-center gap-2">
-          <span>⏳</span> 时间线
+          <TimeIcon size={14} /> 时间线
         </h2>
         <Timeline items={timeline} />
       </div>
@@ -49,7 +50,7 @@ export default function StoryCard({
       {/* 情感总结 */}
       <div className="p-8 pb-6 border-b border-[#f0ebe4]">
         <h2 className="text-sm font-medium text-[#8b8178] mb-3 flex items-center gap-2">
-          <span>💭</span> 情感总结
+          <HeartIcon size={14} /> 情感总结
         </h2>
         <p className="text-[#2d2a26] leading-relaxed text-lg">{description}</p>
       </div>
@@ -57,7 +58,7 @@ export default function StoryCard({
       {/* 连接建议 */}
       <div className="p-8">
         <h2 className="text-sm font-medium text-[#8b8178] mb-3 flex items-center gap-2">
-          <span>💡</span> 连接建议
+          <SparklesIcon size={14} /> 连接建议
         </h2>
         <div className="bg-[#faf8f5] rounded-xl p-5 border border-[#f0ebe4]">
           <p className="text-[#2d2a26] leading-relaxed mb-4">{connectionAction}</p>
@@ -97,7 +98,7 @@ export default function StoryCard({
                 </>
               ) : (
                 <>
-                  <span>🔗</span>
+                  <ShareIcon size={16} />
                   生成分享卡片
                 </>
               )}

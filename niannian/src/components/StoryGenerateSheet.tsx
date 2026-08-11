@@ -55,7 +55,7 @@ export default function StoryGenerateSheet({
             onClick={onManual}
             className="w-full text-left p-4 rounded-2xl bg-white border-2 border-[#D98A45] hover:bg-[#FFF8F0] active:scale-[0.99] transition-all"
           >
-            <p className="text-base font-medium text-[#4B3B2F] mb-1">🧩 人工排列，拼出你的故事</p>
+            <p className="text-base font-medium text-[#4B3B2F] mb-1">人工排列，拼出你的故事</p>
             <p className="text-xs text-[#B8A898] leading-relaxed">
               亲手挑选照片顺序与组合，念念帮你润色成一篇专属故事
             </p>
@@ -71,8 +71,8 @@ export default function StoryGenerateSheet({
               {autoLoading
                 ? '念念撰写中…'
                 : hasExistingStories
-                  ? '🔄 重新生成故事'
-                  : '✨ 念念读懂照片，自动写故事'}
+                  ? '重新生成故事'
+                  : '念念读懂照片，自动写故事'}
             </p>
             <p className="text-xs text-white/80 leading-relaxed">
               {hasExistingStories

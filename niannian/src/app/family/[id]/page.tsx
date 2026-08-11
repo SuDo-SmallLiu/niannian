@@ -5,6 +5,15 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import { useAutoGenerateFamilyStory } from '@/hooks/useAutoGenerateFamilyStory';
+import {
+  CameraIcon,
+  NavMemoryIcon,
+  NavStoryIcon,
+  PhotoIcon,
+  SparklesIcon,
+  type NianNianIconProps,
+} from '@/components/icons/NianNianIcons';
+import type { ComponentType } from 'react';
 
 interface FamilyDetail {
   id: string;
@@ -103,30 +112,36 @@ export default function FamilyDetailPage() {
     );
   }
 
-  const actions = [
+  const actions: Array<{
+    Icon: ComponentType<NianNianIconProps>;
+    title: string;
+    desc: string;
+    href: string;
+    color: string;
+  }> = [
     {
-      icon: '📸',
+      Icon: CameraIcon,
       title: '上传照片',
       desc: '批量上传家庭照片',
       href: `/family/${familyId}/upload`,
       color: 'bg-[#FFF8F0] border-[#F0DCC8]',
     },
     {
-      icon: '🧠',
+      Icon: SparklesIcon,
       title: '念念解析',
       desc: '让念念理解每张照片',
       href: `/family/${familyId}/analyze`,
       color: 'bg-[#FFF8F0] border-[#F0DCC8]',
     },
     {
-      icon: '🃏',
+      Icon: NavMemoryIcon,
       title: '记忆卡',
       desc: '查看每张照片的记忆',
       href: `/family/${familyId}/photos`,
       color: 'bg-white border-[#E8DCC8]',
     },
     {
-      icon: '📖',
+      Icon: NavStoryIcon,
       title: '故事草稿箱',
       desc:
         (family?.story_count || 0) > 0
@@ -162,15 +177,19 @@ export default function FamilyDetailPage() {
           ))}
         </div>
         <div className="flex justify-center gap-6 text-sm text-[#B8A898]">
-          <span>📷 {family.photo_count || 0} 张照片</span>
-          <span>📖 {family.story_count || 0} 个故事</span>
+          <span className="inline-flex items-center gap-1.5">
+            <PhotoIcon size={16} /> {family.photo_count || 0} 张照片
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <NavStoryIcon size={16} /> {family.story_count || 0} 个故事
+          </span>
         </div>
       </div>
 
       {(family.story_count || 0) > 0 && !storyBannerDismissed && (
         <div className="mb-6 animate-fade-in-up delay-75 rounded-2xl border border-[#D98A45]/30 bg-[#FFF8F0] p-4 shadow-sm">
           <div className="flex items-start gap-3">
-            <span className="text-2xl shrink-0">📖</span>
+            <NavStoryIcon size={28} className="shrink-0 text-[#DF8B3A]" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[#4B3B2F]">
                 已为您生成{family.story_count === 1 ? '一个故事' : ` ${family.story_count} 个故事`}
@@ -208,7 +227,7 @@ export default function FamilyDetailPage() {
             disabled={generating}
             className="block w-full rounded-2xl py-4 px-5 bg-[#D98A45] text-white font-medium text-center shadow-sm hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.99]"
           >
-            {generating ? '念念撰写中…' : '✨ 念念自动生成故事'}
+            {generating ? '念念撰写中…' : '念念自动生成故事'}
           </button>
           <p className="text-xs text-center text-[#B8A898] mt-2">
             或到记忆卡页面选择「人工组合故事」
@@ -227,7 +246,7 @@ export default function FamilyDetailPage() {
             disabled={generatingMovie}
             className="w-full rounded-2xl py-4 px-5 bg-[#4B3B2F] text-white font-medium shadow-sm hover:bg-[#3B2F25] disabled:opacity-60 transition-all active:scale-[0.99]"
           >
-            {generatingMovie ? '正在生成…' : '🎬 生成人生电影（互动版播放）'}
+            {generatingMovie ? '正在生成…' : '生成人生电影（互动版播放）'}
           </button>
           <p className="text-xs text-center text-[#B8A898] mt-2">
             将 {family.story_count} 个故事串联为沉浸式人生电影
@@ -242,7 +261,9 @@ export default function FamilyDetailPage() {
             href={action.href}
             className={`rounded-2xl p-5 border shadow-sm hover:shadow-md hover:border-[#D98A45]/30 transition-all active:scale-[0.98] ${action.color}`}
           >
-            <div className="text-2xl mb-2">{action.icon}</div>
+            <div className="mb-2 text-[#DF8B3A]">
+              <action.Icon size={24} />
+            </div>
             <h3 className="text-sm font-medium text-[#4B3B2F] mb-0.5">{action.title}</h3>
             <p className="text-xs text-[#B8A898]">{action.desc}</p>
           </Link>

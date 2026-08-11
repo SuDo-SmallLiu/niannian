@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import PageShell from '@/components/PageShell';
 import PageHero from '@/components/PageHero';
-import PipelineSteps from '@/components/PipelineSteps';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import { useSharePoster } from '@/hooks/useSharePoster';
@@ -161,9 +160,7 @@ export default function MoviesPage() {
         title="人生电影"
         subtitle={appreciate ? '自动播放 · 配乐旁白' : '故事成片 · 配乐旁白自动播放'}
         large={appreciate}
-      >
-        {!appreciate && <PipelineSteps active={3} compact dark />}
-      </PageHero>
+      />
 
         {loading ? (
           <div className="flex justify-center py-20">
@@ -285,7 +282,7 @@ function GenerateFromFamilies({
             onClick={() => onGenerate(f.id)}
             className="w-full py-3 px-4 rounded-xl bg-[#D98A45] text-white text-sm font-medium disabled:opacity-50"
           >
-            {loadingId === f.id ? '生成中…' : `🎬 为「${f.name}」生成人生电影`}
+            {loadingId === f.id ? '生成中…' : `为「${f.name}」生成人生电影`}
           </button>
         ))}
     </div>
