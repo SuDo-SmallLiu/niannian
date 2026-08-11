@@ -30,7 +30,7 @@ export default function BottomNav() {
 
   return (
     <nav className="home-bottom-nav sticky bottom-0 z-[60] safe-bottom">
-      <div className="home-bottom-nav__inner flex items-center justify-around h-16 px-1">
+      <div className="home-bottom-nav__inner flex items-center justify-around h-[72px] px-1">
         {NAV_ITEMS.map((item) => (
           <NavItem key={item.href} {...item} pathname={pathname} />
         ))}
@@ -60,15 +60,15 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`home-bottom-nav__item flex flex-col items-center gap-0.5 px-2 py-1 min-w-[3.25rem] transition-all ${
+      className={`home-bottom-nav__item flex flex-col items-center justify-center gap-1 px-2 py-1 min-w-[44px] min-h-[44px] transition-all ${
         isActive ? 'home-bottom-nav__item--active' : ''
       }`}
     >
       <Icon
         size={24}
-        className={`transition-transform ${isActive ? 'scale-105 text-[#DF8B3A]' : 'text-[#8E7B6B]'}`}
+        className={`transition-transform ${isActive ? 'scale-105 text-[#DF8B3A]' : 'text-[#9B8C7D]'}`}
       />
-      <span className="text-[10px] leading-tight">{label}</span>
+      <span className="text-xs leading-tight font-medium">{label}</span>
     </Link>
   );
 }

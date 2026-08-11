@@ -12,7 +12,7 @@ export default function HomeWelcomeHero({
   onOpenHelp,
   compact = false,
 }: HomeWelcomeHeroProps) {
-  const mascotSize = compact ? 200 : 272;
+  const mascotSize = compact ? 200 : 300;
 
   return (
     <div className={`home-hero relative flex flex-col z-[1] ${compact ? 'home-hero--compact' : ''}`}>

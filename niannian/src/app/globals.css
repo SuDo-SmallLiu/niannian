@@ -459,9 +459,10 @@ body {
   font-family: var(--font-body);
 }
 
-/* 首页顶部 Logo 区 — 居中嵌入背景 */
+/* 首页顶部 Logo 区 — 居中嵌入背景 (~70px) */
 .home-brand-header {
-  padding: 8px 20px 0;
+  padding: 4px 20px 0;
+  min-height: 70px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -470,7 +471,7 @@ body {
 .home-brand-banner {
   display: block;
   width: auto;
-  height: 96px;
+  height: 62px;
   margin: 0 auto;
   object-fit: contain;
   object-position: center center;
@@ -644,11 +645,11 @@ body {
   z-index: 1;
   flex-shrink: 0;
   margin-top: auto;
-  padding: 8px 20px max(16px, env(safe-area-inset-bottom, 0px));
+  padding: 0 20px max(12px, env(safe-area-inset-bottom, 0px));
 }
+
 .home-hero {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -657,14 +658,14 @@ body {
 .home-hero__stage {
   position: relative;
   flex: 0 0 auto;
-  height: clamp(248px, 36vh, 320px);
+  height: 350px;
   margin: 0 auto;
   width: 100%;
   max-width: 390px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .home-hero__stage--compact {
@@ -705,18 +706,19 @@ body {
 }
 
 .home-speech-bubble--left {
-  top: 2%;
-  left: 12px;
-  max-width: 172px;
-  padding: 12px 14px;
-  border-radius: 18px 18px 18px 6px;
+  top: 4%;
+  left: 16px;
+  width: 178px;
+  max-width: 178px;
+  padding: 14px 16px;
+  border-radius: 22px 22px 22px 8px;
 }
 
 .home-speech-bubble--left::after {
   content: '';
   position: absolute;
   bottom: -6px;
-  left: 28px;
+  left: 32px;
   width: 12px;
   height: 12px;
   background: rgba(255, 253, 249, 0.96);
@@ -726,11 +728,12 @@ body {
 }
 
 .home-speech-bubble--right {
-  right: 10px;
-  bottom: 8%;
-  max-width: 168px;
+  right: 12px;
+  top: 42%;
+  width: 136px;
+  max-width: 136px;
   padding: 12px 14px;
-  border-radius: 18px 18px 6px 18px;
+  border-radius: 20px 20px 8px 20px;
   z-index: 15;
 }
 
@@ -759,10 +762,11 @@ body {
   bottom: 10%;
 }
 
-/* 引导主标题 — 位于功能卡片上方，与海兔区域分离 */
+/* 引导主标题 — 位于功能卡片上方 (~60px) */
 .home-guide-block {
   text-align: center;
-  padding: 0 12px 12px;
+  padding: 0 16px 8px;
+  min-height: 52px;
 }
 
 .home-guide-title {
@@ -770,12 +774,12 @@ body {
   z-index: 1;
   font-family: var(--font-display);
   text-align: center;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   color: #4a3326;
   letter-spacing: 0.02em;
-  padding: 0 8px 4px;
-  line-height: 1.4;
+  padding: 0 8px 2px;
+  line-height: 1.35;
 }
 
 .home-guide-decor {
@@ -785,7 +789,7 @@ body {
   gap: 8px;
   font-size: 12px;
   color: #b8a999;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 
@@ -795,11 +799,12 @@ body {
   align-items: flex-start;
   text-align: left;
   padding: 16px;
-  border-radius: 20px;
+  border-radius: 22px;
+  height: 156px;
   min-height: 156px;
   touch-action: manipulation;
   transition: transform 0.14s ease;
-  box-shadow: 0 6px 20px rgba(74, 51, 38, 0.055);
+  box-shadow: 0 8px 24px rgba(125, 92, 57, 0.12);
 }
 
 .home-feature-card:active {
@@ -807,12 +812,12 @@ body {
 }
 
 .home-feature-card--create {
-  border: 1px solid rgba(223, 139, 58, 0.16);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(255, 239, 222, 0.82));
+  border: 1px solid rgba(223, 139, 58, 0.14);
+  background: #fffdf9;
 }
 
 .home-feature-card--appreciate {
-  border: 1px solid rgba(125, 92, 57, 0.12);
+  border: 1px solid rgba(125, 92, 57, 0.1);
   background: #fffdf9;
 }
 
@@ -827,13 +832,13 @@ body {
 }
 
 .home-feature-card__icon--create {
-  background: rgba(223, 139, 58, 0.1);
+  background: rgba(223, 139, 58, 0.08);
   color: #df8b3a;
 }
 
 .home-feature-card__icon--appreciate {
-  background: rgba(139, 115, 85, 0.1);
-  color: #8b7355;
+  background: rgba(223, 139, 58, 0.08);
+  color: #8e7b6b;
 }
 
 .home-feature-card__title {
@@ -866,10 +871,10 @@ body {
 }
 
 .home-feature-card--appreciate .home-feature-card__cta {
-  color: var(--text-secondary);
+  color: #8e7b6b;
 }
 
-/* 底部导航视觉优化 — 文案/顺序不变 */
+/* 底部导航 — 高 72px，导航字 12px/500/#9B8C7D */
 .home-bottom-nav {
   background: rgba(255, 254, 252, 0.92);
   backdrop-filter: blur(14px);
@@ -880,8 +885,10 @@ body {
 }
 
 .home-bottom-nav__item {
-  color: var(--text-muted);
+  color: #9b8c7d;
   border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .home-bottom-nav__item--active {
@@ -892,6 +899,34 @@ body {
 
 .home-bottom-nav__item--active span:last-child {
   font-weight: 600;
+}
+
+@media (max-height: 820px) {
+  .home-hero__stage {
+    height: 320px;
+  }
+
+  .home-brand-banner {
+    height: 56px;
+  }
+
+  .home-guide-title {
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 375px) {
+  .home-speech-bubble--left {
+    width: 164px;
+    max-width: 164px;
+    left: 12px;
+  }
+
+  .home-speech-bubble--right {
+    width: 128px;
+    max-width: 128px;
+    right: 8px;
+  }
 }
 
 /* ── 二级页面品牌 Header — 透明抠图 Logo 嵌入页面背景 ── */
