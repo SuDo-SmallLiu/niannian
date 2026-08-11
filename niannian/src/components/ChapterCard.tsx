@@ -1,7 +1,13 @@
 'use client';
 
-import SharePosterCard from '@/components/SharePosterCard';
-import { EditIcon, RefreshIcon, ShareIcon } from '@/components/icons/NianNianIcons';
+import StoryListCard from '@/components/StoryListCard';
+import {
+  DeleteIcon,
+  EditIcon,
+  NavStoryIcon,
+  RefreshIcon,
+  ShareIcon,
+} from '@/components/icons/NianNianIcons';
 
 interface ChapterCardProps {
   chapter: number;
@@ -42,29 +48,17 @@ export default function ChapterCard({
   onViewDetail,
   onDelete,
 }: ChapterCardProps) {
+  const memoryCount = photoUrls.filter(Boolean).length;
+
   return (
     <section className="mb-10">
-      <div className="flex items-center justify-center gap-2 mb-3">
-        <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium">
-          章节 {String(chapter).padStart(2, '0')}
-        </p>
-        {published ? (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-            已发布
-          </span>
-        ) : (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-            草稿
-          </span>
-        )}
-      </div>
-
-      <SharePosterCard
-        type="story"
+      <StoryListCard
         title={title}
         summary={summary}
-        familyName={familyName}
         photoUrls={photoUrls}
+        memoryCount={memoryCount}
+        chapter={chapter}
+        status={published ? 'published' : 'draft'}
         onClick={onViewDetail}
       />
 
@@ -74,9 +68,10 @@ export default function ChapterCard({
             type="button"
             onClick={onViewDetail}
             disabled={sharing || regenerating || deleting || editing}
-            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#4B3B2F] text-white text-sm font-medium hover:bg-[#3B2F25] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
+            className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded-2xl bg-[#DF8B3A] text-white text-base font-medium hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
-            查看章节详情
+            <NavStoryIcon size={18} />
+            查看故事详情
           </button>
         )}
 
@@ -85,9 +80,9 @@ export default function ChapterCard({
             type="button"
             onClick={onPublish}
             disabled={publishing || sharing || regenerating || deleting}
-            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
+            className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#4A3326] text-white text-base font-medium hover:bg-[#3B2A20] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
-            {publishing ? '发布中…' : '📢 发布到故事页签'}
+            {publishing ? '发布中…' : '发布到故事页签'}
           </button>
         )}
 
@@ -96,11 +91,11 @@ export default function ChapterCard({
             type="button"
             onClick={onEdit}
             disabled={sharing || regenerating || deleting || editing}
-            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-[#D98A45] text-[#D98A45] text-sm font-medium hover:bg-[#FFF8F0] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
+            className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#DF8B3A] text-[#DF8B3A] text-base font-medium hover:bg-[#FFF6EB] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
             {editing ? '编辑中…' : (
               <>
-                <EditIcon size={16} /> 编辑故事
+                <EditIcon size={18} /> 编辑故事
               </>
             )}
           </button>
@@ -111,16 +106,16 @@ export default function ChapterCard({
             type="button"
             onClick={onRegenerate}
             disabled={regenerating || sharing || deleting}
-            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-sm font-medium hover:border-[#D98A45]/40 disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
+            className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#EFE4D6] text-[#8E7B6B] text-base font-medium hover:border-[#DF8B3A]/40 disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
             {regenerating ? (
               <>
-                <span className="w-4 h-4 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-[#DF8B3A]/30 border-t-[#DF8B3A] rounded-full animate-spin" />
                 念念重新生成中…
               </>
             ) : (
               <>
-                <RefreshIcon size={16} /> 重新生成故事
+                <RefreshIcon size={18} /> 重新生成故事
               </>
             )}
           </button>
@@ -130,11 +125,11 @@ export default function ChapterCard({
           type="button"
           onClick={onShare}
           disabled={sharing || regenerating || deleting}
-          className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all active:scale-[0.98] shadow-sm touch-manipulation"
+          className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#22C55E] text-white text-base font-medium hover:bg-[#16A34A] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
         >
           {sharing ? '生成海报中…' : (
             <>
-              <ShareIcon size={16} /> 分享给家人
+              <ShareIcon size={18} /> 分享给家人
             </>
           )}
         </button>
@@ -144,12 +139,20 @@ export default function ChapterCard({
             type="button"
             onClick={onDelete}
             disabled={sharing || regenerating || deleting}
-            className="w-full min-h-[48px] inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-all touch-manipulation"
+            className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD6C7] text-[#FF4D4F] text-base font-medium hover:bg-red-50 disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
           >
-            {deleting ? '删除中…' : '🗑 删除故事'}
+            {deleting ? '删除中…' : (
+              <>
+                <DeleteIcon size={18} /> 删除故事
+              </>
+            )}
           </button>
         )}
       </div>
+
+      {familyName && (
+        <p className="mt-3 text-center text-[13px] text-[#8E7B6B]">{familyName}</p>
+      )}
     </section>
   );
 }

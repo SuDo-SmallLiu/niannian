@@ -212,6 +212,14 @@ export function CheckIcon(props: NianNianIconProps) {
   );
 }
 
+export function DeleteIcon(props: NianNianIconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M10 11v6M14 11v6M6 7l1 14h10l1-14" />
+    </IconBase>
+  );
+}
+
 export const NAV_ICONS = {
   home: NavHomeIcon,
   memory: NavMemoryIcon,

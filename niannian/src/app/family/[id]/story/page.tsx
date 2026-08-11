@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import EmptyStateIcon from '@/components/EmptyStateIcon';
+import { StoryPageMascot } from '@/components/StoryListCard';
 import { NavStoryIcon, PhotoIcon } from '@/components/icons/NianNianIcons';
 
 interface StoryItem {
@@ -300,7 +301,7 @@ export default function StoryPage() {
 
   if (stories.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-24">
+      <div className="min-h-screen bg-[#FFFBF6] px-6 pt-8 pb-24">
         <Link href={`/family/${familyId}`} className="text-[#B8A898] text-sm mb-8 inline-block">
           ← 返回
         </Link>
@@ -338,8 +339,9 @@ export default function StoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F4ED] px-6 pt-8 pb-32">
+    <div className="min-h-screen bg-[#FFFBF6] px-6 pt-8 pb-32">
       {shareModal}
+      <StoryPageMascot />
 
       {confirmStory && (
         <AlertDialog open onOpenChange={(open) => !open && setConfirmStory(null)}>
@@ -383,13 +385,13 @@ export default function StoryPage() {
 
       {/* 标题 */}
       <div className="text-center mb-8 animate-fade-in-up">
-        <p className="text-xs tracking-[0.3em] text-[#D98A45] font-medium mb-3">
+        <p className="text-xs tracking-[0.3em] text-[#DF8B3A] font-medium mb-3">
           故事草稿箱
         </p>
-        <h1 className="text-2xl font-serif font-bold text-[#4B3B2F] leading-snug">
+        <h1 className="text-[28px] font-serif font-bold text-[#4A3326] leading-snug">
           {familyName ? `${familyName}的故事草稿` : '我们的故事草稿'}
         </h1>
-        <p className="mt-3 text-sm text-[#B8A898]">
+        <p className="mt-3 text-[13px] text-[#8E7B6B]">
           共 {stories.length} 个草稿 · 发布后才会出现在「故事」页签
         </p>
       </div>
@@ -410,19 +412,19 @@ export default function StoryPage() {
             if (ok) await fetchData();
           }}
           disabled={autoGenerating}
-          className="w-full py-4 px-5 rounded-2xl bg-[#D98A45] text-white font-medium shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
+          className="w-full py-4 px-5 rounded-2xl bg-[#DF8B3A] text-white font-medium shadow-lg shadow-[#DF8B3A]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all active:scale-[0.98]"
         >
           {autoGenerating ? '念念撰写中…' : '念念自动生成故事'}
         </button>
         <Link
           href={`/family/${familyId}/story/compose`}
-          className="flex items-center justify-between w-full py-4 px-5 rounded-2xl bg-white border border-[#E8DCC8] hover:border-[#D98A45]/40 transition-all shadow-sm"
+          className="flex items-center justify-between w-full py-4 px-5 rounded-2xl bg-white border border-[#EFE4D6] hover:border-[#DF8B3A]/40 transition-all shadow-[0_8px_24px_rgba(74,51,38,0.06)]"
         >
           <div className="text-left">
-            <p className="text-sm font-medium text-[#4B3B2F]">人工组合排列</p>
-            <p className="text-xs text-[#B8A898] mt-0.5">自选照片顺序，手动编排后生成故事</p>
+            <p className="text-sm font-medium text-[#4A3326]">人工组合排列</p>
+            <p className="text-xs text-[#8E7B6B] mt-0.5">自选照片顺序，手动编排后生成故事</p>
           </div>
-          <span className="text-[#D98A45] text-lg">→</span>
+          <span className="text-[#DF8B3A] text-lg">→</span>
         </Link>
         {autoGenerateError && (
           <p className="text-xs text-red-500 text-center px-2">{autoGenerateError}</p>

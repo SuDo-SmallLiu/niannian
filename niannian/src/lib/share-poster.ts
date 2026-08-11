@@ -1,10 +1,15 @@
 import QRCode from 'qrcode';
 import {
+  MASCOT_SHARE_CARD,
   POSTER_COLORS as C,
   POSTER_FONTS as F,
   POSTER_H as H,
+  POSTER_LAYOUT as L,
   POSTER_W as W,
   buildInfoItems,
+  buildMovieFeatures,
+  buildStoryFeatures,
+  type PosterFeatureItem,
   workTypeLabel,
 } from '@/lib/poster-design-tokens';
 
@@ -16,8 +21,12 @@ export interface PosterInput {
   familyName: string;
   photoUrls: string[];
   shareUrl: string;
-  /** 最多 3 项，竖线分隔 */
+  /** 最多 3 项，竖线分隔（非电影类型） */
   infoItems?: string[];
+  /** 电影类型：三列功能说明 */
+  featureItems?: PosterFeatureItem[];
+  chapterCount?: number;
+  memoryCount?: number;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -195,15 +204,15 @@ function buildPhotoSlots(urls: string[], boxX: number, boxY: number, boxW: numbe
     ];
   }
 
-  const gap = 8;
-  const pw = (boxW - gap - 20) / 2;
-  const ph = (boxH - gap - 20) / 2;
+  const gap = 12;
+  const pw = (boxW - gap - 24) / 2;
+  const ph = (boxH - gap - 24) / 2;
   const rots = [-2.2, 1.8, -1.5, 2.4];
   const offsets = [
-    [10, 12],
-    [10 + pw + gap, 18],
-    [16, 12 + ph + gap],
-    [8 + pw + gap, 8 + ph + gap],
+    [12, 14],
+    [12 + pw + gap, 20],
+    [18, 14 + ph + gap],
+    [10 + pw + gap, 10 + ph + gap],
   ];
   return list.map((url, i) => ({
     x: boxX + offsets[i][0],
@@ -221,16 +230,16 @@ async function drawPhotoCollage(
   type: PosterInput['type']
 ) {
   const boxX = 40;
-  const boxY = 168;
+  const boxY = 200;
   const boxW = W - 80;
-  const boxH = type === 'memory' ? 520 : 480;
+  const boxH = L.photoH[type] ?? L.photoH.movie;
   const slots = buildPhotoSlots(urls, boxX, boxY, boxW, boxH);
 
   if (slots.length === 0) {
-    drawRoundRect(ctx, boxX, boxY, boxW, boxH, 22);
-    ctx.fillStyle = '#F5EBDD';
+    drawRoundRect(ctx, boxX, boxY, boxW, boxH, 24);
+    ctx.fillStyle = C.lightKhaki;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(223,139,58,0.15)';
+    ctx.strokeStyle = 'rgba(223,139,58,0.12)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
     return boxY + boxH;
@@ -243,39 +252,100 @@ async function drawPhotoCollage(
 
     const bx = -slot.w / 2;
     const by = -slot.h / 2;
-    const border = 5;
+    const border = 8;
 
     ctx.shadowColor = 'rgba(74, 51, 38, 0.12)';
-    ctx.shadowBlur = 14;
-    ctx.shadowOffsetY = 6;
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 8;
     ctx.fillStyle = C.photoBorder;
-    drawRoundRect(ctx, bx - border, by - border, slot.w + border * 2, slot.h + border * 2, 20);
+    drawRoundRect(ctx, bx - border, by - border, slot.w + border * 2, slot.h + border * 2, 24);
     ctx.fill();
 
     ctx.shadowColor = 'transparent';
-    drawRoundRect(ctx, bx, by, slot.w, slot.h, 18);
+    drawRoundRect(ctx, bx, by, slot.w, slot.h, 24);
     ctx.clip();
     try {
       const img = await loadImage(slot.url);
       drawCoverImage(ctx, img, bx, by, slot.w, slot.h);
     } catch {
-      ctx.fillStyle = '#F0E8D8';
+      ctx.fillStyle = C.lightKhaki;
       ctx.fillRect(bx, by, slot.w, slot.h);
     }
     ctx.restore();
   }
 
   ctx.save();
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.7;
   ctx.fillStyle = C.tape;
-  ctx.fillRect(boxX + boxW * 0.62, boxY + 8, 52, 18);
-  ctx.fillStyle = C.brandYellow;
-  ctx.globalAlpha = 0.45;
-  ctx.font = '14px serif';
-  ctx.fillText('✦', boxX + 18, boxY + boxH - 12);
+  ctx.fillRect(boxX + boxW * 0.58, boxY + 10, 52, 18);
+  if (slots.length >= 4) {
+    ctx.fillStyle = C.brandYellow;
+    ctx.globalAlpha = 0.9;
+    ctx.font = '18px serif';
+    ctx.fillText('♥', boxX + boxW / 2 - 8, boxY + boxH / 2 + 6);
+  }
   ctx.restore();
 
   return boxY + boxH;
+}
+
+function drawFeatureIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, index: number) {
+  ctx.save();
+  ctx.strokeStyle = C.darkCoffee;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (index === 0) {
+    drawRoundRect(ctx, cx - 14, cy - 12, 28, 24, 4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy - 4);
+    ctx.lineTo(cx + 8, cy - 4);
+    ctx.moveTo(cx - 8, cy + 2);
+    ctx.lineTo(cx + 4, cy + 2);
+    ctx.stroke();
+  } else if (index === 1) {
+    drawRoundRect(ctx, cx - 14, cy - 10, 28, 20, 4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy + 1, 6, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    drawRoundRect(ctx, cx - 14, cy - 10, 28, 20, 3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy - 2);
+    ctx.lineTo(cx + 10, cy - 2);
+    ctx.moveTo(cx - 6, cy + 6);
+    ctx.lineTo(cx + 6, cy + 6);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawFeatureSection(ctx: CanvasRenderingContext2D, items: PosterFeatureItem[], y: number): number {
+  if (items.length === 0) return y;
+  const colW = (W - 80) / 3;
+  items.slice(0, 3).forEach((item, i) => {
+    const cx = 40 + colW * i + colW / 2;
+    drawFeatureIcon(ctx, cx, y + 18, i);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = C.darkCoffee;
+    ctx.font = `500 22px ${F.body}`;
+    wrapText(ctx, item.title, cx - colW / 2 + 8, y + 40, colW - 16, 28, 2);
+    ctx.fillStyle = C.auxCoffee;
+    ctx.font = `400 14px ${F.body}`;
+    wrapText(ctx, item.desc, cx - colW / 2 + 8, y + 72, colW - 16, 20, 2);
+    if (i > 0) {
+      ctx.strokeStyle = C.divider;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(40 + colW * i, y + 8);
+      ctx.lineTo(40 + colW * i, y + L.featureH - 8);
+      ctx.stroke();
+    }
+  });
+  return y + L.featureH;
 }
 
 function drawInfoRow(ctx: CanvasRenderingContext2D, items: string[], y: number): number {
@@ -303,74 +373,79 @@ function drawInfoRow(ctx: CanvasRenderingContext2D, items: string[], y: number):
 }
 
 async function drawShareZone(ctx: CanvasRenderingContext2D, shareUrl: string, y: number) {
-  const zoneH = 168;
-  const zoneX = 36;
-  const zoneW = W - 72;
+  const zoneH = L.shareCardH;
+  const zoneX = 40;
+  const zoneW = W - 80;
   const zoneY = y;
+  const pad = L.shareCardPad;
 
-  drawRoundRect(ctx, zoneX, zoneY, zoneW, zoneH, 24);
-  ctx.fillStyle = C.shareZoneBg;
+  drawRoundRect(ctx, zoneX, zoneY, zoneW, zoneH, L.shareCardRadius);
+  ctx.fillStyle = C.shareCardBg;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(246, 181, 27, 0.22)';
+  ctx.strokeStyle = 'rgba(246, 181, 27, 0.18)';
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  const innerW = zoneW - pad * 2;
+  const leftW = innerW * 0.4;
+  const rightX = zoneX + pad + leftW;
+
   try {
-    const mascot = await loadImage(assetUrl('/niannian/mascot-wave.poster.png'));
-    ctx.drawImage(mascot, zoneX + 16, zoneY + zoneH / 2 - 36, 72, 72);
+    const mascot = await loadImage(assetUrl(MASCOT_SHARE_CARD));
+    const mascotSize = L.mascotW;
+    const mascotX = zoneX + pad + (leftW - mascotSize) / 2;
+    const mascotY = zoneY + (zoneH - mascotSize) / 2;
+    ctx.drawImage(mascot, mascotX, mascotY, mascotSize, mascotSize);
   } catch {
     ctx.fillStyle = C.brandOrange;
-    ctx.globalAlpha = 0.2;
+    ctx.globalAlpha = 0.15;
     ctx.beginPath();
-    ctx.arc(zoneX + 52, zoneY + zoneH / 2, 32, 0, Math.PI * 2);
+    ctx.arc(zoneX + pad + leftW / 2, zoneY + zoneH / 2, 48, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
 
-  const bubbleX = zoneX + 96;
-  const bubbleW = zoneW - 96 - 150;
-  drawRoundRect(ctx, bubbleX, zoneY + 28, bubbleW, 56, 16);
+  const bubbleW = innerW * 0.6 - 140;
+  drawRoundRect(ctx, rightX, zoneY + pad, bubbleW, 56, 16);
   ctx.fillStyle = C.card;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(125, 92, 57, 0.12)';
+  ctx.strokeStyle = 'rgba(125, 92, 57, 0.1)';
   ctx.stroke();
 
   ctx.fillStyle = C.darkCoffee;
-  ctx.font = `400 13px ${F.hand}`;
+  ctx.font = `400 20px ${F.hand}`;
   ctx.textAlign = 'left';
   wrapText(
     ctx,
     '把照片留下，把故事留下，把记忆留下。',
-    bubbleX + 12,
-    zoneY + 50,
-    bubbleW - 20,
-    20,
+    rightX + 14,
+    zoneY + pad + 24,
+    bubbleW - 24,
+    24,
     2
   );
 
-  const qrSize = 120;
-  const qrX = zoneX + zoneW - qrSize - 16;
-  const qrY = zoneY + 24;
+  const qrSize = 112;
+  const qrX = zoneX + zoneW - pad - qrSize;
+  const qrY = zoneY + pad;
   const qrDataUrl = await QRCode.toDataURL(shareUrl, {
     width: qrSize,
     margin: 1,
     color: { dark: C.darkCoffee, light: '#FFFFFF' },
   });
-  drawRoundRect(ctx, qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 14);
+  drawRoundRect(ctx, qrX - 6, qrY - 6, qrSize + 12, qrSize + 12, 12);
   ctx.fillStyle = '#FFFFFF';
   ctx.fill();
   const qrImg = await loadImage(qrDataUrl);
   ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
   ctx.fillStyle = C.darkCoffee;
-  ctx.font = `600 13px ${F.body}`;
+  ctx.font = `500 22px ${F.body}`;
   ctx.textAlign = 'left';
-  ctx.fillText('扫码查看完整内容', bubbleX, zoneY + 100);
-  ctx.fillStyle = C.lightCoffee;
-  ctx.font = `400 11px ${F.body}`;
-  ctx.fillText('长按保存海报', bubbleX, zoneY + 122);
-  ctx.fillText('分享转发', bubbleX, zoneY + 138);
-  ctx.fillText('和家人一起回忆', bubbleX, zoneY + 154);
+  ctx.fillText('扫码查看完整内容', rightX, zoneY + pad + 78);
+  ctx.fillStyle = C.auxCoffee;
+  ctx.font = `400 14px ${F.body}`;
+  ctx.fillText('长按保存海报 · 分享转发 · 和家人一起回忆', rightX, zoneY + pad + 108);
 
   return zoneY + zoneH;
 }
@@ -402,45 +477,68 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
   }
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = C.darkCoffee;
-  ctx.font = `700 28px ${F.brand}`;
-  ctx.fillText('念念年年', W / 2, 148);
-
+  ctx.fillStyle = C.brandYellow;
+  ctx.font = `400 16px ${F.body}`;
+  ctx.fillText('♥', W / 2 - 56, 176);
   ctx.fillStyle = C.brandOrange;
-  ctx.font = `500 18px ${F.body}`;
+  ctx.font = `500 22px ${F.body}`;
   ctx.fillText(workTypeLabel(input.type), W / 2, 176);
+  ctx.fillStyle = C.brandYellow;
+  ctx.fillText('♥', W / 2 + 56, 176);
 
   const photoBottom = await drawPhotoCollage(ctx, input.photoUrls, input.type);
 
-  let textY = photoBottom + 36;
+  let textY = photoBottom + 32;
   ctx.textAlign = 'left';
   ctx.fillStyle = C.darkCoffee;
-  ctx.font = `700 32px ${F.brand}`;
-  textY = wrapText(ctx, input.title, 48, textY, W - 96, 40, 2) + 12;
-
-  const infoItems =
-    input.infoItems ??
-    buildInfoItems({
-      type: input.type,
-      subtitle: input.subtitle,
-      familyName: input.familyName,
-      photoCount: input.photoUrls.filter(Boolean).length,
-    });
-  textY = drawInfoRow(ctx, infoItems, textY) + 8;
+  ctx.font = `700 44px ${F.brand}`;
+  textY = wrapText(ctx, input.title, 48, textY, W - 96, 52, 2) + 16;
 
   if (input.summary) {
-    ctx.fillStyle = C.auxCoffee;
+    ctx.fillStyle = C.bodyCoffee;
     ctx.font = `400 16px ${F.body}`;
-    wrapText(ctx, input.summary, 48, textY, W - 96, 26, 3);
+    textY = wrapText(ctx, input.summary, 48, textY, W - 96, 26, 2) + 16;
   }
 
-  const shareZoneY = H - 28 - 24 - 168;
+  if (input.type === 'movie') {
+    const features =
+      input.featureItems ??
+      buildMovieFeatures({
+        chapterCount: input.chapterCount,
+        memoryCount: input.memoryCount ?? input.photoUrls.filter(Boolean).length,
+      });
+    textY = drawFeatureSection(ctx, features, textY) + 8;
+  } else if (input.type === 'story') {
+    const features =
+      input.featureItems ??
+      buildStoryFeatures({
+        memoryCount: input.memoryCount ?? input.photoUrls.filter(Boolean).length,
+      });
+    textY = drawFeatureSection(ctx, features, textY) + 8;
+  } else {
+    const infoItems =
+      input.infoItems ??
+      buildInfoItems({
+        type: input.type,
+        subtitle: input.subtitle,
+        familyName: input.familyName,
+        photoCount: input.photoUrls.filter(Boolean).length,
+      });
+    textY = drawInfoRow(ctx, infoItems, textY) + 8;
+  }
+
+  const shareZoneY = H - 40 - L.shareCardH;
   await drawShareZone(ctx, input.shareUrl, shareZoneY);
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = C.lightCoffee;
-  ctx.font = `400 12px ${F.body}`;
-  ctx.fillText('让每一张照片都成为回家的理由', W / 2, H - 28);
+  ctx.fillStyle = C.brandYellow;
+  ctx.font = `400 14px ${F.body}`;
+  ctx.fillText('♥', W / 2 - 148, H - 22);
+  ctx.fillStyle = C.auxCoffee;
+  ctx.font = `400 14px ${F.body}`;
+  ctx.fillText('让每一张照片都成为回家的理由', W / 2, H - 22);
+  ctx.fillStyle = C.brandYellow;
+  ctx.fillText('♥', W / 2 + 148, H - 22);
 
   return canvas.toDataURL('image/png', 0.92);
 }

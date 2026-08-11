@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import Link from 'next/link';
 import PageShell from '@/components/PageShell';
-import PageHero from '@/components/PageHero';
-import SharePosterCard from '@/components/SharePosterCard';
+import StoryListCard, { StoryPageMascot } from '@/components/StoryListCard';
 import EmptyStateIcon from '@/components/EmptyStateIcon';
-import { NavStoryIcon } from '@/components/icons/NianNianIcons';
+import { DeleteIcon, LocationIcon, NavStoryIcon, ShareIcon } from '@/components/icons/NianNianIcons';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useSharePoster } from '@/hooks/useSharePoster';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
@@ -151,78 +150,101 @@ export default function StoriesPage() {
   };
 
   return (
-    <PageShell className={appreciate ? 'text-lg' : ''}>
+    <PageShell className={`bg-[#FFFBF6]${appreciate ? ' text-lg' : ''}`}>
       {shareModal}
-      <PageHero
-        title="家庭故事"
-        subtitle="来自记忆卡，不是你的相册流水账"
-        large={appreciate}
-      />
+      <StoryPageMascot />
 
-        {families.length > 1 && (
-          <div className="max-w-md mx-auto mb-6">
-            <p className="text-xs text-[#B8A898] mb-2">按主题筛选</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+      <header className="flex items-start justify-between gap-3 mb-5 px-0.5">
+        <div className="min-w-0 text-left">
+          <h1
+            className={`font-serif font-bold text-[#4A3326] leading-snug m-0 ${
+              appreciate ? 'text-[32px]' : 'text-[28px]'
+            }`}
+          >
+            家庭故事
+          </h1>
+          <p className="text-[13px] text-[#8E7B6B] mt-1 mb-0 leading-relaxed">
+            来自记忆卡，不是你的相册流水账
+          </p>
+        </div>
+        {!appreciate && (
+          <Link
+            href="/family"
+            className="shrink-0 inline-flex items-center justify-center h-10 px-4 rounded-2xl bg-[#DF8B3A] text-white text-sm font-medium hover:bg-[#C47A3A] transition-colors active:scale-[0.98]"
+          >
+            + 记录故事
+          </Link>
+        )}
+      </header>
+
+      {families.length > 1 && (
+        <div className="max-w-md mx-auto mb-5">
+          <p className="text-xs text-[#8E7B6B] mb-2">按主题筛选</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setThemeFilter('all')}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${
+                themeFilter === 'all'
+                  ? 'bg-[#DF8B3A] text-white'
+                  : 'bg-white border border-[#EFE4D6] text-[#8E7B6B]'
+              }`}
+            >
+              全部主题
+            </button>
+            {families.map((f) => (
               <button
+                key={f.id}
                 type="button"
-                onClick={() => setThemeFilter('all')}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-xs ${
-                  themeFilter === 'all'
-                    ? 'bg-[#D98A45] text-white'
-                    : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
+                onClick={() => setThemeFilter(f.id)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${
+                  themeFilter === f.id
+                    ? 'bg-[#DF8B3A] text-white'
+                    : 'bg-white border border-[#EFE4D6] text-[#8E7B6B]'
                 }`}
               >
-                全部主题
+                {f.name}
               </button>
-              {families.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setThemeFilter(f.id)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs ${
-                    themeFilter === f.id
-                      ? 'bg-[#D98A45] text-white'
-                      : 'bg-white border border-[#E8DCC8] text-[#8B7355]'
-                  }`}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-6 h-6 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+      {loading ? (
+        <div className="flex justify-center py-20">
+          <div className="w-6 h-6 border-2 border-[#DF8B3A]/30 border-t-[#DF8B3A] rounded-full animate-spin" />
+        </div>
+      ) : filteredStories.length === 0 ? (
+        <div className="py-16">
+          <EmptyStateIcon
+            icon={NavStoryIcon}
+            title="还没有已发布的故事"
+            description="在主题管理的草稿箱里编辑并发布后，会出现在这里"
+          />
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => router.push('/family')}
+              className="mt-6 px-6 py-3 rounded-2xl bg-[#DF8B3A] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all active:scale-[0.98]"
+            >
+              去我的主题
+            </button>
           </div>
-        ) : filteredStories.length === 0 ? (
-          <div className="py-16">
-            <EmptyStateIcon
-              icon={NavStoryIcon}
-              title="还没有已发布的故事"
-              description="在主题管理的草稿箱里编辑并发布后，会出现在这里"
-            />
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => router.push('/family')}
-                className="mt-6 px-6 py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
-              >
-                去我的主题
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-8 max-w-md mx-auto">
-            {filteredStories.map((story) => (
+        </div>
+      ) : (
+        <div className="space-y-8 max-w-md mx-auto pb-8">
+          {filteredStories.map((story) => {
+            const photoUrls = photoUrlsByStory[story.id] || [];
+            const memoryCount = photoUrls.length;
+
+            return (
               <div key={story.id} className="relative">
-                <SharePosterCard
-                  type="story"
+                <StoryListCard
                   title={story.title}
                   summary={story.summary || story.description}
-                  familyName={story.family_name || ''}
-                  photoUrls={photoUrlsByStory[story.id] || []}
+                  photoUrls={photoUrls}
+                  memoryCount={memoryCount}
+                  status="published"
                   onClick={() =>
                     router.push(
                       appreciate
@@ -232,20 +254,20 @@ export default function StoriesPage() {
                   }
                 />
 
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-col gap-3">
                   {appreciate ? (
                     <>
                       <button
                         type="button"
                         onClick={() => router.push(`/stories/${story.id}/play?appreciate=1`)}
-                        className="flex-1 min-w-[140px] py-3 rounded-2xl bg-[#D98A45] text-white text-base font-medium hover:bg-[#C47A3A] transition-all"
+                        className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded-2xl bg-[#DF8B3A] text-white text-base font-medium hover:bg-[#C47A3A] transition-all active:scale-[0.98]"
                       >
                         ▶ 自动播放
                       </button>
                       <button
                         type="button"
                         onClick={() => router.push(`/stories/${story.id}?appreciate=1`)}
-                        className="flex-1 min-w-[120px] py-3 rounded-2xl border border-[#E8DCC8] text-[#8B7355] text-base"
+                        className="w-full h-12 inline-flex items-center justify-center rounded-2xl border border-[#EFE4D6] text-[#8E7B6B] text-base active:scale-[0.98]"
                       >
                         阅读全文
                       </button>
@@ -255,44 +277,54 @@ export default function StoriesPage() {
                       <button
                         type="button"
                         onClick={() => router.push(`/stories/${story.id}`)}
-                        className="flex-1 min-w-[140px] py-3 rounded-2xl bg-[#D98A45] text-white text-sm font-medium hover:bg-[#C47A3A] transition-all"
+                        className="w-full h-[52px] inline-flex items-center justify-center gap-2 rounded-2xl bg-[#DF8B3A] text-white text-base font-medium hover:bg-[#C47A3A] transition-all active:scale-[0.98] touch-manipulation"
                       >
-                        章节详情
+                        <NavStoryIcon size={18} />
+                        查看故事详情
                       </button>
                       <button
                         type="button"
                         onClick={() => handleShare(story)}
                         disabled={sharingId === story.id}
-                        className="flex-1 min-w-[120px] py-3 rounded-2xl bg-[#07C160] text-white text-sm font-medium hover:bg-[#06AD56] disabled:opacity-50 transition-all"
+                        className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#22C55E] text-white text-base font-medium hover:bg-[#16A34A] disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
                       >
+                        <ShareIcon size={18} />
                         {sharingId === story.id ? '生成中…' : '分享'}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(story)}
                         disabled={deletingId === story.id || sharingId === story.id}
-                        className="w-full py-3 rounded-2xl border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-50 transition-all"
+                        className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-2xl border border-[#FFD6C7] text-[#FF4D4F] text-base font-medium hover:bg-red-50 disabled:opacity-50 transition-all active:scale-[0.98] touch-manipulation"
                       >
-                        {deletingId === story.id ? '删除中…' : '🗑 删除故事'}
+                        <DeleteIcon size={18} />
+                        {deletingId === story.id ? '删除中…' : '删除故事'}
                       </button>
                     </>
                   )}
                 </div>
-                <div className="flex items-center justify-between mt-2 text-xs text-[#D8CCB8]">
-                  <span>
-                    {story.family_name && `${story.family_name} · `}
-                    {story.created_at?.slice(0, 10)}
+
+                <div className="flex items-center justify-between gap-2 mt-3 text-[13px] text-[#8E7B6B]">
+                  <span className="inline-flex items-center gap-1 min-w-0 truncate">
+                    {story.family_name && (
+                      <>
+                        <LocationIcon size={14} className="shrink-0" />
+                        {story.family_name}
+                      </>
+                    )}
                   </span>
-                  <span className="text-[#B8A898]">
+                  <span className="shrink-0">{story.created_at?.slice(0, 10)}</span>
+                  <span className="shrink-0">
                     {(story.read_count ?? 0) > 0
-                      ? `${story.read_count} 人读过你的故事`
+                      ? `${story.read_count} 人读过`
                       : '还没有人读过'}
                   </span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      )}
     </PageShell>
   );
 }
