@@ -122,12 +122,15 @@ function PhotoCollage({
 
 function FeatureGrid({ items }: { items: PosterFeatureItem[] }) {
   return (
-    <div className="grid grid-cols-3 gap-2 mt-5 text-center">
+    <div className="grid grid-cols-3 gap-2 mt-5">
       {items.map((item, i) => (
-        <div key={item.title} className={`px-1 ${i > 0 ? 'border-l border-[#E8E1D6]' : ''}`}>
+        <div
+          key={item.title}
+          className={`flex flex-col items-center text-center px-1 ${i > 0 ? 'border-l border-[#E8E1D6]' : ''}`}
+        >
           <FeatureIcon index={i} />
-          <p className="text-[#4A3326] text-[15px] font-medium leading-snug">{item.title}</p>
-          <p className="text-[#8E7B6B] text-xs mt-1 leading-snug">{item.desc}</p>
+          <p className="text-[#4A3326] text-[15px] font-medium leading-snug w-full">{item.title}</p>
+          <p className="text-[#8E7B6B] text-xs mt-1 leading-snug w-full">{item.desc}</p>
         </div>
       ))}
     </div>

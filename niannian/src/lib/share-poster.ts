@@ -349,10 +349,10 @@ function drawFeatureSection(ctx: CanvasRenderingContext2D, items: PosterFeatureI
     ctx.textAlign = 'center';
     ctx.fillStyle = C.darkCoffee;
     ctx.font = `500 22px ${F.body}`;
-    wrapText(ctx, item.title, cx - colW / 2 + 8, y + 40, colW - 16, 28, 2);
+    wrapText(ctx, item.title, cx, y + 40, colW - 16, 28, 2);
     ctx.fillStyle = C.auxCoffee;
     ctx.font = `400 14px ${F.body}`;
-    wrapText(ctx, item.desc, cx - colW / 2 + 8, y + 72, colW - 16, 20, 2);
+    wrapText(ctx, item.desc, cx, y + 72, colW - 16, 20, 2);
     if (i > 0) {
       ctx.strokeStyle = C.divider;
       ctx.lineWidth = 1;
@@ -376,7 +376,7 @@ function drawInfoRow(ctx: CanvasRenderingContext2D, items: string[], y: number):
   usable.forEach((item, i) => {
     const cx = 48 + segW * i + segW / 2;
     const lines = item.length > 14 ? 2 : 1;
-    wrapText(ctx, item, cx - segW / 2 + 8, y, segW - 16, 22, lines);
+    wrapText(ctx, item, cx, y, segW - 16, 22, lines);
     if (i > 0) {
       ctx.strokeStyle = C.divider;
       ctx.lineWidth = 1;
