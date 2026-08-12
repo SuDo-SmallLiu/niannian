@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkHeavyApiRateLimit } from '@/lib/api-rate-limit';
 import { getFamily, getPhoto } from '@/lib/db';
-import { retryPhotoAnalysis } from '@/services/photo-batch-analysis.service';
+import { createPhotoAnalyzeSingleJob } from '@/lib/jobs/create-jobs';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
+
+function clientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown'
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const rate = checkHeavyApiRateLimit({
+      ip: clientIp(request),
+      endpoint: 'analyze_retry',
+    });
+    if (!rate.ok) {
+      return NextResponse.json(
+        { error: '请求过于频繁，请稍后再试', retryAfterSec: rate.retryAfterSec },
+        { status: 429, headers: rate.retryAfterSec ? { 'Retry-After': String(rate.retryAfterSec) } : {} }
+      );
+    }
+
     const { familyId, photoId } = await request.json();
 
     if (!familyId || !photoId) {
@@ -22,9 +42,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '照片不存在' }, { status: 404 });
     }
 
-    await retryPhotoAnalysis(familyId, photoId);
+    const jobId = createPhotoAnalyzeSingleJob({
+      familyId,
+      photoId,
+      mode: 'retry',
+    });
 
-    return NextResponse.json({ status: 'completed', photoId });
+    return NextResponse.json({ status: 'queued', jobId, photoId });
   } catch (error) {
     const accessResp = familyAccessErrorResponse(error);
     if (accessResp) return accessResp;

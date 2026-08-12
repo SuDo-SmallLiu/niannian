@@ -1,10 +1,12 @@
-import { randomUUID } from 'crypto';
-
 const REQUEST_ID_HEADER = 'x-request-id';
 const TRACE_ID_HEADER = 'x-trace-id';
 
+/** Edge / Node 通用 — 不使用 node:crypto，避免 middleware Edge 运行时崩溃 */
 export function createRequestId(): string {
-  return randomUUID();
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function getRequestIdFromHeaders(headers: Headers): string | null {

@@ -54,3 +54,72 @@ export async function regenerateStoryAsync(
   if (!jobId) throw new Error('未返回 jobId');
   return pollJobUntilDone(jobId, options);
 }
+
+/** 人工组合故事：提交任务并轮询至完成 */
+export async function composeStoryAsync(
+  familyId: string,
+  photoIds: string[],
+  options?: PollJobOptions
+): Promise<{ storyId: string }> {
+  const res = await fetch('/api/story/compose', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ familyId, photoIds }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data.error as string) || '生成失败');
+  const jobId = data.jobId as string;
+  if (!jobId) throw new Error('未返回 jobId');
+  const result = await pollJobUntilDone(jobId, options);
+  const storyId = (result.result as { storyId?: string } | undefined)?.storyId;
+  if (!storyId) throw new Error('故事生成未完成');
+  return { storyId };
+}
+
+/** 单张照片 AI 解析 */
+export async function analyzePhotoAsync(
+  photoId: string,
+  withSupplement = false,
+  options?: PollJobOptions
+): Promise<{
+  photo: unknown;
+  memoryCard: unknown;
+  tags: unknown;
+  familyName?: string;
+}> {
+  const res = await fetch('/api/analyze/photo', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoId, withSupplement }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data.error as string) || '解析失败');
+  const jobId = data.jobId as string;
+  if (!jobId) throw new Error('未返回 jobId');
+  const result = await pollJobUntilDone(jobId, options);
+  const payload = (result.result as Record<string, unknown> | undefined) ?? {};
+  return payload as {
+    photo: unknown;
+    memoryCard: unknown;
+    tags: unknown;
+    familyName?: string;
+  };
+}
+
+/** 重试单张照片解析 */
+export async function retryPhotoAnalysisAsync(
+  familyId: string,
+  photoId: string,
+  options?: PollJobOptions
+): Promise<void> {
+  const res = await fetch('/api/analyze/retry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ familyId, photoId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error((data.error as string) || '重试失败');
+  const jobId = data.jobId as string;
+  if (!jobId) throw new Error('未返回 jobId');
+  await pollJobUntilDone(jobId, options);
+}

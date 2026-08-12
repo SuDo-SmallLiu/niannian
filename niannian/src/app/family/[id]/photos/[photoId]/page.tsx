@@ -14,6 +14,7 @@ import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
 import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
 import { computeMemoryCardCompletion } from '@/lib/memory-card-completion';
+import { analyzePhotoAsync } from '@/lib/poll-job';
 
 interface Tag {
   layer: number;
@@ -176,18 +177,10 @@ export default function MemoryCardPage() {
         userNotes.trim() ||
         (aiQuestions || []).some((q) => q.answer?.trim())
       );
-      const res = await fetch('/api/analyze/photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, withSupplement: hasSupplement }),
-      });
-      const result = await res.json();
-      if (!res.ok) {
-        setError(result.error || '重新解析失败');
-        setReanalyzing(false);
-        return;
-      }
-      applyMemoryCardData(result);
+      const result = await analyzePhotoAsync(photoId, hasSupplement);
+      applyMemoryCardData(
+        result as Parameters<typeof applyMemoryCardData>[0]
+      );
     } catch {
       setError('重新解析失败，请重试');
     } finally {

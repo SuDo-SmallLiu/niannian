@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/accessible-chat';
 import { Button } from '@/components/ui/button';
 import { Mic, Square, Loader2 } from 'lucide-react';
+import { analyzePhotoAsync } from '@/lib/poll-job';
 
 export interface AiQuestion {
   id: string;
@@ -302,16 +303,7 @@ export default function UserSupplementPanel({
       const saved = dirty ? await saveSupplement() : true;
       if (!saved) return;
 
-      const res = await fetch('/api/analyze/photo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId, withSupplement: true }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage(data.error || '重新理解失败');
-        return;
-      }
+      const data = await analyzePhotoAsync(photoId, true);
       setDirty(false);
       setMessage('已结合补充更新记忆卡');
       onReanalyzed(data);

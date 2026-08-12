@@ -73,11 +73,13 @@
 |------|----------|
 | `POST /api/story/generate` | `story_generate` |
 | `POST /api/story/regenerate` | `story_regenerate` |
+| `POST /api/story/compose` | `story_compose` |
+| `POST /api/analyze` | `photo_analysis`（批次，progress.tasks 追踪子任务） |
+| `POST /api/analyze/photo` | `photo_analyze_single` |
+| `POST /api/analyze/retry` | `photo_analyze_single` |
 
 ### 待异步化（下一阶段）
 
-- `POST /api/story/compose`
-- `POST /api/analyze/photo`、`/api/analyze/retry`
 - `POST /api/speech/synthesize`
 - `POST /api/movie/render`（preparePlanOnly）
 

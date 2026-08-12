@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { regenerateStoryAsync } from '@/lib/poll-job';
+import { regenerateStoryAsync, composeStoryAsync } from '@/lib/poll-job';
 import MemoryCardComposeItem, {
   getMemoryCardComposeHints,
 } from '@/components/MemoryCardComposeItem';
@@ -134,14 +134,16 @@ export default function ManualStoryComposePage() {
     setGenerating(true);
     setError('');
     try {
-      const res = await fetch('/api/story/compose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId, photoIds: selectedIds }),
+      const { storyId } = await composeStoryAsync(familyId, selectedIds, {
+        onProgress: ({ progress }) => {
+          const message =
+            progress && typeof progress.message === 'string'
+              ? progress.message
+              : '念念正在撰写故事…';
+          void message;
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '生成失败');
-      router.push(`/family/${familyId}/story?storyId=${data.storyId}`);
+      router.push(`/family/${familyId}/story?storyId=${storyId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成失败');
     } finally {

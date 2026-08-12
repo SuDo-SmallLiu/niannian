@@ -11,10 +11,18 @@ import type { JobRecord, JobType } from '@/lib/jobs/types';
 import { regenerateStoryById } from '@/lib/regenerate-story';
 import { runStoryEngine, type RunStoryEngineOptions } from '@/lib/story-engine';
 import type { RegenMode } from '@/lib/story-engine/types';
+import {
+  executePhotoAnalysisJob,
+  executePhotoAnalyzeSingleJob,
+  executeStoryComposeJob,
+} from '@/services/photo-batch-analysis.service';
 
 const WORKER_JOB_TYPES: JobType[] = [
   'story_generate',
   'story_regenerate',
+  'story_compose',
+  'photo_analysis',
+  'photo_analyze_single',
 ];
 
 let processorRunning = false;
@@ -56,6 +64,15 @@ async function dispatchJob(job: JobRecord): Promise<void> {
       break;
     case 'story_regenerate':
       await handleStoryRegenerate(job);
+      break;
+    case 'story_compose':
+      await executeStoryComposeJob(job);
+      break;
+    case 'photo_analysis':
+      await executePhotoAnalysisJob(job);
+      break;
+    case 'photo_analyze_single':
+      await executePhotoAnalyzeSingleJob(job);
       break;
     default:
       throw new Error(`Unsupported job type: ${job.type}`);
@@ -105,7 +122,6 @@ export async function runJobProcessorLoop(options?: {
   return processed;
 }
 
-/** 扫描心跳超时的 running 任务并重新入队或标记失败 */
 export function recoverStaleJobs(staleMinutes = 30): number {
   const stale = listStaleRunningJobs(staleMinutes);
   for (const job of stale) {
@@ -114,9 +130,8 @@ export function recoverStaleJobs(staleMinutes = 30): number {
   return stale.length;
 }
 
-/** Web 进程内轻量调度：提交任务后触发一次消费（不阻塞 HTTP） */
 export function scheduleInProcessJobDrain(): void {
-  void runJobProcessorLoop({ maxJobs: 3, idleMs: 0 }).catch((err) => {
+  void runJobProcessorLoop({ maxJobs: 5, idleMs: 0 }).catch((err) => {
     console.error('[job-processor] drain failed', err);
   });
 }

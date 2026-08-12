@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { retryPhotoAnalysisAsync } from '@/lib/poll-job';
 
 interface RetryAnalysisButtonProps {
   familyId: string;
@@ -20,15 +21,7 @@ export default function RetryAnalysisButton({
   const handleRetry = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/analyze/retry', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId, photoId }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || '重试失败');
-      }
+      await retryPhotoAnalysisAsync(familyId, photoId);
       onRetried?.();
     } catch {
       /* caller may show toast */

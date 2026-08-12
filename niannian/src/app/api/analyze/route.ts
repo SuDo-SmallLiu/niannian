@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPhotosByFamily, getFamily, getPhoto } from '@/lib/db';
 import { buildAnalysisStatusFromDb } from '@/lib/analysis-db-status';
 import { cleanupStaleAnalysisJobs, getAnalysisJob, summarizeJob } from '@/lib/photo-analysis-job';
-import { runFamilyPhotoAnalysis } from '@/services/photo-batch-analysis.service';
+import { createPhotoAnalysisJob } from '@/lib/jobs/create-jobs';
+import { findActivePhotoAnalysisJob } from '@/lib/jobs/photo-analysis-jobs';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
 export async function POST(request: NextRequest) {
@@ -24,18 +25,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '该家庭没有照片，请先上传照片' }, { status: 400 });
     }
 
-    const existing = getAnalysisJob(familyId);
-    if (existing?.status === 'processing') {
-      return NextResponse.json({ status: 'processing', familyId });
+    const activeDbJob = findActivePhotoAnalysisJob(familyId);
+    if (activeDbJob) {
+      const photoIds = activeDbJob.payload.photoIds as string[] | undefined;
+      return NextResponse.json({
+        status: 'processing',
+        familyId,
+        jobId: activeDbJob.id,
+        total: photoIds?.length,
+      });
+    }
+
+    const memJob = getAnalysisJob(familyId);
+    if (memJob?.status === 'processing') {
+      return NextResponse.json({
+        status: 'processing',
+        familyId,
+        jobId: memJob.jobId,
+        total: memJob.photos.length,
+      });
     }
 
     const photoIds = photos.map((p) => p.id);
+    const job = createPhotoAnalysisJob({ familyId, photoIds });
 
-    runFamilyPhotoAnalysis(familyId, photoIds).catch((err) => {
-      console.error(`分析家庭 ${familyId} 失败:`, err);
+    return NextResponse.json({
+      status: 'processing',
+      familyId,
+      jobId: job.id,
+      total: photoIds.length,
     });
-
-    return NextResponse.json({ status: 'processing', familyId, total: photoIds.length });
   } catch (error) {
     const accessResp = familyAccessErrorResponse(error);
     if (accessResp) return accessResp;
