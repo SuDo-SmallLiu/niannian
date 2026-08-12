@@ -25,34 +25,6 @@ export interface FamilyAnalysisJob {
   jobId?: string;
 }
 
-/** @deprecated 内存任务已迁移至 DB；保留 API 兼容 */
-const legacyJobs = new Map<string, FamilyAnalysisJob>();
-const TTL_MS = 30 * 60 * 1000;
-
-export function cleanupStaleAnalysisJobs(): void {
-  const now = Date.now();
-  for (const [familyId, job] of legacyJobs) {
-    if (now - job.updatedAt > TTL_MS) legacyJobs.delete(familyId);
-  }
-}
-
-export function getAnalysisJob(familyId: string): FamilyAnalysisJob | undefined {
-  cleanupStaleAnalysisJobs();
-
-  const dbJob = findActivePhotoAnalysisJob(familyId);
-  if (dbJob) {
-    const mapped = dbJobToFamilyAnalysisJob(dbJob);
-    return { ...mapped, jobId: dbJob.id };
-  }
-
-  const recentDone = getRecentPhotoAnalysisJob(familyId);
-  if (recentDone) {
-    return { ...recentDone, jobId: recentDone.jobId };
-  }
-
-  return legacyJobs.get(familyId);
-}
-
 function getRecentPhotoAnalysisJob(
   familyId: string
 ): (FamilyAnalysisJob & { jobId: string }) | undefined {
@@ -73,44 +45,19 @@ function getRecentPhotoAnalysisJob(
   return { ...dbJobToFamilyAnalysisJob(job), jobId: job.id };
 }
 
-/** @deprecated 使用 createPhotoAnalysisJob */
-export function createAnalysisJob(familyId: string, photoIds: string[]): FamilyAnalysisJob {
-  const now = Date.now();
-  const job: FamilyAnalysisJob = {
-    familyId,
-    status: 'processing',
-    startedAt: now,
-    updatedAt: now,
-    photos: photoIds.map((photoId) => ({ photoId, status: 'pending', updatedAt: now })),
-  };
-  legacyJobs.set(familyId, job);
-  return job;
-}
+export function getAnalysisJob(familyId: string): FamilyAnalysisJob | undefined {
+  const dbJob = findActivePhotoAnalysisJob(familyId);
+  if (dbJob) {
+    const mapped = dbJobToFamilyAnalysisJob(dbJob);
+    return { ...mapped, jobId: dbJob.id };
+  }
 
-/** @deprecated DB job 由 worker 更新 progress */
-export function updatePhotoTask(
-  familyId: string,
-  photoId: string,
-  patch: Partial<Pick<PhotoTaskState, 'status' | 'error'>>
-): void {
-  const job = legacyJobs.get(familyId);
-  if (!job) return;
-  const task = job.photos.find((p) => p.photoId === photoId);
-  if (!task) return;
-  Object.assign(task, patch, { updatedAt: Date.now() });
-  job.updatedAt = Date.now();
-}
+  const recentDone = getRecentPhotoAnalysisJob(familyId);
+  if (recentDone) {
+    return { ...recentDone, jobId: recentDone.jobId };
+  }
 
-/** @deprecated */
-export function finalizeAnalysisJob(familyId: string, status: 'done' | 'error'): void {
-  const job = legacyJobs.get(familyId);
-  if (!job) return;
-  job.status = status;
-  job.updatedAt = Date.now();
-}
-
-export function clearAnalysisJob(familyId: string): void {
-  legacyJobs.delete(familyId);
+  return undefined;
 }
 
 export function summarizeJob(job: FamilyAnalysisJob) {

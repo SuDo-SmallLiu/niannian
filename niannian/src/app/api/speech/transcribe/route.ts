@@ -1,10 +1,17 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
+import { requireAuth, AuthError, unauthorizedResponse } from '@/lib/auth';
 import { transcribeAudioBlob } from '@/lib/speech-transcribe';
 
 export const runtime = 'nodejs';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    await requireAuth(request);
+
+    const rateLimited = heavyApiRateLimitResponse(request, 'speech/transcribe');
+    if (rateLimited) return rateLimited;
+
     const formData = await request.formData();
     const audio = formData.get('audio');
 
@@ -21,6 +28,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ text });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return unauthorizedResponse();
+    }
     const message = error instanceof Error ? error.message : '语音识别失败';
     return NextResponse.json({ error: message }, { status: 500 });
   }

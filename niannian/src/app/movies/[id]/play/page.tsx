@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import InteractiveStoryPlayer from '@/components/h5/InteractiveStoryPlayer';
 import MovieVideoPlayer from '@/components/h5/MovieVideoPlayer';
@@ -10,7 +10,8 @@ import { buildMovieSlides, type StoryH5Input } from '@/lib/h5-story-slides';
 import { getSlideNarrationText } from '@/lib/slide-narration';
 import { sanitizeRenderError } from '@/lib/movie-render-error';
 import { primeAudioInUserGesture } from '@/lib/prime-audio-gesture';
-import type { MovieRenderProgress } from '@/lib/movie-render-progress';
+import { watchJobUntilDone } from '@/lib/poll-job';
+import { createRenderProgress, type MovieRenderProgress } from '@/lib/movie-render-progress';
 
 type RenderStatus = 'none' | 'queued' | 'rendering' | 'ready' | 'failed';
 type PlayMode = 'select' | 'h5' | 'mp4';
@@ -39,7 +40,42 @@ export default function MoviePlayPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [playMode, setPlayMode] = useState<PlayMode>('select');
+  const [renderJobId, setRenderJobId] = useState<string | null>(null);
+  const watchingJobRef = useRef<string | null>(null);
   const { openSharePoster, loading: shareLoading, modal: shareModal } = useSharePoster();
+
+  const refreshMovieState = useCallback(async () => {
+    try {
+      const [movieRes, renderRes] = await Promise.all([
+        fetch(`/api/movie?movieId=${movieId}`),
+        fetch(`/api/movie/render?movieId=${movieId}`),
+      ]);
+      const movieData = await movieRes.json();
+      const renderData = await renderRes.json();
+
+      if (movieRes.ok) {
+        if (movieData.narration) setNarration(movieData.narration);
+        if (movieData.movie?.media_url) setMediaUrl(movieData.movie.media_url);
+        if (movieData.movie?.render_status) {
+          setRenderStatus(movieData.movie.render_status);
+        }
+        if (movieData.movie?.render_error !== undefined) {
+          setRenderError(sanitizeRenderError(movieData.movie.render_error));
+        }
+      }
+      if (renderRes.ok) {
+        if (renderData.mediaUrl) setMediaUrl(renderData.mediaUrl);
+        if (renderData.renderStatus) setRenderStatus(renderData.renderStatus);
+        if (renderData.renderError !== undefined) {
+          setRenderError(sanitizeRenderError(renderData.renderError));
+        }
+        if (renderData.renderProgress) setRenderProgress(renderData.renderProgress);
+        if (renderData.renderJobId) setRenderJobId(renderData.renderJobId as string);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [movieId]);
 
   useEffect(() => {
     async function load() {
@@ -76,7 +112,11 @@ export default function MoviePlayPage() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ movieId, retry: true }),
-            });
+            })
+              .then((res) => res.json())
+              .then((data) => {
+                if (data.jobId) setRenderJobId(data.jobId as string);
+              });
             return;
           }
           if (!data.movie.media_url && status !== 'ready' && status !== 'rendering' && status !== 'queued') {
@@ -97,45 +137,55 @@ export default function MoviePlayPage() {
   }, [movieId]);
 
   useEffect(() => {
-    if (loading || error || playMode !== 'select') return;
+    if (!renderJobId || watchingJobRef.current === renderJobId) return;
     if (renderStatus === 'ready' && mediaUrl) return;
 
-    const poll = async () => {
-      try {
-        const [movieRes, renderRes] = await Promise.all([
-          fetch(`/api/movie?movieId=${movieId}`),
-          fetch(`/api/movie/render?movieId=${movieId}`),
-        ]);
-        const movieData = await movieRes.json();
-        const renderData = await renderRes.json();
+    watchingJobRef.current = renderJobId;
+    let cancelled = false;
 
-        if (movieRes.ok) {
-          if (movieData.narration) setNarration(movieData.narration);
-          if (movieData.movie?.media_url) setMediaUrl(movieData.movie.media_url);
-          if (movieData.movie?.render_status) {
-            setRenderStatus(movieData.movie.render_status);
-          }
-          if (movieData.movie?.render_error !== undefined) {
-            setRenderError(sanitizeRenderError(movieData.movie.render_error));
-          }
+    void watchJobUntilDone(renderJobId, {
+      timeoutMs: 30 * 60 * 1000,
+      onProgress: ({ progress }) => {
+        if (cancelled) return;
+        const message = typeof progress?.message === 'string' ? progress.message : undefined;
+        if (message) {
+          setRenderProgress((prev) =>
+            createRenderProgress({
+              phase: prev?.phase ?? 'segments',
+              message,
+              segmentDone: prev?.segmentDone ?? 0,
+              segmentTotal: prev?.segmentTotal ?? 0,
+              percent:
+                typeof progress?.percent === 'number'
+                  ? progress.percent
+                  : (prev?.percent ?? 0),
+            })
+          );
         }
-        if (renderRes.ok) {
-          if (renderData.mediaUrl) setMediaUrl(renderData.mediaUrl);
-          if (renderData.renderStatus) setRenderStatus(renderData.renderStatus);
-          if (renderData.renderError !== undefined) {
-            setRenderError(sanitizeRenderError(renderData.renderError));
-          }
-          if (renderData.renderProgress) setRenderProgress(renderData.renderProgress);
-        }
-      } catch {
-        /* ignore */
-      }
+        void refreshMovieState();
+      },
+    })
+      .then(() => {
+        if (!cancelled) void refreshMovieState();
+      })
+      .catch(() => {
+        if (!cancelled) void refreshMovieState();
+      });
+
+    return () => {
+      cancelled = true;
     };
+  }, [renderJobId, renderStatus, mediaUrl, refreshMovieState]);
 
-    const intervalMs = renderStatus === 'failed' ? 8000 : 4000;
-    const timer = setInterval(poll, intervalMs);
+  useEffect(() => {
+    if (loading || error) return;
+    if (renderStatus === 'ready' && mediaUrl) return;
+
+    void refreshMovieState();
+    const intervalMs = renderJobId ? 12000 : renderStatus === 'failed' ? 8000 : 5000;
+    const timer = setInterval(() => void refreshMovieState(), intervalMs);
     return () => clearInterval(timer);
-  }, [movieId, loading, error, playMode, renderStatus, mediaUrl]);
+  }, [movieId, loading, error, renderStatus, mediaUrl, renderJobId, refreshMovieState]);
 
   const mp4Ready = renderStatus === 'ready' && Boolean(mediaUrl);
   const mp4Rendering = renderStatus === 'queued' || renderStatus === 'rendering';

@@ -271,3 +271,41 @@ export async function synthesizeSpeechAsync(
     engine: payload.engine as string | undefined,
   };
 }
+
+export interface PhotoAnalysisProgressSnapshot {
+  total: number;
+  completed: number;
+  failed: number;
+  active: number;
+  progress: number;
+  message?: string;
+}
+
+export function snapshotPhotoAnalysisProgress(
+  progress?: Record<string, unknown>
+): PhotoAnalysisProgressSnapshot {
+  return {
+    total: typeof progress?.total === 'number' ? progress.total : 0,
+    completed: typeof progress?.completed === 'number' ? progress.completed : 0,
+    failed: typeof progress?.failed === 'number' ? progress.failed : 0,
+    active: typeof progress?.active === 'number' ? progress.active : 0,
+    progress: typeof progress?.progress === 'number' ? progress.progress : 0,
+    message: typeof progress?.message === 'string' ? progress.message : undefined,
+  };
+}
+
+/** 批量照片解析：SSE 订阅 Job，完成后返回 Job 视图 */
+export async function watchPhotoAnalysisJob(
+  jobId: string,
+  options?: PollJobOptions & {
+    onSnapshot?: (snapshot: PhotoAnalysisProgressSnapshot) => void;
+  }
+): Promise<JobView> {
+  return watchJobUntilDone(jobId, {
+    ...options,
+    onProgress: ({ status, progress, result }) => {
+      options?.onProgress?.({ status, progress, result });
+      options?.onSnapshot?.(snapshotPhotoAnalysisProgress(progress));
+    },
+  });
+}

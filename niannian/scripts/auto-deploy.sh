@@ -28,7 +28,17 @@ deploy() {
     return 0
   fi
 
-  echo "$LOG_TAG $(date '+%F %T') 发现更新 $LOCAL -> $REMOTE"
+  if git merge-base --is-ancestor "$REMOTE" "$LOCAL"; then
+    echo "$LOG_TAG $(date '+%F %T') 本地领先 origin/$BRANCH ($LOCAL)，跳过 reset"
+    return 0
+  fi
+
+  if ! git merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
+    echo "$LOG_TAG $(date '+%F %T') 本地与 origin/$BRANCH 分叉，跳过 reset（需人工处理）"
+    return 1
+  fi
+
+  echo "$LOG_TAG $(date '+%F %T') 发现远程更新 $LOCAL -> $REMOTE"
   git reset --hard "origin/$BRANCH"
 
   cd "$APP_DIR"

@@ -10,6 +10,7 @@ import MemoryCardStatus, {
 } from '@/components/memory/MemoryCardStatus';
 import RetryAnalysisButton from '@/components/memory/RetryAnalysisButton';
 import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
+import { watchPhotoAnalysisJob } from '@/lib/poll-job';
 
 const LOADING_PHRASES = [
   '正在翻阅相册……',
@@ -19,7 +20,6 @@ const LOADING_PHRASES = [
   '正在整理属于家的故事……',
 ];
 
-const POLL_INTERVAL = 2000;
 const POLL_TIMEOUT = 300000;
 
 interface PhotoTask {
@@ -39,14 +39,6 @@ interface PollPayload {
   active?: number;
   progress?: number;
   photos?: PhotoTask[];
-}
-
-function isTerminalPoll(pollData: PollPayload): boolean {
-  if (pollData.status === 'done' || pollData.status === 'error') return true;
-  const total = pollData.total ?? 0;
-  if (total <= 0) return false;
-  const finished = (pollData.completed ?? 0) + (pollData.failed ?? 0);
-  return finished >= total && (pollData.active ?? 0) === 0;
 }
 
 export default function AnalyzePage() {
@@ -123,6 +115,13 @@ export default function AnalyzePage() {
     [familyId, router]
   );
 
+  const refreshAnalyzeView = useCallback(async () => {
+    const pollData = await pollStatus();
+    if (cancelledRef.current) return pollData;
+    applyPollData(pollData);
+    return pollData;
+  }, [pollStatus, applyPollData]);
+
   const startAnalysis = useCallback(async () => {
     if (cancelledRef.current) return;
     setError('');
@@ -144,45 +143,48 @@ export default function AnalyzePage() {
         return;
       }
 
+      const jobId = startData.jobId as string | undefined;
+      if (!jobId) {
+        setError('未收到任务 ID');
+        hasRun.current = false;
+        return;
+      }
+
       if (typeof startData.total === 'number') {
         setSummary((prev) => ({ ...prev, total: startData.total }));
       }
 
-      const startTime = Date.now();
+      await refreshAnalyzeView();
 
-      while (Date.now() - startTime < POLL_TIMEOUT) {
-        if (cancelledRef.current) return;
+      const result = await watchPhotoAnalysisJob(jobId, {
+        timeoutMs: POLL_TIMEOUT,
+        onSnapshot: (snapshot) => {
+          if (cancelledRef.current) return;
+          setSummary((prev) => ({ ...prev, ...snapshot }));
+        },
+        onProgress: () => {
+          void refreshAnalyzeView();
+        },
+      });
 
-        const pollData = await pollStatus();
-        if (cancelledRef.current) return;
+      if (cancelledRef.current) return;
 
-        applyPollData(pollData);
-
-        if (pollData.status === 'done' || (pollData.status !== 'error' && isTerminalPoll(pollData))) {
-          finishSuccess(pollData);
-          return;
-        }
-
-        if (pollData.status === 'error') {
-          setError(pollData.message || '解析失败，请重试');
-          hasRun.current = false;
-          return;
-        }
-
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-      }
-
-      if (!cancelledRef.current) {
-        setError('解析时间较长，可先去照片库查看已完成的结果。');
+      const pollData = await refreshAnalyzeView();
+      if (result.status === 'error') {
+        setError((result.error as string) || pollData?.message || '解析失败，请重试');
         hasRun.current = false;
+        return;
       }
-    } catch {
+
+      finishSuccess(pollData || { redirectTo: `/family/${familyId}/photos` });
+    } catch (err) {
       if (!cancelledRef.current) {
-        setError('网络不太稳定，解析可能中断了。你可以重试。');
+        const msg = err instanceof Error ? err.message : '网络不太稳定，解析可能中断了。';
+        setError(msg.includes('超时') ? '解析时间较长，可先去照片库查看已完成的结果。' : msg);
         hasRun.current = false;
       }
     }
-  }, [familyId, pollStatus, applyPollData, finishSuccess]);
+  }, [familyId, refreshAnalyzeView, finishSuccess]);
 
   useEffect(() => {
     if (hasRun.current) return;
@@ -195,8 +197,7 @@ export default function AnalyzePage() {
   };
 
   const handlePhotoRetried = async () => {
-    const pollData = await pollStatus();
-    applyPollData(pollData);
+    await refreshAnalyzeView();
   };
 
   return (

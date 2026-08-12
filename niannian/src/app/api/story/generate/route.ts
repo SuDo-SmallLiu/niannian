@@ -1,36 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
-import { createStoryJob, getStoryJob, startStoryJob } from '@/lib/story-job';
+import { createStoryJob, startStoryJob } from '@/lib/story-job';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
-
-export async function GET(request: NextRequest) {
-  try {
-    const jobId = request.nextUrl.searchParams.get('jobId');
-    if (!jobId) {
-      return NextResponse.json({ error: '缺少 jobId' }, { status: 400 });
-    }
-
-    const job = getStoryJob(jobId);
-    if (!job) {
-      return NextResponse.json({ error: '任务不存在或已过期' }, { status: 404 });
-    }
-
-    await requireFamilyAccess(request, job.familyId);
-
-    return NextResponse.json({
-      jobId: job.id,
-      status: job.status,
-      progress: job.progress,
-      error: job.error,
-      storyCount: job.storyCount,
-      sceneCount: job.sceneCount,
-    });
-  } catch (error) {
-    const accessResp = familyAccessErrorResponse(error);
-    if (accessResp) return accessResp;
-    return NextResponse.json({ error: '获取失败' }, { status: 500 });
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {

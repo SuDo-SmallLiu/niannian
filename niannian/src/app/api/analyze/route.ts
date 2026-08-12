@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
 import { getPhotosByFamily, getFamily, getPhoto } from '@/lib/db';
 import { buildAnalysisStatusFromDb } from '@/lib/analysis-db-status';
-import { cleanupStaleAnalysisJobs, getAnalysisJob, summarizeJob } from '@/lib/photo-analysis-job';
+import { getAnalysisJob, summarizeJob } from '@/lib/photo-analysis-job';
 import { createPhotoAnalysisJob } from '@/lib/jobs/create-jobs';
 import { findActivePhotoAnalysisJob } from '@/lib/jobs/photo-analysis-jobs';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
@@ -40,16 +40,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const memJob = getAnalysisJob(familyId);
-    if (memJob?.status === 'processing') {
-      return NextResponse.json({
-        status: 'processing',
-        familyId,
-        jobId: memJob.jobId,
-        total: memJob.photos.length,
-      });
-    }
-
     const photoIds = photos.map((p) => p.id);
     const job = createPhotoAnalysisJob({ familyId, photoIds });
 
@@ -76,7 +66,6 @@ export async function GET(request: NextRequest) {
 
     await requireFamilyAccess(request, familyId);
 
-    cleanupStaleAnalysisJobs();
     const job = getAnalysisJob(familyId);
 
     if (!job) {
@@ -122,40 +111,43 @@ export async function GET(request: NextRequest) {
       });
     }
 
-  const summary = summarizeJob(job);
-  const photos = job.photos.map((task) => {
-    const photo = getPhoto(task.photoId);
-    return {
-      id: task.photoId,
-      status: task.status,
-      error: task.error,
-      url: photo?.url,
-    };
-  });
+    const summary = summarizeJob(job);
+    const photos = job.photos.map((task) => {
+      const photo = getPhoto(task.photoId);
+      return {
+        id: task.photoId,
+        status: task.status,
+        error: task.error,
+        url: photo?.url,
+      };
+    });
 
-  if (job.status === 'done') {
+    if (job.status === 'done') {
+      return NextResponse.json({
+        status: 'done',
+        jobId: job.jobId,
+        redirectTo: `/family/${familyId}/photos`,
+        ...summary,
+        photos,
+      });
+    }
+
+    if (job.status === 'error') {
+      return NextResponse.json({
+        status: 'error',
+        jobId: job.jobId,
+        message: '部分照片解析失败，可单独重试',
+        ...summary,
+        photos,
+      });
+    }
+
     return NextResponse.json({
-      status: 'done',
-      redirectTo: `/family/${familyId}/photos`,
+      status: 'processing',
+      jobId: job.jobId,
       ...summary,
       photos,
     });
-  }
-
-  if (job.status === 'error') {
-    return NextResponse.json({
-      status: 'error',
-      message: '部分照片解析失败，可单独重试',
-      ...summary,
-      photos,
-    });
-  }
-
-  return NextResponse.json({
-    status: 'processing',
-    ...summary,
-    photos,
-  });
   } catch (error) {
     const accessResp = familyAccessErrorResponse(error);
     if (accessResp) return accessResp;
