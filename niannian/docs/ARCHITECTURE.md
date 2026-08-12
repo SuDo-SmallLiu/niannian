@@ -1,6 +1,6 @@
 # 念念年年 · 系统架构
 
-> 更新：2026-08-10
+> 更新：2026-08-12 · 架构优化见 [ARCHITECTURE-OPTIMIZATION.md](./ARCHITECTURE-OPTIMIZATION.md)
 
 ---
 

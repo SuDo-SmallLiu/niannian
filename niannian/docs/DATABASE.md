@@ -272,7 +272,7 @@ erDiagram
 | 表 | 职责 |
 |----|------|
 | `stories` | 故事主表（标题、主题、时间线 JSON） |
-| `story_memory_cards` | 故事 ↔ 记忆卡关联（`memory_card_id` 实际存 `photo_id`） |
+| `story_memory_cards` | 故事 ↔ 记忆卡关联；**`photo_id` 为 canonical 字段**，`memory_card_id` 历史兼容（值同为 `photo_id`） |
 | `story_versions` | 重新生成历史版本 |
 | `shares` | 故事分享码 |
 
@@ -280,7 +280,18 @@ erDiagram
 
 ---
 
-### 4. 人生电影（Life Movie）
+### 5. 任务队列（Job Queue · 2026-08）
+
+| 表 | 职责 |
+|----|------|
+| `schema_migrations` | 版本化迁移记录 |
+| `jobs` | 持久化异步任务（type/status/payload/progress/idempotency_key） |
+| `job_events` | 任务事件流（created/progress/completed/failed） |
+| `media_assets` | 媒体资产元数据（对象存储迁移预留） |
+
+---
+
+### 6. 人生电影（Life Movie）
 
 | 表 | 职责 |
 |----|------|
@@ -302,7 +313,7 @@ none → queued → rendering → ready
 
 ---
 
-### 5. 分享
+### 7. 分享
 
 | 表 | 对象 | 公开路由 |
 |----|------|----------|

@@ -1,8 +1,11 @@
-import { getStoriesByFamily } from '@/lib/db';
-import { runStoryEngine, type RunStoryEngineOptions } from '@/lib/story-engine';
+import { createJob, getJobById, jobToPublicView } from '@/lib/jobs/job-repository';
+import { scheduleInProcessJobDrain } from '@/lib/jobs/job-processor';
+import type { JobRecord } from '@/lib/jobs/types';
+import type { RunStoryEngineOptions } from '@/lib/story-engine';
 
 export type StoryJobStatus = 'queued' | 'running' | 'done' | 'error';
 
+/** 与旧版内存 Job 兼容的视图 */
 export interface StoryJob {
   id: string;
   familyId: string;
@@ -15,65 +18,81 @@ export interface StoryJob {
   updatedAt: number;
 }
 
-const jobs = new Map<string, StoryJob>();
-const TTL_MS = 60 * 60 * 1000;
-
-function cleanupOldJobs() {
-  const now = Date.now();
-  for (const [id, job] of jobs) {
-    if (now - job.updatedAt > TTL_MS) jobs.delete(id);
-  }
+function mapStatus(status: JobRecord['status']): StoryJobStatus {
+  if (status === 'cancelled') return 'error';
+  return status;
 }
 
-export function createStoryJob(familyId: string): string {
-  cleanupOldJobs();
-  const id = `story_job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const now = Date.now();
-  jobs.set(id, {
-    id,
+function toStoryJob(job: JobRecord): StoryJob {
+  const progressMessage =
+    typeof job.progress.message === 'string' ? job.progress.message : '处理中…';
+
+  return {
+    id: job.id,
+    familyId: job.familyId || '',
+    status: mapStatus(job.status),
+    progress: progressMessage,
+    error: job.errorMessage || undefined,
+    storyCount:
+      typeof job.result?.storyCount === 'number' ? job.result.storyCount : undefined,
+    sceneCount:
+      typeof job.result?.sceneCount === 'number' ? job.result.sceneCount : undefined,
+    createdAt: Date.parse(job.createdAt),
+    updatedAt: Date.parse(job.updatedAt),
+  };
+}
+
+export function createStoryJob(
+  familyId: string,
+  options: Pick<RunStoryEngineOptions, 'replaceExisting'> = {}
+): string {
+  const job = createJob({
+    type: 'story_generate',
     familyId,
-    status: 'queued',
-    progress: '排队中…',
-    createdAt: now,
-    updatedAt: now,
+    idempotencyKey: `story_generate:${familyId}`,
+    payload: { replaceExisting: options.replaceExisting !== false },
   });
-  return id;
+  return job.id;
 }
 
 export function getStoryJob(jobId: string): StoryJob | null {
-  return jobs.get(jobId) || null;
+  const job = getJobById(jobId);
+  if (!job || job.type !== 'story_generate') return null;
+  return toStoryJob(job);
 }
 
 export function startStoryJob(
   jobId: string,
-  options: RunStoryEngineOptions = {}
+  _options: RunStoryEngineOptions = {}
 ): void {
-  const job = jobs.get(jobId);
-  if (!job || job.status !== 'queued') return;
+  const job = getJobById(jobId);
+  if (!job || job.type !== 'story_generate') return;
+  scheduleInProcessJobDrain();
+}
 
-  void (async () => {
-    job.status = 'running';
-    job.progress = '正在聚类记忆卡…';
-    job.updatedAt = Date.now();
+export function createStoryRegenerateJob(input: {
+  storyId: string;
+  familyId: string;
+  mode: string;
+}): string {
+  const job = createJob({
+    type: 'story_regenerate',
+    familyId: input.familyId,
+    resourceId: input.storyId,
+    idempotencyKey: `story_regenerate:${input.storyId}:${input.mode}`,
+    payload: { storyId: input.storyId, mode: input.mode },
+  });
+  scheduleInProcessJobDrain();
+  return job.id;
+}
 
-    try {
-      const result = await runStoryEngine(job.familyId, {
-        ...options,
-        onProgress: (message) => {
-          job.progress = message;
-          job.updatedAt = Date.now();
-        },
-      });
-      const stories = getStoriesByFamily(job.familyId);
-      job.status = 'done';
-      job.progress = '完成';
-      job.storyCount = stories.length;
-      job.sceneCount = result.scenes.length;
-      job.updatedAt = Date.now();
-    } catch (error) {
-      job.status = 'error';
-      job.error = error instanceof Error ? error.message : '生成失败';
-      job.updatedAt = Date.now();
-    }
-  })();
+export function getStoryRegenerateJob(jobId: string): StoryJob | null {
+  const job = getJobById(jobId);
+  if (!job || job.type !== 'story_regenerate') return null;
+  return toStoryJob(job);
+}
+
+export function getPublicJobView(jobId: string) {
+  const job = getJobById(jobId);
+  return job ? jobToPublicView(job) : null;
 }

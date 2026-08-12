@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { regenerateStoryAsync } from '@/lib/poll-job';
 import EmptyStateIcon from '@/components/EmptyStateIcon';
 import { StoryPageMascot } from '@/components/StoryListCard';
 import { NavStoryIcon, PhotoIcon } from '@/components/icons/NianNianIcons';
@@ -127,28 +128,21 @@ export default function StoryPage() {
     showLoading('念念正在重新生成故事', '读取最新记忆卡并撰写中，请保持页面打开…');
     const startedAt = Date.now();
     try {
-      const res = await fetch('/api/story/regenerate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id, mode: 'full' }),
+      await regenerateStoryAsync(story.id, 'full', {
+        onProgress: ({ progress }) => {
+          const message =
+            progress && typeof progress.message === 'string'
+              ? progress.message
+              : '读取最新记忆卡并撰写中…';
+          showLoading('念念正在重新生成故事', message);
+        },
       });
-      const data = await res.json();
       const minLoadingMs = 1200;
       const elapsed = Date.now() - startedAt;
       if (elapsed < minLoadingMs) {
         await new Promise((resolve) => setTimeout(resolve, minLoadingMs - elapsed));
       }
-      if (!res.ok) {
-        setRegenerateError(data.error || '重新生成失败');
-        return;
-      }
-      if (data.story) {
-        setStories((prev) =>
-          prev.map((item) => (item.id === story.id ? { ...item, ...data.story } : item))
-        );
-      } else {
-        await fetchData();
-      }
+      await fetchData();
       setRegenerateSuccess('故事已更新，请查看上方内容');
       window.setTimeout(() => setRegenerateSuccess(''), 4000);
     } catch {

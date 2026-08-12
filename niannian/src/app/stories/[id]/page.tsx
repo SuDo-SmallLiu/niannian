@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { regenerateStoryAsync } from '@/lib/poll-job';
 import StoryChapterTimeline from '@/components/StoryChapterTimeline';
 import StoryInlineEditor from '@/components/StoryInlineEditor';
 import { useSharePoster } from '@/hooks/useSharePoster';
@@ -163,15 +164,16 @@ export default function StoryDetailPage() {
     setRegenerating(true);
     showLoading('AI 正在重新发现故事', '请保持页面打开…');
     try {
-      const res = await fetch('/api/story/regenerate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id, mode: regenMode }),
+      await regenerateStoryAsync(story.id, regenMode, {
+        onProgress: ({ progress }) => {
+          const message =
+            progress && typeof progress.message === 'string'
+              ? progress.message
+              : '请保持页面打开…';
+          showLoading('AI 正在重新发现故事', message);
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '重新生成失败');
-      if (data.story) setStory((prev) => ({ ...prev!, ...data.story }));
-      else await load();
+      await load();
     } catch (err) {
       await alert({
         title: '重新生成失败',

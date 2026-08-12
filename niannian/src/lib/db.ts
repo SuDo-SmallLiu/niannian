@@ -2,6 +2,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { runMigrations } from '@/lib/migrations';
 
 const DB_PATH = path.join(process.cwd(), 'data', 'niannian.db');
 
@@ -17,6 +18,7 @@ export function getDb(): Database.Database {
     db = new Database(DB_PATH);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+    db.pragma('busy_timeout = 5000');
     initializeDatabase();
   }
   return db;
@@ -325,6 +327,7 @@ function migrateDatabase(database: Database.Database) {
 
   migrateStoriesV1ToV2(database);
   migrateStoryPhotosToMemoryCards(database);
+  runMigrations(database);
   scheduleSearchIndexBackfillIfEmpty();
 }
 
@@ -656,7 +659,7 @@ export function deletePhotoById(photoId: string): boolean {
 
   database.prepare('DELETE FROM tags WHERE photo_id = ?').run(photoId);
   database.prepare('DELETE FROM memory_cards WHERE photo_id = ?').run(photoId);
-  database.prepare('DELETE FROM story_memory_cards WHERE memory_card_id = ?').run(photoId);
+  database.prepare('DELETE FROM story_memory_cards WHERE memory_card_id = ? OR photo_id = ?').run(photoId, photoId);
   database.prepare('DELETE FROM photo_shares WHERE photo_id = ?').run(photoId);
   database.prepare('DELETE FROM global_memory_search WHERE photo_id = ?').run(photoId);
   database.prepare('DELETE FROM photos WHERE id = ?').run(photoId);
@@ -687,12 +690,26 @@ export function setStoryMemoryCards(
   ]);
 
   database.prepare('DELETE FROM story_memory_cards WHERE story_id = ?').run(storyId);
-  const insert = database.prepare(`
-    INSERT INTO story_memory_cards (story_id, memory_card_id, order_index, scene_id)
-    VALUES (?, ?, ?, ?)
-  `);
+
+  const smcCols = database.prepare('PRAGMA table_info(story_memory_cards)').all() as Array<{ name: string }>;
+  const hasPhotoId = smcCols.some((c) => c.name === 'photo_id');
+
+  const insert = hasPhotoId
+    ? database.prepare(`
+        INSERT INTO story_memory_cards (story_id, memory_card_id, photo_id, order_index, scene_id)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+    : database.prepare(`
+        INSERT INTO story_memory_cards (story_id, memory_card_id, order_index, scene_id)
+        VALUES (?, ?, ?, ?)
+      `);
+
   for (const item of items) {
-    insert.run(storyId, item.photoId, item.orderIndex, item.sceneId || null);
+    if (hasPhotoId) {
+      insert.run(storyId, item.photoId, item.photoId, item.orderIndex, item.sceneId || null);
+    } else {
+      insert.run(storyId, item.photoId, item.orderIndex, item.sceneId || null);
+    }
   }
 
   for (const photoId of affectedPhotoIds) {

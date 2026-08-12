@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     await requireFamilyAccess(request, familyId);
-    const jobId = createStoryJob(familyId);
+    const jobId = createStoryJob(familyId, { replaceExisting });
     startStoryJob(jobId, { replaceExisting });
 
     return NextResponse.json({ ok: true, jobId });

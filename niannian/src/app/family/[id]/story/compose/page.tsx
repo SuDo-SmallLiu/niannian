@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { regenerateStoryAsync } from '@/lib/poll-job';
 import MemoryCardComposeItem, {
   getMemoryCardComposeHints,
 } from '@/components/MemoryCardComposeItem';
@@ -91,13 +92,7 @@ export default function ManualStoryComposePage() {
     setRegeneratingId(storyId);
     setError('');
     try {
-      const res = await fetch('/api/story/regenerate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storyId, mode: 'full' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '重新生成失败');
+      await regenerateStoryAsync(storyId, 'full');
       router.push(`/family/${familyId}/story?storyId=${storyId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : '重新生成失败');

@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE } from '@/lib/auth-session';
+import { resolveRequestId } from '@/lib/request-context';
+
+function attachRequestId(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set('x-request-id', requestId);
+  response.headers.set('x-trace-id', requestId);
+  return response;
+}
+
+function jsonWithRequestId(body: unknown, init: ResponseInit, requestId: string) {
+  const response = NextResponse.json(body, init);
+  return attachRequestId(response, requestId);
+}
 
 function isPublicPage(pathname: string): boolean {
   if (pathname === '/' || pathname === '/login') return true;
@@ -29,21 +41,22 @@ function isStaticAsset(pathname: string): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const requestId = resolveRequestId(request.headers);
 
   if (isStaticAsset(pathname)) {
-    return NextResponse.next();
+    return attachRequestId(NextResponse.next(), requestId);
   }
 
   const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
 
   if (pathname.startsWith('/api/')) {
     if (isPublicApi(pathname, request.method)) {
-      return NextResponse.next();
+      return attachRequestId(NextResponse.next(), requestId);
     }
     if (!session) {
-      return NextResponse.json({ error: '请先登录' }, { status: 401 });
+      return jsonWithRequestId({ error: '请先登录' }, { status: 401 }, requestId);
     }
-    return NextResponse.next();
+    return attachRequestId(NextResponse.next(), requestId);
   }
 
   if (!isPublicPage(pathname) && !session) {
@@ -57,7 +70,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(redirect, request.url));
   }
 
-  return NextResponse.next();
+  return attachRequestId(NextResponse.next(), requestId);
 }
 
 export const config = {
