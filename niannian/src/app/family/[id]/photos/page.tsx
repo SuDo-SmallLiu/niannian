@@ -472,7 +472,7 @@ export default function PhotoLibraryPage() {
               type="button"
               onClick={() => setShowGenerateSheet(true)}
               disabled={!canGenerateStory}
-              className="block w-full py-4 rounded-2xl bg-[#D98A45] text-white font-serif text-lg text-center shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
+              className="block w-full py-3.5 rounded-2xl bg-[#D98A45] text-white text-sm font-medium text-center shadow-lg shadow-[#D98A45]/20 hover:bg-[#C47A3A] disabled:opacity-50 transition-all"
             >
               去生成故事
             </button>

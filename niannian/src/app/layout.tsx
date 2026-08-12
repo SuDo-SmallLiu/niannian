@@ -26,7 +26,9 @@ export default function RootLayout({
         <AppProviders>
           <div className="app-shell">
             <main className="app-shell__main">{children}</main>
-            <NavShell />
+            <div className="app-shell__nav">
+              <NavShell />
+            </div>
           </div>
         </AppProviders>
       </body>

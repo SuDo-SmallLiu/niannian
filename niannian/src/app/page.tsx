@@ -210,7 +210,7 @@ function HomePageContent() {
   }
 
   return (
-    <div className="home-page h-[calc(100dvh-4.5rem)] max-h-[772px] flex flex-col bg-[#F8F4ED] overflow-hidden relative">
+    <div className="home-page flex-1 min-h-0 flex flex-col bg-[#F8F4ED] overflow-hidden relative">
       <HomeBackgroundDecor />
       <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
 

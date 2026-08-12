@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import PageShell from '@/components/PageShell';
-import StoryListCard, { StoryPageMascot } from '@/components/StoryListCard';
+import StoryListCard from '@/components/StoryListCard';
 import EmptyStateIcon from '@/components/EmptyStateIcon';
 import { DeleteIcon, LocationIcon, NavStoryIcon, ShareIcon } from '@/components/icons/NianNianIcons';
 import { useAppreciateMode } from '@/components/providers/appreciate-mode-provider';
@@ -152,10 +152,9 @@ export default function StoriesPage() {
   return (
     <PageShell className={`bg-[#FFFBF6]${appreciate ? ' text-lg' : ''}`}>
       {shareModal}
-      <StoryPageMascot />
 
-      <header className="flex items-start justify-between gap-3 mb-5 px-0.5">
-        <div className="min-w-0 text-left">
+      <header className="relative mb-5 px-0.5">
+        <div className="text-center">
           <h1
             className={`font-serif font-bold text-[#4A3326] leading-snug m-0 ${
               appreciate ? 'text-[32px]' : 'text-[28px]'
@@ -170,7 +169,7 @@ export default function StoriesPage() {
         {!appreciate && (
           <Link
             href="/family"
-            className="shrink-0 inline-flex items-center justify-center h-10 px-4 rounded-2xl bg-[#DF8B3A] text-white text-sm font-medium hover:bg-[#C47A3A] transition-colors active:scale-[0.98]"
+            className="absolute top-0 right-0 inline-flex items-center justify-center h-10 px-4 rounded-2xl bg-[#DF8B3A] text-white text-sm font-medium hover:bg-[#C47A3A] transition-colors active:scale-[0.98]"
           >
             + 记录故事
           </Link>

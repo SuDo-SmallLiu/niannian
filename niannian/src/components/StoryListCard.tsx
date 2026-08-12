@@ -140,22 +140,3 @@ export default function StoryListCard({
     </article>
   );
 }
-
-/** 列表页右下角念念形象 */
-export function StoryPageMascot() {
-  return (
-    <div
-      className="pointer-events-none fixed bottom-[76px] right-3 z-20 w-[72px] h-[72px] opacity-95"
-      aria-hidden
-    >
-      <Image
-        src="/niannian/mascot-small-poster.png"
-        alt=""
-        width={72}
-        height={72}
-        unoptimized
-        className="w-full h-full object-contain drop-shadow-md"
-      />
-    </div>
-  );
-}

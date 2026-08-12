@@ -29,7 +29,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="home-bottom-nav sticky bottom-0 z-[60] safe-bottom">
+    <nav className="home-bottom-nav safe-bottom">
       <div className="home-bottom-nav__inner flex items-center justify-around h-[72px] px-1">
         {NAV_ITEMS.map((item) => (
           <NavItem key={item.href} {...item} pathname={pathname} />

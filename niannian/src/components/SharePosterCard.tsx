@@ -39,6 +39,32 @@ const PHOTO_TRANSFORMS = [
   'rotate-[2deg] -translate-y-1',
 ];
 
+function FeatureIcon({ index }: { index: number }) {
+  const stroke = '#4A3326';
+  if (index === 0) {
+    return (
+      <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-2">
+        <rect x="2" y="2" width="24" height="20" rx="4" stroke={stroke} strokeWidth="2" />
+        <path d="M8 10h12M8 14h10" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (index === 1) {
+    return (
+      <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-2">
+        <rect x="2" y="4" width="24" height="16" rx="4" stroke={stroke} strokeWidth="2" />
+        <circle cx="14" cy="12" r="5" stroke={stroke} strokeWidth="2" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-2">
+      <rect x="2" y="4" width="24" height="16" rx="3" stroke={stroke} strokeWidth="2" />
+      <path d="M6 12h16M8 16h12" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function PhotoCollage({
   type,
   photoUrls,
@@ -47,7 +73,8 @@ function PhotoCollage({
   photoUrls: string[];
 }) {
   const urls = photoUrls.filter(Boolean).slice(0, 4);
-  const minH = type === 'movie' ? 'min-h-[300px]' : type === 'memory' ? 'min-h-[260px]' : 'min-h-[240px]';
+  const minH =
+    type === 'movie' || type === 'story' ? 'min-h-[310px]' : 'min-h-[260px]';
 
   if (urls.length === 0) {
     return (
@@ -95,16 +122,27 @@ function PhotoCollage({
 
 function FeatureGrid({ items }: { items: PosterFeatureItem[] }) {
   return (
-    <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+    <div className="grid grid-cols-3 gap-2 mt-5 text-center">
       {items.map((item, i) => (
-        <div
-          key={item.title}
-          className={`px-1 ${i > 0 ? 'border-l border-[#E8E1D6]' : ''}`}
-        >
+        <div key={item.title} className={`px-1 ${i > 0 ? 'border-l border-[#E8E1D6]' : ''}`}>
+          <FeatureIcon index={i} />
           <p className="text-[#4A3326] text-[15px] font-medium leading-snug">{item.title}</p>
           <p className="text-[#8E7B6B] text-xs mt-1 leading-snug">{item.desc}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function MemoriesStamp() {
+  return (
+    <div
+      className="absolute top-3 right-4 w-[92px] h-[92px] rounded-full border-2 border-[#D8C9B3]/60 flex flex-col items-center justify-center text-[#D8C9B3]/60 pointer-events-none"
+      aria-hidden
+    >
+      <span className="text-[10px] tracking-wider font-medium">MEMORIES</span>
+      <span className="text-sm leading-none my-0.5">♥</span>
+      <span className="text-[9px]">2020.08.09</span>
     </div>
   );
 }
@@ -200,6 +238,7 @@ export default function SharePosterCard({
       className={`bg-[#FFF6E6] rounded-[28px] overflow-hidden border border-[rgba(223,139,58,0.12)] shadow-[0_8px_28px_rgba(125,92,57,0.12)] ${interactive ? 'cursor-pointer active:scale-[0.99] transition-transform touch-manipulation' : ''} ${className}`}
     >
       <div className="pt-5 pb-2 text-center relative">
+        <MemoriesStamp />
         <Image
           src="/niannian/brand-banner.png"
           alt="念念年年"
@@ -220,13 +259,10 @@ export default function SharePosterCard({
       </div>
 
       <div className="px-6 pb-4">
-        <h2 className="text-[#4A3326] font-serif font-bold text-[28px] leading-[1.35] line-clamp-2">
+        <h2 className="text-[#4A3326] font-serif font-bold text-[22px] leading-[1.35] line-clamp-2">
           {title}
+          <span className="text-[#F6B51B] ml-1">♡</span>
         </h2>
-
-        {summary && (
-          <p className="text-[#6B5E4D] text-base leading-relaxed mt-3 line-clamp-2">{summary}</p>
-        )}
 
         {features.length > 0 ? (
           <FeatureGrid items={features} />
@@ -244,33 +280,39 @@ export default function SharePosterCard({
             </div>
           )
         )}
+
+        {summary && (
+          <p className="text-[#8E7B6B] text-sm leading-relaxed mt-4 text-center line-clamp-2">
+            {summary}
+          </p>
+        )}
       </div>
 
       {showQr && shareUrl && (
-        <div className="mx-5 mb-4 rounded-[28px] bg-[#FFF3D6] border border-[rgba(246,181,27,0.18)] p-4 min-h-[220px] flex gap-3 items-stretch">
-          <div className="w-[40%] flex items-end justify-center shrink-0">
+        <div className="mx-5 mb-4 rounded-[28px] bg-[#FFF3D6] border border-[rgba(246,181,27,0.18)] p-4 min-h-[220px] relative overflow-visible">
+          <div className="absolute left-2 bottom-0 w-[40%] max-w-[110px] pointer-events-none">
             <Image
               src={MASCOT_SHARE_CARD}
               alt="念念"
               width={220}
               height={220}
               unoptimized
-              className="w-full max-w-[110px] h-auto object-contain object-bottom"
+              className="w-full h-auto object-contain object-bottom translate-y-2"
             />
           </div>
-          <div className="w-[60%] flex flex-col min-w-0">
-            <div className="bg-[#FFFDF9] rounded-2xl px-3 py-2 border border-[rgba(125,92,57,0.1)] mb-2">
-              <p className="text-[#4A3326] text-sm leading-relaxed">
+          <div className="ml-[38%] flex flex-col min-h-[188px]">
+            <div className="bg-[#FFFDF9] rounded-2xl px-3 py-2.5 border border-[rgba(125,92,57,0.1)] mb-3">
+              <p className="text-[#4A3326] text-sm leading-relaxed font-[family-name:var(--font-handwriting,'KaiTi',cursive)]">
                 把照片留下，把故事留下，把记忆留下。
               </p>
             </div>
             <div className="flex items-end justify-between gap-2 flex-1">
-              <div className="min-w-0">
+              <div className="min-w-0 pb-1">
                 <p className="text-[#4A3326] text-sm font-medium">扫码查看完整内容</p>
                 <p className="text-[#8E7B6B] text-xs mt-1 leading-relaxed">
-                  长按保存海报 · 分享转发
+                  长按保存海报
                   <br />
-                  和家人一起回忆
+                  分享给家人一起回忆
                 </p>
               </div>
               {qrDataUrl ? (

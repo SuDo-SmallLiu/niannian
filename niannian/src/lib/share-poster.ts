@@ -149,16 +149,31 @@ function drawPaperTexture(ctx: CanvasRenderingContext2D) {
   ctx.restore();
 }
 
+function drawMemoriesStamp(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = '#D8C9B3';
+  ctx.fillStyle = '#D8C9B3';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 46, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.font = `500 11px ${F.body}`;
+  ctx.fillText('MEMORIES', cx, cy - 14);
+  ctx.font = `400 14px ${F.body}`;
+  ctx.fillText('♥', cx, cy + 2);
+  ctx.font = `400 10px ${F.body}`;
+  ctx.fillText('2020.08.09', cx, cy + 20);
+  ctx.restore();
+}
+
 function drawDecorations(ctx: CanvasRenderingContext2D) {
   ctx.save();
   ctx.globalAlpha = 0.04;
   ctx.strokeStyle = C.darkCoffee;
   ctx.lineWidth = 2;
   drawRoundRect(ctx, 32, 120, 96, 72, 6);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(620, 180, 28, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.fillStyle = C.brandYellow;
@@ -176,6 +191,8 @@ function drawDecorations(ctx: CanvasRenderingContext2D) {
   ctx.quadraticCurveTo(200, 860, 360, 920);
   ctx.stroke();
   ctx.restore();
+
+  drawMemoriesStamp(ctx, 648, 108);
 }
 
 interface PhotoSlot {
@@ -389,24 +406,25 @@ async function drawShareZone(ctx: CanvasRenderingContext2D, shareUrl: string, y:
   const innerW = zoneW - pad * 2;
   const leftW = innerW * 0.4;
   const rightX = zoneX + pad + leftW;
+  const rightW = innerW * 0.6;
 
   try {
     const mascot = await loadImage(assetUrl(MASCOT_SHARE_CARD));
     const mascotSize = L.mascotW;
-    const mascotX = zoneX + pad + (leftW - mascotSize) / 2;
-    const mascotY = zoneY + (zoneH - mascotSize) / 2;
+    const mascotX = zoneX + pad - 12;
+    const mascotY = zoneY + zoneH - mascotSize + 12;
     ctx.drawImage(mascot, mascotX, mascotY, mascotSize, mascotSize);
   } catch {
     ctx.fillStyle = C.brandOrange;
     ctx.globalAlpha = 0.15;
     ctx.beginPath();
-    ctx.arc(zoneX + pad + leftW / 2, zoneY + zoneH / 2, 48, 0, Math.PI * 2);
+    ctx.arc(zoneX + pad + leftW / 2, zoneY + zoneH - 60, 48, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
 
-  const bubbleW = innerW * 0.6 - 140;
-  drawRoundRect(ctx, rightX, zoneY + pad, bubbleW, 56, 16);
+  const bubbleH = 72;
+  drawRoundRect(ctx, rightX, zoneY + pad, rightW, bubbleH, 16);
   ctx.fillStyle = C.card;
   ctx.fill();
   ctx.strokeStyle = 'rgba(125, 92, 57, 0.1)';
@@ -419,15 +437,15 @@ async function drawShareZone(ctx: CanvasRenderingContext2D, shareUrl: string, y:
     ctx,
     '把照片留下，把故事留下，把记忆留下。',
     rightX + 14,
-    zoneY + pad + 24,
-    bubbleW - 24,
+    zoneY + pad + 28,
+    rightW - 28,
     24,
     2
   );
 
   const qrSize = 112;
   const qrX = zoneX + zoneW - pad - qrSize;
-  const qrY = zoneY + pad;
+  const qrY = zoneY + zoneH - pad - qrSize;
   const qrDataUrl = await QRCode.toDataURL(shareUrl, {
     width: qrSize,
     margin: 1,
@@ -439,13 +457,16 @@ async function drawShareZone(ctx: CanvasRenderingContext2D, shareUrl: string, y:
   const qrImg = await loadImage(qrDataUrl);
   ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
+  const textX = rightX;
+  const textStartY = zoneY + pad + bubbleH + 20;
   ctx.fillStyle = C.darkCoffee;
-  ctx.font = `500 22px ${F.body}`;
+  ctx.font = `500 16px ${F.body}`;
   ctx.textAlign = 'left';
-  ctx.fillText('扫码查看完整内容', rightX, zoneY + pad + 78);
+  ctx.fillText('扫码查看完整内容', textX, textStartY);
   ctx.fillStyle = C.auxCoffee;
   ctx.font = `400 14px ${F.body}`;
-  ctx.fillText('长按保存海报 · 分享转发 · 和家人一起回忆', rightX, zoneY + pad + 108);
+  ctx.fillText('长按保存海报', textX, textStartY + 22);
+  ctx.fillText('分享给家人一起回忆', textX, textStartY + 44);
 
   return zoneY + zoneH;
 }
@@ -492,13 +513,7 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
   ctx.textAlign = 'left';
   ctx.fillStyle = C.darkCoffee;
   ctx.font = `700 44px ${F.brand}`;
-  textY = wrapText(ctx, input.title, 48, textY, W - 96, 52, 2) + 16;
-
-  if (input.summary) {
-    ctx.fillStyle = C.bodyCoffee;
-    ctx.font = `400 16px ${F.body}`;
-    textY = wrapText(ctx, input.summary, 48, textY, W - 96, 26, 2) + 16;
-  }
+  textY = wrapText(ctx, `${input.title} ♡`, 48, textY, W - 96, 52, 2) + 20;
 
   if (input.type === 'movie') {
     const features =
@@ -507,14 +522,14 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
         chapterCount: input.chapterCount,
         memoryCount: input.memoryCount ?? input.photoUrls.filter(Boolean).length,
       });
-    textY = drawFeatureSection(ctx, features, textY) + 8;
+    textY = drawFeatureSection(ctx, features, textY) + 12;
   } else if (input.type === 'story') {
     const features =
       input.featureItems ??
       buildStoryFeatures({
         memoryCount: input.memoryCount ?? input.photoUrls.filter(Boolean).length,
       });
-    textY = drawFeatureSection(ctx, features, textY) + 8;
+    textY = drawFeatureSection(ctx, features, textY) + 12;
   } else {
     const infoItems =
       input.infoItems ??
@@ -524,7 +539,14 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
         familyName: input.familyName,
         photoCount: input.photoUrls.filter(Boolean).length,
       });
-    textY = drawInfoRow(ctx, infoItems, textY) + 8;
+    textY = drawInfoRow(ctx, infoItems, textY) + 12;
+  }
+
+  if (input.summary) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = C.auxCoffee;
+    ctx.font = `400 16px ${F.body}`;
+    wrapText(ctx, input.summary, W / 2, textY, W - 96, 26, 2);
   }
 
   const shareZoneY = H - 40 - L.shareCardH;

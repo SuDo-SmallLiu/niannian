@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { regenerateStoryAsync } from '@/lib/poll-job';
 import EmptyStateIcon from '@/components/EmptyStateIcon';
-import { StoryPageMascot } from '@/components/StoryListCard';
 import { NavStoryIcon, PhotoIcon } from '@/components/icons/NianNianIcons';
 
 interface StoryItem {
@@ -335,7 +334,6 @@ export default function StoryPage() {
   return (
     <div className="min-h-screen bg-[#FFFBF6] px-6 pt-8 pb-32">
       {shareModal}
-      <StoryPageMascot />
 
       {confirmStory && (
         <AlertDialog open onOpenChange={(open) => !open && setConfirmStory(null)}>

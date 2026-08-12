@@ -28,7 +28,7 @@ export default function NavShell() {
 
   if (appreciate) {
     return (
-      <nav className="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-[#F0E8D8] safe-bottom z-50">
+      <nav className="bg-white/95 backdrop-blur-md border-t border-[#F0E8D8] safe-bottom z-50">
         <div className="flex items-center justify-around h-20 px-2">
           <AppreciateNavItem icon={NavMemoryIcon} label="照片" href="/family/memories?appreciate=1" pathname={pathname} />
           <AppreciateNavItem icon={NavStoryIcon} label="故事" href="/stories?appreciate=1" pathname={pathname} />
