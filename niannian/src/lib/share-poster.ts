@@ -343,26 +343,31 @@ function drawFeatureIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
 function drawFeatureSection(ctx: CanvasRenderingContext2D, items: PosterFeatureItem[], y: number): number {
   if (items.length === 0) return y;
   const colW = (W - 80) / 3;
+  const iconCy = y + 14;
+  const titleStartY = y + 50;
+  let sectionBottom = y + L.featureH;
+
   items.slice(0, 3).forEach((item, i) => {
     const cx = 40 + colW * i + colW / 2;
-    drawFeatureIcon(ctx, cx, y + 18, i);
+    drawFeatureIcon(ctx, cx, iconCy, i);
     ctx.textAlign = 'center';
     ctx.fillStyle = C.darkCoffee;
     ctx.font = `500 22px ${F.body}`;
-    wrapText(ctx, item.title, cx, y + 40, colW - 16, 28, 2);
+    const titleBottom = wrapText(ctx, item.title, cx, titleStartY, colW - 16, 28, 2);
     ctx.fillStyle = C.auxCoffee;
     ctx.font = `400 14px ${F.body}`;
-    wrapText(ctx, item.desc, cx, y + 72, colW - 16, 20, 2);
+    const descBottom = wrapText(ctx, item.desc, cx, titleBottom + 10, colW - 16, 20, 2);
+    sectionBottom = Math.max(sectionBottom, descBottom + 4);
     if (i > 0) {
       ctx.strokeStyle = C.divider;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(40 + colW * i, y + 8);
-      ctx.lineTo(40 + colW * i, y + L.featureH - 8);
+      ctx.lineTo(40 + colW * i, sectionBottom - 4);
       ctx.stroke();
     }
   });
-  return y + L.featureH;
+  return sectionBottom;
 }
 
 function drawInfoRow(ctx: CanvasRenderingContext2D, items: string[], y: number): number {

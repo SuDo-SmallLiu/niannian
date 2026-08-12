@@ -32,7 +32,7 @@ export const POSTER_FONTS = {
 export const POSTER_LAYOUT = {
   headerH: 220,
   photoH: { movie: 620, story: 620, memory: 520 },
-  featureH: 120,
+  featureH: 132,
   shareCardH: 220,
   shareCardPad: 32,
   shareCardRadius: 28,

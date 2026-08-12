@@ -43,7 +43,7 @@ function FeatureIcon({ index }: { index: number }) {
   const stroke = '#4A3326';
   if (index === 0) {
     return (
-      <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-2">
+      <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-3 shrink-0 block">
         <rect x="2" y="2" width="24" height="20" rx="4" stroke={stroke} strokeWidth="2" />
         <path d="M8 10h12M8 14h10" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
       </svg>
@@ -51,14 +51,14 @@ function FeatureIcon({ index }: { index: number }) {
   }
   if (index === 1) {
     return (
-      <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-2">
+      <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-3 shrink-0 block">
         <rect x="2" y="4" width="24" height="16" rx="4" stroke={stroke} strokeWidth="2" />
         <circle cx="14" cy="12" r="5" stroke={stroke} strokeWidth="2" />
       </svg>
     );
   }
   return (
-    <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-2">
+    <svg width="28" height="24" viewBox="0 0 28 24" fill="none" aria-hidden className="mx-auto mb-3 shrink-0 block">
       <rect x="2" y="4" width="24" height="16" rx="3" stroke={stroke} strokeWidth="2" />
       <path d="M6 12h16M8 16h12" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
     </svg>
@@ -126,11 +126,11 @@ function FeatureGrid({ items }: { items: PosterFeatureItem[] }) {
       {items.map((item, i) => (
         <div
           key={item.title}
-          className={`flex flex-col items-center text-center px-1 ${i > 0 ? 'border-l border-[#E8E1D6]' : ''}`}
+          className={`flex flex-col items-center text-center px-1 pt-1 ${i > 0 ? 'border-l border-[#E8E1D6]' : ''}`}
         >
           <FeatureIcon index={i} />
-          <p className="text-[#4A3326] text-[15px] font-medium leading-snug w-full">{item.title}</p>
-          <p className="text-[#8E7B6B] text-xs mt-1 leading-snug w-full">{item.desc}</p>
+          <p className="text-[#4A3326] text-[15px] font-medium leading-snug w-full mt-0.5">{item.title}</p>
+          <p className="text-[#8E7B6B] text-xs mt-1.5 leading-snug w-full">{item.desc}</p>
         </div>
       ))}
     </div>
