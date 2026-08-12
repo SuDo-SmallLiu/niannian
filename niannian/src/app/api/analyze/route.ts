@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
 import { getPhotosByFamily, getFamily, getPhoto } from '@/lib/db';
 import { buildAnalysisStatusFromDb } from '@/lib/analysis-db-status';
 import { cleanupStaleAnalysisJobs, getAnalysisJob, summarizeJob } from '@/lib/photo-analysis-job';
@@ -8,6 +9,9 @@ import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-acc
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = heavyApiRateLimitResponse(request, 'analyze');
+    if (rateLimited) return rateLimited;
+
     const { familyId } = await request.json();
 
     if (!familyId) {

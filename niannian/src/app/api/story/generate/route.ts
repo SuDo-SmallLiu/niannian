@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
 import { createStoryJob, getStoryJob, startStoryJob } from '@/lib/story-job';
 import { requireFamilyAccess, familyAccessErrorResponse } from '@/lib/family-access';
 
@@ -33,6 +34,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = heavyApiRateLimitResponse(request, 'story/generate');
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
     const familyId = body.familyId as string | undefined;
     const replaceExisting = body.replaceExisting !== false;

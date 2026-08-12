@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { synthesizeSpeechAsync } from '@/lib/poll-job';
 import { estimateNarrationMs } from '@/lib/slide-narration';
 
 interface UseNarrationOptions {
@@ -194,19 +195,10 @@ export function useNarration({
     };
 
     const requestSynthesize = () => {
-      void fetch('/api/speech/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, slideId, movieId }),
-      })
-        .then(async (res) => {
+      void synthesizeSpeechAsync({ text, slideId, movieId })
+        .then((data) => {
           if (cancelled) return;
-          const data = await res.json();
-          if (res.ok && data.url) {
-            playUrl(data.url);
-          } else {
-            cleanupBrowser = speakWithBrowserTts(text, finish, onDurationRef.current);
-          }
+          playUrl(data.url);
         })
         .catch(() => {
           if (cancelled) return;

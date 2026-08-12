@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
+import { watchJobUntilDone } from '@/lib/poll-job';
 
 export function useAutoGenerateFamilyStory(familyId: string) {
   const router = useRouter();
@@ -32,8 +33,6 @@ export function useAutoGenerateFamilyStory(familyId: string) {
       setError('');
       showLoading('念念撰写故事中', '正在读取记忆卡并串联叙事…');
 
-      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
       try {
         const res = await fetch('/api/story/generate', {
           method: 'POST',
@@ -46,20 +45,17 @@ export function useAutoGenerateFamilyStory(familyId: string) {
         const jobId = data.jobId as string;
         if (!jobId) throw new Error('未收到任务 ID');
 
-        for (let i = 0; i < 180; i++) {
-          await sleep(2000);
-          const pollRes = await fetch(`/api/story/generate?jobId=${encodeURIComponent(jobId)}`);
-          const poll = await pollRes.json();
-          if (!pollRes.ok) throw new Error(poll.error || '查询进度失败');
-          if (poll.progress) showLoading('念念撰写故事中', poll.progress);
-          if (poll.status === 'done') {
-            router.push(`/family/${familyId}/story`);
-            return true;
-          }
-          if (poll.status === 'error') throw new Error(poll.error || '生成失败');
-        }
+        await watchJobUntilDone(jobId, {
+          timeoutMs: 12 * 60 * 1000,
+          onProgress: ({ progress }) => {
+            const message =
+              typeof progress?.message === 'string' ? progress.message : undefined;
+            if (message) showLoading('念念撰写故事中', message);
+          },
+        });
 
-        throw new Error('生成超时，请稍后在故事草稿箱查看');
+        router.push(`/family/${familyId}/story`);
+        return true;
       } catch (err) {
         const msg = err instanceof Error ? err.message : '生成失败';
         setError(msg);

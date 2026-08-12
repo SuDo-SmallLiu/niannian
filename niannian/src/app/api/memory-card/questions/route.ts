@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
 import { getMemoryCardByPhoto } from '@/lib/db';
 import {
   regenerateMemoryCardQuestions,
@@ -8,6 +9,9 @@ import { requirePhotoAccess, familyAccessErrorResponse } from '@/lib/family-acce
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = heavyApiRateLimitResponse(request, 'memory-card/questions');
+    if (rateLimited) return rateLimited;
+
     const { photoId, forceRefresh } = await request.json();
     if (!photoId) {
       return NextResponse.json({ error: '缺少 photoId' }, { status: 400 });

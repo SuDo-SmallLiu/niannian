@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { heavyApiRateLimitResponse } from '@/lib/heavy-api-guard';
 import { getLifeMovie } from '@/lib/db';
-import { prepareMovieAudioPlan } from '@/lib/movie-render';
+import {
+  createMovieAudioPlanJob,
+  findActiveMovieRenderJob,
+} from '@/lib/jobs/create-jobs';
 import { scheduleMovieRender, retryMovieRender, isMovieRendering } from '@/lib/movie-render-queue';
 import { parseMovieAudioPlan } from '@/lib/movie-audio-plan';
 import { parseMovieRenderProgress } from '@/lib/movie-render-progress';
 import { requireMovieAccess, familyAccessErrorResponse } from '@/lib/family-access';
-
-export const maxDuration = 300;
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest) {
       renderError: movie.render_error,
       renderedAt: movie.rendered_at,
       rendering: isMovieRendering(movieId),
+      renderJobId: findActiveMovieRenderJob(movieId)?.id ?? null,
       renderProgress,
       audioPlan: audioPlan
         ? {
@@ -60,6 +63,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = heavyApiRateLimitResponse(request, 'movie/render');
+    if (rateLimited) return rateLimited;
+
     const body = await request.json();
     const { movieId, preparePlanOnly, retry } = body as {
       movieId?: string;
@@ -78,8 +84,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (preparePlanOnly) {
-      const plan = await prepareMovieAudioPlan(movieId);
-      return NextResponse.json({ success: true, audioPlan: plan });
+      const job = createMovieAudioPlanJob({ movieId, familyId: movie.family_id });
+      return NextResponse.json(
+        { success: true, jobId: job.id, status: job.status },
+        { status: 202 }
+      );
     }
 
     if (movie.render_status === 'ready' && movie.media_url && !retry) {
@@ -91,11 +100,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const started = retry ? retryMovieRender(movieId) : scheduleMovieRender(movieId, { retry: movie.render_status === 'failed' });
+    const started = retry
+      ? retryMovieRender(movieId)
+      : scheduleMovieRender(movieId, { retry: movie.render_status === 'failed' });
+
+    const activeJob = findActiveMovieRenderJob(movieId);
     return NextResponse.json({
       success: true,
       renderStatus: started ? 'queued' : movie.render_status,
-      message: started ? '渲染任务已启动' : '渲染进行中或已完成',
+      jobId: activeJob?.id ?? null,
+      message: started ? '渲染任务已排队' : '渲染进行中或已完成',
     });
   } catch (error) {
     const accessResp = familyAccessErrorResponse(error);

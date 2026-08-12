@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import { useAutoGenerateFamilyStory } from '@/hooks/useAutoGenerateFamilyStory';
+import { generateMovieAsync } from '@/lib/poll-job';
 import {
   CameraIcon,
   NavMemoryIcon,
@@ -74,14 +75,17 @@ export default function FamilyDetailPage() {
     setGeneratingMovie(true);
     showLoading('正在编排人生电影', '串联故事章节并渲染音视频，完成后即可播放…');
     try {
-      const res = await fetch('/api/movie/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId, prefetchAudio: true, renderVideo: true }),
+      const { movieId } = await generateMovieAsync(familyId, {
+        prefetchAudio: true,
+        renderVideo: true,
+        timeoutMs: 20 * 60 * 1000,
+        onProgress: ({ progress }) => {
+          const message =
+            typeof progress?.message === 'string' ? progress.message : undefined;
+          if (message) showLoading('正在编排人生电影', message);
+        },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '生成失败');
-      router.push(`/movies/${data.movieId}/play`);
+      router.push(`/movies/${movieId}/play`);
     } catch (err) {
       await alert({
         title: '生成失败',

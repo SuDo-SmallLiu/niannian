@@ -3,11 +3,18 @@ import {
   claimNextQueuedJob,
   completeJob,
   failJob,
+  hasRunningJobOfType,
   listStaleRunningJobs,
   requeueStaleJob,
   updateJobProgress,
 } from '@/lib/jobs/job-repository';
 import type { JobRecord, JobType } from '@/lib/jobs/types';
+import {
+  executeMovieAudioPlanJob,
+  executeMovieRenderJob,
+  executeSpeechSynthesizeJob,
+} from '@/lib/jobs/media-jobs.service';
+import { executeMovieGenerateJob } from '@/lib/jobs/movie-generate-jobs.service';
 import { regenerateStoryById } from '@/lib/regenerate-story';
 import { runStoryEngine, type RunStoryEngineOptions } from '@/lib/story-engine';
 import type { RegenMode } from '@/lib/story-engine/types';
@@ -23,6 +30,10 @@ const WORKER_JOB_TYPES: JobType[] = [
   'story_compose',
   'photo_analysis',
   'photo_analyze_single',
+  'movie_generate',
+  'movie_audio_plan',
+  'speech_synthesize',
+  'movie_render',
 ];
 
 let processorRunning = false;
@@ -74,13 +85,26 @@ async function dispatchJob(job: JobRecord): Promise<void> {
     case 'photo_analyze_single':
       await executePhotoAnalyzeSingleJob(job);
       break;
+    case 'movie_generate':
+      await executeMovieGenerateJob(job);
+      break;
+    case 'movie_audio_plan':
+      await executeMovieAudioPlanJob(job);
+      break;
+    case 'speech_synthesize':
+      await executeSpeechSynthesizeJob(job);
+      break;
+    case 'movie_render':
+      await executeMovieRenderJob(job);
+      break;
     default:
       throw new Error(`Unsupported job type: ${job.type}`);
   }
 }
 
 export async function processNextJob(types: JobType[] = WORKER_JOB_TYPES): Promise<boolean> {
-  const job = claimNextQueuedJob(types);
+  const skipTypes = hasRunningJobOfType('movie_render') ? (['movie_render'] as JobType[]) : undefined;
+  const job = claimNextQueuedJob(types, skipTypes);
   if (!job) return false;
 
   try {

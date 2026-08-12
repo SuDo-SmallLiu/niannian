@@ -1,56 +1,30 @@
-import { renderMovieToMp4 } from '@/lib/movie-render';
-import { updateMovieRenderStatus, getLifeMovie } from '@/lib/db';
-import { createRenderProgress } from '@/lib/movie-render-progress';
-import { isMovieNarrationPrefetching } from '@/lib/movie-narration-prefetch';
+import { getLifeMovie } from '@/lib/db';
+import {
+  createMovieRenderJob,
+  findActiveMovieRenderJob,
+} from '@/lib/jobs/create-jobs';
 
-const rendering = new Set<string>();
-let globalRenderActive = false;
-
-async function waitForNarrationPrefetch(movieId: string, maxWaitMs = 600_000): Promise<void> {
-  const start = Date.now();
-  while (isMovieNarrationPrefetching(movieId)) {
-    if (Date.now() - start > maxWaitMs) break;
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-}
-
-/** 后台渲染人生电影 MP4（幂等；旁白 prefetch 进行中时会等待；全局同时仅 1 个） */
-export function scheduleMovieRender(movieId: string, options: { retry?: boolean } = {}): boolean {
-  if (rendering.has(movieId) || globalRenderActive) return false;
-
+/** 通过 DB Job 队列调度人生电影 MP4 渲染（全局同时仅 1 个 running） */
+export function scheduleMovieRender(
+  movieId: string,
+  options: { retry?: boolean; familyId?: string } = {}
+): boolean {
   const movie = getLifeMovie(movieId);
   if (!movie) return false;
   if (movie.render_status === 'ready' && movie.media_url && !options.retry) return false;
   if (movie.render_status === 'failed' && !options.retry) return false;
 
-  rendering.add(movieId);
-  globalRenderActive = true;
-  updateMovieRenderStatus(movieId, 'queued', {
-    error: '',
-    progress: createRenderProgress({
-      phase: 'queued',
-      message: options.retry ? '正在重新生成完整视频…' : '渲染任务排队中，等待旁白生成…',
-    }),
-  });
+  const familyId = options.familyId || movie.family_id;
+  if (!familyId) return false;
 
-  void (async () => {
-    try {
-      await waitForNarrationPrefetch(movieId);
-      const result = await renderMovieToMp4(movieId);
-      console.info('[movie-render] done:', movieId, result.mediaUrl, `${result.totalDurationMs}ms`);
-    } catch (err) {
-      console.error('[movie-render] failed:', movieId, err);
-    } finally {
-      rendering.delete(movieId);
-      globalRenderActive = false;
-    }
-  })();
+  if (findActiveMovieRenderJob(movieId)) return false;
 
+  createMovieRenderJob({ movieId, familyId, retry: options.retry });
   return true;
 }
 
 export function isMovieRendering(movieId: string): boolean {
-  return rendering.has(movieId);
+  return !!findActiveMovieRenderJob(movieId);
 }
 
 /** 旁白预生成完成后链式触发渲染 */

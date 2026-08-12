@@ -6,7 +6,9 @@ export type JobType =
   | 'story_compose'
   | 'photo_analysis'
   | 'photo_analyze_single'
+  | 'movie_generate'
   | 'movie_render'
+  | 'movie_audio_plan'
   | 'movie_tts'
   | 'speech_synthesize';
 

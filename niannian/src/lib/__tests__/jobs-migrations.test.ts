@@ -13,6 +13,7 @@ import {
   getJobById,
   findActiveJobByIdempotencyKey,
   completeJob,
+  hasRunningJobOfType,
 } from '@/lib/jobs/job-repository';
 
 describe('migrations', () => {
@@ -88,5 +89,13 @@ describe('job repository', () => {
     const updated = getJobById(job.id);
     expect(updated?.status).toBe('done');
     expect(updated?.result?.storyId).toBe('s1');
+  });
+
+  it('tracks running movie_render for mutex', () => {
+    createJob({ type: 'movie_render', resourceId: 'm1', familyId: 'f1' });
+    const running = createJob({ type: 'movie_render', resourceId: 'm2', familyId: 'f1' });
+    const db = testDb;
+    db.prepare(`UPDATE jobs SET status = 'running' WHERE id = ?`).run(running.id);
+    expect(hasRunningJobOfType('movie_render')).toBe(true);
   });
 });

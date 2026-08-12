@@ -3,23 +3,23 @@ import {
   getOrCreateStoryShare,
   getOrCreatePhotoShare,
   getOrCreateMovieShare,
-  getPhoto,
-  getStory,
-  getLifeMovie,
   getShareByCode,
   incrementStoryReadCount,
 } from '@/lib/db';
 import { buildSharePlayUrl } from '@/lib/public-base-url';
+import {
+  requireMovieAccess,
+  requirePhotoAccess,
+  requireStoryAccess,
+  familyAccessErrorResponse,
+} from '@/lib/family-access';
 
 export async function POST(request: NextRequest) {
   try {
     const { storyId, photoId, movieId } = await request.json();
 
     if (movieId) {
-      const movie = getLifeMovie(movieId);
-      if (!movie) {
-        return NextResponse.json({ error: '人生电影不存在' }, { status: 404 });
-      }
+      await requireMovieAccess(request, movieId);
       const shareCode = getOrCreateMovieShare(movieId);
       return NextResponse.json({
         shareCode,
@@ -29,10 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (photoId) {
-      const photo = getPhoto(photoId);
-      if (!photo) {
-        return NextResponse.json({ error: '照片不存在' }, { status: 404 });
-      }
+      await requirePhotoAccess(request, photoId);
       const shareCode = getOrCreatePhotoShare(photoId);
       return NextResponse.json({
         shareCode,
@@ -42,10 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (storyId) {
-      const story = getStory(storyId);
-      if (!story) {
-        return NextResponse.json({ error: '故事不存在' }, { status: 404 });
-      }
+      await requireStoryAccess(request, storyId);
       const shareCode = getOrCreateStoryShare(storyId);
       return NextResponse.json({
         shareCode,
@@ -56,6 +50,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: '缺少 storyId、photoId 或 movieId' }, { status: 400 });
   } catch (error) {
+    const accessResp = familyAccessErrorResponse(error);
+    if (accessResp) return accessResp;
     console.error('创建分享失败:', error);
     return NextResponse.json({ error: '创建分享失败' }, { status: 500 });
   }

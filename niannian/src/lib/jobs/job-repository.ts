@@ -102,17 +102,31 @@ export function getJobById(jobId: string): JobRecord | null {
   return row ? rowToJob(row) : null;
 }
 
-export function claimNextQueuedJob(types?: JobType[]): JobRecord | null {
+export function hasRunningJobOfType(type: JobType): boolean {
+  const db = getDb();
+  const row = db
+    .prepare(`SELECT id FROM jobs WHERE type = ? AND status = 'running' LIMIT 1`)
+    .get(type) as { id: string } | undefined;
+  return !!row;
+}
+
+export function claimNextQueuedJob(
+  types?: JobType[],
+  skipTypes?: JobType[]
+): JobRecord | null {
   const db = getDb();
   const typeFilter = types?.length
     ? `AND type IN (${types.map(() => '?').join(', ')})`
     : '';
-  const params = types?.length ? types : [];
+  const skipFilter = skipTypes?.length
+    ? `AND type NOT IN (${skipTypes.map(() => '?').join(', ')})`
+    : '';
+  const params = [...(types?.length ? types : []), ...(skipTypes?.length ? skipTypes : [])];
 
   const row = db
     .prepare(
       `SELECT * FROM jobs
-       WHERE status = 'queued' ${typeFilter}
+       WHERE status = 'queued' ${typeFilter} ${skipFilter}
        ORDER BY created_at ASC
        LIMIT 1`
     )
