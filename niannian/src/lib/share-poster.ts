@@ -432,11 +432,11 @@ async function drawShareZone(ctx: CanvasRenderingContext2D, shareUrl: string, y:
 
   ctx.fillStyle = C.darkCoffee;
   ctx.font = `400 20px ${F.hand}`;
-  ctx.textAlign = 'left';
+  ctx.textAlign = 'center';
   wrapText(
     ctx,
     '把照片留下，把故事留下，把记忆留下。',
-    rightX + 14,
+    rightX + rightW / 2,
     zoneY + pad + 28,
     rightW - 28,
     24,
@@ -457,16 +457,17 @@ async function drawShareZone(ctx: CanvasRenderingContext2D, shareUrl: string, y:
   const qrImg = await loadImage(qrDataUrl);
   ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
 
-  const textX = rightX;
+  const textAreaW = Math.max(rightW - qrSize - 16, rightW * 0.45);
+  const textCenterX = rightX + textAreaW / 2;
   const textStartY = zoneY + pad + bubbleH + 20;
   ctx.fillStyle = C.darkCoffee;
   ctx.font = `500 16px ${F.body}`;
-  ctx.textAlign = 'left';
-  ctx.fillText('扫码查看完整内容', textX, textStartY);
+  ctx.textAlign = 'center';
+  ctx.fillText('扫码查看完整内容', textCenterX, textStartY);
   ctx.fillStyle = C.auxCoffee;
   ctx.font = `400 14px ${F.body}`;
-  ctx.fillText('长按保存海报', textX, textStartY + 22);
-  ctx.fillText('分享给家人一起回忆', textX, textStartY + 44);
+  ctx.fillText('长按保存海报', textCenterX, textStartY + 22);
+  ctx.fillText('分享给家人一起回忆', textCenterX, textStartY + 44);
 
   return zoneY + zoneH;
 }
@@ -510,10 +511,10 @@ export async function generateSharePoster(input: PosterInput): Promise<string> {
   const photoBottom = await drawPhotoCollage(ctx, input.photoUrls, input.type);
 
   let textY = photoBottom + 32;
-  ctx.textAlign = 'left';
+  ctx.textAlign = 'center';
   ctx.fillStyle = C.darkCoffee;
   ctx.font = `700 44px ${F.brand}`;
-  textY = wrapText(ctx, `${input.title} ♡`, 48, textY, W - 96, 52, 2) + 20;
+  textY = wrapText(ctx, `${input.title} ♡`, W / 2, textY, W - 96, 52, 2) + 20;
 
   if (input.type === 'movie') {
     const features =

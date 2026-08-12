@@ -258,7 +258,7 @@ export default function SharePosterCard({
         <PhotoCollage type={type} photoUrls={photoUrls} />
       </div>
 
-      <div className="px-6 pb-4">
+      <div className="px-6 pb-4 text-center">
         <h2 className="text-[#4A3326] font-serif font-bold text-[22px] leading-[1.35] line-clamp-2">
           {title}
           <span className="text-[#F6B51B] ml-1">♡</span>
@@ -302,12 +302,12 @@ export default function SharePosterCard({
           </div>
           <div className="ml-[38%] flex flex-col min-h-[188px]">
             <div className="bg-[#FFFDF9] rounded-2xl px-3 py-2.5 border border-[rgba(125,92,57,0.1)] mb-3">
-              <p className="text-[#4A3326] text-sm leading-relaxed font-[family-name:var(--font-handwriting,'KaiTi',cursive)]">
+              <p className="text-[#4A3326] text-sm leading-relaxed text-center font-[family-name:var(--font-handwriting,'KaiTi',cursive)]">
                 把照片留下，把故事留下，把记忆留下。
               </p>
             </div>
             <div className="flex items-end justify-between gap-2 flex-1">
-              <div className="min-w-0 pb-1">
+              <div className="min-w-0 pb-1 flex-1 text-center pr-2">
                 <p className="text-[#4A3326] text-sm font-medium">扫码查看完整内容</p>
                 <p className="text-[#8E7B6B] text-xs mt-1 leading-relaxed">
                   长按保存海报
