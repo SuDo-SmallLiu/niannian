@@ -137,16 +137,17 @@ export function getApiKeyProfiles(): ApiKeyProfile[] {
 export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
   const visionKey = process.env.ARK_VISION_API_KEY?.trim();
   if (visionKey) {
+    const visionBase =
+      process.env.ARK_VISION_BASE_URL?.trim() ||
+      process.env.ARK_BASE_URL_FALLBACK?.trim() ||
+      'https://ark.cn-beijing.volces.com/api/v3';
     const visionProfile: ApiKeyProfile = {
       apiKey: visionKey,
-      baseURL:
-        process.env.ARK_VISION_BASE_URL?.trim() ||
-        process.env.ARK_BASE_URL_FALLBACK?.trim() ||
-        'https://ark.cn-beijing.volces.com/api/v3',
+      baseURL: visionBase,
       visionModels: buildModelChain(
         process.env.ARK_VISION_MODEL,
         process.env.ARK_VISION_MODEL_FALLBACKS,
-        getVolcengineVisionModelChain()
+        defaultVisionModelsForBase(visionBase)
       ),
       textModels: [],
     };
@@ -173,7 +174,9 @@ export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
     profiles.push({
       apiKey: fallbackKey,
       baseURL: volcengineBase,
-      visionModels: process.env.ARK_VISION_API_KEY?.trim() ? [] : getVolcengineVisionModelChain(),
+      visionModels: process.env.ARK_VISION_API_KEY?.trim()
+        ? []
+        : defaultVisionModelsForBase(volcengineBase),
       textModels: [],
     });
   }
@@ -182,12 +185,18 @@ export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
   return sorted.length > 0 ? sorted : getApiKeyProfiles();
 }
 
-function getVolcengineVisionModelChain(): string[] {
-  return buildModelChain(
-    process.env.ARK_VISION_MODEL_FALLBACK,
-    process.env.ARK_VISION_MODEL_FALLBACKS,
-    ['doubao-seed-2-0-pro-260215']
-  );
+function defaultVisionModelsForBase(baseURL: string): string[] {
+  if (baseURL.includes('volces.com')) {
+    return buildModelChain(
+      process.env.ARK_VISION_MODEL_FALLBACK,
+      process.env.ARK_VISION_MODEL_FALLBACKS,
+      ['doubao-seed-2-0-pro-260215']
+    );
+  }
+  if (baseURL.includes('aliyuncs.com')) {
+    return ['qwen-vl-plus', 'qwen3-vl-plus'];
+  }
+  return [];
 }
 
 export function getApiKeyChain(): string[] {
