@@ -44,6 +44,24 @@ export function isRetryableKeyError(error: unknown): boolean {
   return false;
 }
 
+/** 网关/模型不支持当前请求（如视觉输入）时可切换备用网关 */
+export function isRetryableGatewayError(error: unknown): boolean {
+  if (isRetryableKeyError(error)) return true;
+  const msg = extractApiMessage(error);
+  const status = (error as { status?: number })?.status;
+  if (status === 500 || status === 502 || status === 503) return true;
+  if (msg.includes('Internal Server Error')) return true;
+  if (msg.includes('Model do not support image')) return true;
+  if (msg.includes('不支持该模型')) return true;
+  if (msg.includes('模型不存在')) return true;
+  return false;
+}
+
+function visionModelsForTextGateway(): string[] {
+  if (process.env.ARK_VISION_API_KEY?.trim()) return [];
+  return getVisionModelChain();
+}
+
 export function buildModelChain(
   primary: string | undefined,
   fallbacksEnv: string | undefined,
@@ -86,7 +104,7 @@ export function getApiKeyProfiles(): ApiKeyProfile[] {
     profiles.push({
       apiKey: primaryKey,
       baseURL: process.env.ARK_BASE_URL?.trim() || 'https://ark.cn-beijing.volces.com/api/v3',
-      visionModels: getVisionModelChain(),
+      visionModels: visionModelsForTextGateway(),
       textModels: getTextModelChain(),
     });
   }
@@ -97,7 +115,9 @@ export function getApiKeyProfiles(): ApiKeyProfile[] {
       apiKey: fallbackKey,
       baseURL:
         process.env.ARK_BASE_URL_FALLBACK?.trim() || 'https://ark.cn-beijing.volces.com/api/v3',
-      visionModels: buildModelChain(
+      visionModels: process.env.ARK_VISION_API_KEY?.trim()
+        ? []
+        : buildModelChain(
         process.env.ARK_VISION_MODEL_FALLBACK,
         process.env.ARK_VISION_MODEL_FALLBACKS,
         ['doubao-seed-2-0-pro-260215']
@@ -144,7 +164,7 @@ export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
     profiles.push({
       apiKey: primaryKey,
       baseURL: process.env.ARK_BASE_URL?.trim() || volcengineBase,
-      visionModels: getVisionModelChain(),
+      visionModels: visionModelsForTextGateway(),
       textModels: [],
     });
   }
@@ -153,7 +173,7 @@ export function getVisionApiKeyProfiles(): ApiKeyProfile[] {
     profiles.push({
       apiKey: fallbackKey,
       baseURL: volcengineBase,
-      visionModels: getVolcengineVisionModelChain(),
+      visionModels: process.env.ARK_VISION_API_KEY?.trim() ? [] : getVolcengineVisionModelChain(),
       textModels: [],
     });
   }
@@ -273,7 +293,7 @@ export async function chatWithKeyAndModelFallback(
     } catch (error) {
       lastError = error;
       const hasNextProfile = pi < profiles.length - 1;
-      if (isRetryableKeyError(error) && hasNextProfile) {
+      if (isRetryableGatewayError(error) && hasNextProfile) {
         console.warn('API 网关不可用，尝试备用网关...');
         continue;
       }

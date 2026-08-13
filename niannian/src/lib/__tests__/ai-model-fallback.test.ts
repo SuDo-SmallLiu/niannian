@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildModelChain,
+  isRetryableGatewayError,
   isRetryableKeyError,
   isRetryableModelError,
 } from '@/lib/ai-model-fallback';
@@ -19,6 +20,11 @@ describe('ai-model-fallback', () => {
   it('detects retryable key errors', () => {
     expect(isRetryableKeyError({ code: 'InvalidApiKey' })).toBe(true);
     expect(isRetryableKeyError({ message: 'Authentication Fails' })).toBe(true);
+  });
+
+  it('detects retryable gateway errors', () => {
+    expect(isRetryableGatewayError({ status: 500, message: 'Internal Server Error' })).toBe(true);
+    expect(isRetryableGatewayError({ message: 'Model do not support image input' })).toBe(true);
   });
 });
 
