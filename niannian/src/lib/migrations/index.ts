@@ -2,12 +2,14 @@ import type Database from 'better-sqlite3';
 import { migration002JobsAndEvents } from '@/lib/migrations/002_jobs_and_events';
 import { migration003StoryMemoryCardsPhotoId } from '@/lib/migrations/003_story_memory_cards_photo_id';
 import { migration004IdempotencyIndexes } from '@/lib/migrations/004_idempotency_indexes';
+import { migration005JobsIdempotencyActiveOnly } from '@/lib/migrations/005_jobs_idempotency_active_only';
 import type { Migration } from '@/lib/migrations/types';
 
 const MIGRATIONS: Migration[] = [
   migration002JobsAndEvents,
   migration003StoryMemoryCardsPhotoId,
   migration004IdempotencyIndexes,
+  migration005JobsIdempotencyActiveOnly,
 ];
 
 function ensureSchemaMigrationsTable(db: Database.Database): void {

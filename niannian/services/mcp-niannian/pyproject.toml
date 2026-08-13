@@ -1,0 +1,26 @@
+[project]
+name = "niannian-mcp-server"
+version = "0.1.0"
+description = "念念年年家庭记忆助手 MCP — 搜索记忆、故事与人生电影"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "SuDo-SmallLiu" }]
+dependencies = [
+    "mcp>=2.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+niannian-mcp-server = "niannian_mcp:main"
+
+[project.urls]
+Homepage = "https://github.com/SuDo-SmallLiu/niannian"
+Repository = "https://github.com/SuDo-SmallLiu/niannian"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/niannian_mcp"]

@@ -91,6 +91,24 @@ describe('job repository', () => {
     expect(updated?.result?.storyId).toBe('s1');
   });
 
+  it('allows new job after previous idempotency job completed', () => {
+    const first = createJob({
+      type: 'movie_generate',
+      familyId: 'f1',
+      idempotencyKey: 'movie_generate:f1',
+    });
+    completeJob(first.id, { movieId: 'm1' });
+
+    const second = createJob({
+      type: 'movie_generate',
+      familyId: 'f1',
+      idempotencyKey: 'movie_generate:f1',
+    });
+    expect(second.id).not.toBe(first.id);
+    expect(second.status).toBe('queued');
+    expect(getJobById(first.id)?.idempotencyKey).toBeNull();
+  });
+
   it('tracks running movie_render for mutex', () => {
     createJob({ type: 'movie_render', resourceId: 'm1', familyId: 'f1' });
     const running = createJob({ type: 'movie_render', resourceId: 'm2', familyId: 'f1' });

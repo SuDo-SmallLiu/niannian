@@ -71,6 +71,14 @@ export function createJob(input: CreateJobInput): JobRecord {
   if (input.idempotencyKey) {
     const existing = findActiveJobByIdempotencyKey(input.idempotencyKey);
     if (existing) return existing;
+
+    // 已完成/失败任务仍占用旧版全表唯一索引时，释放 key 以便重新提交
+    db.prepare(
+      `UPDATE jobs
+       SET idempotency_key = NULL, updated_at = datetime('now')
+       WHERE idempotency_key = ?
+         AND status IN ('done', 'error')`
+    ).run(input.idempotencyKey);
   }
 
   const id = generateJobId();

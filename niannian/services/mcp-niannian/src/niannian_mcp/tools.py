@@ -1,4 +1,4 @@
-"""念念年年 MCP 工具 — 本地 PM2 / streamable-http 入口"""
+"""念念年年 MCP 工具 — 薄包装 Next.js API"""
 from __future__ import annotations
 
 import logging
@@ -25,7 +25,7 @@ mcp = MCPServer(
 
 
 def _base_url() -> str:
-    return os.environ.get("NIANNIAN_BASE_URL", "http://127.0.0.1:3000").rstrip("/")
+    return os.environ.get("NIANNIAN_BASE_URL", "https://niannian-years.top").rstrip("/")
 
 
 def _session_cookie() -> str | None:
