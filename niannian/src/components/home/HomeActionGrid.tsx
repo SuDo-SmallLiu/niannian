@@ -64,7 +64,7 @@ export default function HomeActionGrid({ familyId, onCreateFamily }: HomeActionG
         });
         break;
       case 'describe':
-        router.push(`/family/${familyId}/photos?filter=needs_supplement`);
+        router.push(`/family/${familyId}/supplement`);
         break;
       default:
         break;

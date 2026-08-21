@@ -443,6 +443,7 @@ export default function MemoryCardPage() {
           {!appreciate && (
           <UserSupplementPanel
             photoId={photoId}
+            familyId={familyId}
             notes={userNotes}
             onNotesChange={setUserNotes}
             questions={aiQuestions}

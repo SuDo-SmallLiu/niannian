@@ -18,6 +18,7 @@ const WELCOME =
 
 interface UserSupplementPanelProps {
   photoId: string;
+  familyId?: string;
   notes: string;
   onNotesChange: (notes: string) => void;
   questions: import('@/lib/supplement-chat').AiQuestion[];
@@ -44,6 +45,7 @@ interface UserSupplementPanelProps {
 
 export default function UserSupplementPanel({
   photoId,
+  familyId,
   notes,
   onNotesChange,
   questions,
@@ -87,7 +89,11 @@ export default function UserSupplementPanel({
           </p>
         </div>
         <Link
-          href={`/photos/${photoId}/supplement`}
+          href={
+            familyId
+              ? `/family/${familyId}/supplement?photoId=${photoId}`
+              : `/photos/${photoId}/supplement`
+          }
           className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFF8F0] text-[#DF8B3A] text-xs font-medium border border-[#F5E6C8]"
         >
           <MessageCircle className="w-3.5 h-3.5" />

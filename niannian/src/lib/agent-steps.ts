@@ -34,7 +34,7 @@ export const AGENT_STEPS: AgentStepDef[] = [
     desc: '补充更多细节，让念念更懂你的故事',
     href: ({ firstFamilyId }) =>
       firstFamilyId
-        ? `/family/${firstFamilyId}/photos?filter=needs_supplement`
+        ? `/family/${firstFamilyId}/supplement`
         : '/family/memories',
   },
   {

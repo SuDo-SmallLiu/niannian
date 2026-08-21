@@ -4,11 +4,20 @@ import NianNianAvatar from '@/components/NianNianAvatar';
 
 interface SupplementProgressHeaderProps {
   dialogProgress: number;
+  photoIndex?: number;
+  photoTotal?: number;
 }
 
 export default function SupplementProgressHeader({
   dialogProgress,
+  photoIndex,
+  photoTotal,
 }: SupplementProgressHeaderProps) {
+  const batchLabel =
+    photoTotal && photoTotal > 1 && photoIndex !== undefined
+      ? ` · 第 ${photoIndex + 1}/${photoTotal} 张`
+      : '';
+
   return (
     <header className="shrink-0 border-b border-[#E8DCC8] bg-[#FFFBF7]/95 backdrop-blur-sm px-4 pt-safe pb-3">
       <div className="flex items-center gap-3 mb-3">
@@ -17,9 +26,9 @@ export default function SupplementProgressHeader({
         </div>
         <div className="min-w-0">
           <p className="text-[15px] font-semibold text-[#4A3326] leading-tight">
-            补充记忆卡 · 引导式提问
+            补充记忆卡 · 引导式提问{batchLabel}
           </p>
-          <p className="text-xs text-[#8E7B6B] mt-0.5">和念念聊聊，让照片更有故事</p>
+          <p className="text-xs text-[#8E7B6B] mt-0.5">左右滑动换照片，对话一键补充</p>
         </div>
       </div>
       <div className="flex items-center justify-between gap-3 mb-1.5">

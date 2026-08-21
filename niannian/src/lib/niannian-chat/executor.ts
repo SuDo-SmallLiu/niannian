@@ -19,10 +19,11 @@ export function resolveIntentHref(
     case 'analyze_photos':
       return familyId ? `/family/${familyId}/upload?mode=ocr` : '/family/memories';
     case 'supplement_memory':
-      if (photoId) return `/photos/${photoId}/supplement`;
-      return familyId
-        ? `/family/${familyId}/photos?filter=needs_supplement`
-        : '/family/memories';
+      if (familyId) {
+        const q = photoId ? `?photoId=${encodeURIComponent(photoId)}` : '';
+        return `/family/${familyId}/supplement${q}`;
+      }
+      return '/family/memories';
     case 'generate_story':
       return familyId
         ? `/family/${familyId}/photos?generateStory=1`

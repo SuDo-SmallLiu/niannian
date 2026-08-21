@@ -180,7 +180,9 @@ export default function PhotoLibraryPage() {
       searchParams.get('chat') === '1' ||
       (photo.memoryCard && getMemoryCardStatus(photo.memoryCard) === 'needs_supplement')
     ) {
-      router.push(`/photos/${photo.id}/supplement`);
+      router.push(
+        `/family/${familyId}/supplement?photoId=${encodeURIComponent(photo.id)}`
+      );
       return;
     }
     router.push(`/family/${familyId}/photos/${photo.id}`);
