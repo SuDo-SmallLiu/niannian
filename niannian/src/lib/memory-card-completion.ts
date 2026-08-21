@@ -79,3 +79,10 @@ export function countReadyForStory(
 ): number {
   return cards.filter((c) => computeMemoryCardCompletion(c) >= threshold).length;
 }
+
+/** 记忆卡完成度百分比（0–100），供补充对话顶栏展示 */
+export function getCompletionPercent(
+  card: MemoryCardCompletionInput | null | undefined
+): number {
+  return computeMemoryCardCompletion(card);
+}

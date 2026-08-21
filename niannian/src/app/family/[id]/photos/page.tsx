@@ -15,6 +15,7 @@ import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-
 import {
   aggregateCompletion,
   countReadyForStory,
+  getMemoryCardStatus,
 } from '@/lib/memory-card-completion';
 import { useAppDialog } from '@/components/providers/app-dialog-provider';
 import {
@@ -98,10 +99,17 @@ export default function PhotoLibraryPage() {
     return () => clearTimeout(timer);
   }, [loading, familyId]);
 
-  const filteredPhotos = useMemo(
-    () => filterMemoryCards(photos, filters),
-    [photos, filters]
-  );
+  const statusFilter = searchParams.get('filter');
+
+  const filteredPhotos = useMemo(() => {
+    let list = filterMemoryCards(photos, filters);
+    if (statusFilter === 'needs_supplement') {
+      list = list.filter(
+        (p) => p.memoryCard && getMemoryCardStatus(p.memoryCard) === 'needs_supplement'
+      );
+    }
+    return list;
+  }, [photos, filters, statusFilter]);
 
   const filterOptions = useMemo(() => collectFilterOptions(photos), [photos]);
 
@@ -165,6 +173,14 @@ export default function PhotoLibraryPage() {
     if (selectMode || storyPickMode) {
       if (storyPickMode && photo.memoryCard?.analysis_status !== 'analyzed') return;
       toggleSelect(photo.id);
+      return;
+    }
+    if (
+      statusFilter === 'needs_supplement' ||
+      searchParams.get('chat') === '1' ||
+      (photo.memoryCard && getMemoryCardStatus(photo.memoryCard) === 'needs_supplement')
+    ) {
+      router.push(`/photos/${photo.id}/supplement`);
       return;
     }
     router.push(`/family/${familyId}/photos/${photo.id}`);

@@ -944,6 +944,37 @@ body {
   }
 }
 
+/* ── 首页 Agent 化（Phase 0） ── */
+
+.home-agent-page {
+  position: relative;
+}
+
+.home-agent-header {
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+}
+
+.home-chat-composer {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pt-safe {
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
+}
+
+.pb-safe {
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── 二级页面品牌 Header — 透明抠图 Logo 嵌入页面背景 ── */
 
 .brand-header {

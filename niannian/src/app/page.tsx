@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PRESET_MEMBERS } from '@/lib/family-members';
 import HomeWelcomeHero from '@/components/HomeWelcomeHero';
-import HomeFeatureCards from '@/components/HomeFeatureCards';
+import HomeAgentPage from '@/components/home/HomeAgentPage';
 import HomeBackgroundDecor from '@/components/HomeBackgroundDecor';
 import HomeLoginPanel from '@/components/HomeLoginPanel';
 import NianNianHelpDesk from '@/components/NianNianHelpDesk';
@@ -211,12 +211,7 @@ function HomePageContent() {
 
   return (
     <div className="home-page flex-1 min-h-0 flex flex-col bg-[#F8F4ED] overflow-hidden relative">
-      <HomeBackgroundDecor />
-      <NianNianHelpDesk open={helpOpen} onClose={() => setHelpOpen(false)} pipeline={null} />
-
-      <HomeWelcomeHero onOpenHelp={() => setHelpOpen(true)} />
-
-      <HomeFeatureCards onCreate={() => setMode('create')} />
+      <HomeAgentPage onCreateFamily={() => setMode('create')} />
     </div>
   );
 }

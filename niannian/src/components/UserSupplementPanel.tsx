@@ -1,29 +1,27 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
-import { FIXED_SUPPLEMENT_QUESTIONS } from '@/lib/supplement-questions';
+import { useSupplementChat } from '@/hooks/useSupplementChat';
 import {
   AccessibleChatPanel,
   AccessibleChatComposer,
-  type ChatMessage,
 } from '@/components/ui/accessible-chat';
 import { Button } from '@/components/ui/button';
-import { Mic, Square, Loader2 } from 'lucide-react';
-import { analyzePhotoAsync } from '@/lib/poll-job';
+import Link from 'next/link';
+import { Mic, Square, Loader2, MessageCircle } from 'lucide-react';
 
-export interface AiQuestion {
-  id: string;
-  question: string;
-  answer: string;
-}
+export type { AiQuestion } from '@/lib/supplement-chat';
+export { saveMemoryCardSupplement } from '@/lib/supplement-chat';
+
+const WELCOME =
+  '你好，我是念念。照片里的故事需要你来告诉我。我们一句一句聊，你也可以用语音回答。';
 
 interface UserSupplementPanelProps {
   photoId: string;
   notes: string;
   onNotesChange: (notes: string) => void;
-  questions: AiQuestion[];
-  onQuestionsChange: (questions: AiQuestion[]) => void;
+  questions: import('@/lib/supplement-chat').AiQuestion[];
+  onQuestionsChange: (questions: import('@/lib/supplement-chat').AiQuestion[]) => void;
   integratedSummary?: {
     people: string[];
     location: string;
@@ -34,7 +32,7 @@ interface UserSupplementPanelProps {
   onSaved: (data: {
     user_notes: string;
     voice_transcript: string;
-    ai_questions: AiQuestion[];
+    ai_questions: import('@/lib/supplement-chat').AiQuestion[];
   }) => void;
   onReanalyzed: (data: {
     photo: unknown;
@@ -42,124 +40,6 @@ interface UserSupplementPanelProps {
     tags: unknown;
     familyName?: string;
   }) => void;
-}
-
-const WELCOME =
-  '你好，我是念念。照片里的故事需要你来告诉我：时间、地点、人物关系，以及当时发生了什么。我们一句一句聊，你也可以用语音回答。';
-
-type QueueItem = { id: string; text: string; source: 'fixed' | 'ai' };
-
-export async function saveMemoryCardSupplement(
-  photoId: string,
-  notes: string,
-  questions: AiQuestion[],
-  voiceTranscript = ''
-): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> {
-  const res = await fetch('/api/memory-card', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      photoId,
-      user_notes: notes.trim(),
-      voice_transcript: voiceTranscript.trim(),
-      ai_questions: questions,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    return { ok: false, error: data.error || '保存失败' };
-  }
-  return { ok: true, data };
-}
-
-function buildQuestionQueue(questions: AiQuestion[]): QueueItem[] {
-  const queue: QueueItem[] = FIXED_SUPPLEMENT_QUESTIONS.map((text, i) => ({
-    id: `fixed-${i}`,
-    text,
-    source: 'fixed' as const,
-  }));
-  for (const q of questions) {
-    queue.push({ id: q.id, text: q.question, source: 'ai' });
-  }
-  return queue;
-}
-
-function getAnswerForItem(
-  item: QueueItem,
-  fixedAnswers: string[],
-  aiQuestions: AiQuestion[]
-): string {
-  if (item.source === 'fixed') {
-    const idx = FIXED_SUPPLEMENT_QUESTIONS.findIndex((t) => t === item.text);
-    return fixedAnswers[idx]?.trim() || '';
-  }
-  return aiQuestions.find((q) => q.id === item.id)?.answer?.trim() || '';
-}
-
-function buildThreadFromState(
-  queue: QueueItem[],
-  fixedAnswers: string[],
-  aiQuestions: AiQuestion[]
-): { thread: ChatMessage[]; answeredCount: number; allDone: boolean } {
-  const thread: ChatMessage[] = [
-    { id: 'welcome', role: 'assistant', content: WELCOME, label: '念念' },
-  ];
-
-  if (queue.length === 0) {
-    return { thread, answeredCount: 0, allDone: true };
-  }
-
-  let answeredCount = 0;
-
-  for (let i = 0; i < queue.length; i++) {
-    const item = queue[i];
-    const answer = getAnswerForItem(item, fixedAnswers, aiQuestions);
-
-    thread.push({
-      id: `q-${item.id}`,
-      role: 'assistant',
-      content: item.text,
-      label: '念念',
-    });
-
-    if (answer) {
-      thread.push({ id: `a-${item.id}`, role: 'user', content: answer });
-      answeredCount = i + 1;
-    } else {
-      break;
-    }
-  }
-
-  const allDone = answeredCount >= queue.length;
-  if (allDone) {
-    thread.push({
-      id: 'done',
-      role: 'assistant',
-      content: '谢谢你的补充！可以点「保存」，或「结合补充重新理解」让念念更新记忆卡。',
-      label: '念念',
-    });
-  }
-
-  return { thread, answeredCount, allDone };
-}
-
-function mergeFixedAnswers(prev: string[], index: number, text: string): string[] {
-  const next = [...prev];
-  while (next.length <= index) next.push('');
-  next[index] = text;
-  return next;
-}
-
-function fixedAnswersToNotes(answers: string[]): string {
-  return answers.map((a) => a.trim()).filter(Boolean).join('\n');
-}
-
-function combinedNotes(fixedAnswers: string[], aiQuestions: AiQuestion[]): string {
-  const parts = [
-    fixedAnswersToNotes(fixedAnswers),
-    ...aiQuestions.filter((q) => q.answer?.trim()).map((q) => q.answer.trim()),
-  ].filter(Boolean);
-  return parts.join('\n');
 }
 
 export default function UserSupplementPanel({
@@ -173,163 +53,47 @@ export default function UserSupplementPanel({
   onSaved,
   onReanalyzed,
 }: UserSupplementPanelProps) {
-  const [loadingQuestions, setLoadingQuestions] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [reanalyzing, setReanalyzing] = useState(false);
-  const [message, setMessage] = useState('');
-  const [dirty, setDirty] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState('');
-  const [draft, setDraft] = useState('');
-  const [fixedAnswers, setFixedAnswers] = useState<string[]>([]);
+  const chat = useSupplementChat({
+    photoId,
+    initialNotes: notes,
+    initialQuestions: questions,
+    numbered: false,
+    onNotesChange,
+    onQuestionsChange,
+    onSaved,
+    onReanalyzed,
+  });
 
-  const voice = useVoiceInput();
+  const threadWithWelcome = [
+    { id: 'welcome', role: 'assistant' as const, content: WELCOME, label: '念念' },
+    ...chat.thread,
+  ];
 
-  const questionQueue = useMemo(() => buildQuestionQueue(questions), [questions]);
-
-  const { thread, answeredCount, allDone } = useMemo(
-    () => buildThreadFromState(questionQueue, fixedAnswers, questions),
-    [questionQueue, fixedAnswers, questions]
-  );
-
-  const loadQuestions = useCallback(async () => {
-    setLoadingQuestions(true);
-    try {
-      const res = await fetch('/api/memory-card/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoId }),
-      });
-      const data = await res.json();
-      if (res.ok && data.ai_questions) {
-        onQuestionsChange(data.ai_questions);
-      }
-    } catch {
-      setMessage('加载引导问题失败');
-    } finally {
-      setLoadingQuestions(false);
-    }
-  }, [photoId, onQuestionsChange]);
-
-  useEffect(() => {
-    setFixedAnswers(notes.trim() ? notes.trim().split('\n') : []);
-    setDraft('');
-    setDirty(false);
-    setMessage('');
-    setVoiceTranscript('');
-    loadQuestions();
-  }, [photoId, loadQuestions]);
-
-  const submitReply = useCallback(
-    (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || allDone || answeredCount >= questionQueue.length) return;
-
-      const current = questionQueue[answeredCount];
-      if (!current) return;
-
-      if (current.source === 'fixed') {
-        const fixedIdx = FIXED_SUPPLEMENT_QUESTIONS.findIndex((t) => t === current.text);
-        const nextFixed = mergeFixedAnswers(fixedAnswers, fixedIdx, trimmed);
-        setFixedAnswers(nextFixed);
-        onNotesChange(combinedNotes(nextFixed, questions));
-      } else {
-        const nextQuestions = questions.map((q) =>
-          q.id === current.id ? { ...q, answer: trimmed } : q
-        );
-        onQuestionsChange(nextQuestions);
-        onNotesChange(combinedNotes(fixedAnswers, nextQuestions));
-      }
-
-      setDirty(true);
-      setDraft('');
-    },
-    [
-      allDone,
-      answeredCount,
-      questionQueue,
-      fixedAnswers,
-      questions,
-      onNotesChange,
-      onQuestionsChange,
-    ]
-  );
-
-  const appendVoiceText = useCallback((text: string) => {
-    setVoiceTranscript((prev) => (prev ? `${prev}\n${text}` : text));
-    setDraft((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
-    setMessage('语音已转为文字，点发送即可');
-  }, []);
-
-  const saveSupplement = async (): Promise<boolean> => {
-    setSaving(true);
-    setMessage('');
-    try {
-      const noteText = combinedNotes(fixedAnswers, questions) || notes;
-
-      const result = await saveMemoryCardSupplement(
-        photoId,
-        noteText,
-        questions,
-        voiceTranscript
-      );
-      if (!result.ok) {
-        setMessage(result.error || '保存失败');
-        return false;
-      }
-      const data = result.data!;
-      setDirty(false);
-      setMessage('已保存');
-      onSaved({
-        user_notes: (data.memoryCard as { user_notes?: string })?.user_notes || noteText,
-        voice_transcript:
-          (data.memoryCard as { voice_transcript?: string })?.voice_transcript ||
-          voiceTranscript.trim(),
-        ai_questions:
-          (data.memoryCard as { ai_questions?: AiQuestion[] })?.ai_questions || questions,
-      });
-      return true;
-    } catch {
-      setMessage('保存失败，请重试');
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleReanalyzeWithSupplement = async () => {
-    setReanalyzing(true);
-    setMessage('');
-    try {
-      const saved = dirty ? await saveSupplement() : true;
-      if (!saved) return;
-
-      const data = await analyzePhotoAsync(photoId, true);
-      setDirty(false);
-      setMessage('已结合补充更新记忆卡');
-      onReanalyzed(data);
-    } catch {
-      setMessage('重新理解失败，请重试');
-    } finally {
-      setReanalyzing(false);
-    }
-  };
-
-  const hasSupplement =
-    fixedAnswers.some((a) => a.trim()) || questions.some((q) => q.answer?.trim()) || !!notes.trim();
-  const voiceBusy = voice.isRecording || voice.isTranscribing;
-  const busy = disabled || saving || reanalyzing || voiceBusy || loadingQuestions;
-  const waitingForReply = !allDone && answeredCount < questionQueue.length;
-
-  const voiceLabel = voice.isTranscribing
+  const voiceLabel = chat.voice.isTranscribing
     ? '识别中…'
-    : voice.isRecording
+    : chat.voice.isRecording
       ? '结束'
       : '语音';
 
+  const busy = disabled || chat.busy;
+
   return (
     <section className="bg-white rounded-2xl p-5 border border-[#E8DCC8] shadow-sm">
-      <h2 className="text-sm font-semibold text-[#4A3326] mb-1">用户层 · 完善记忆</h2>
-      <p className="text-[15px] text-[#8E7B6B] mb-4 leading-relaxed">与念念对话，一句一句补充照片背后的故事</p>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-sm font-semibold text-[#4A3326] mb-1">用户层 · 完善记忆</h2>
+          <p className="text-[15px] text-[#8E7B6B] leading-relaxed">
+            与念念对话，一句一句补充照片背后的故事
+          </p>
+        </div>
+        <Link
+          href={`/photos/${photoId}/supplement`}
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FFF8F0] text-[#DF8B3A] text-xs font-medium border border-[#F5E6C8]"
+        >
+          <MessageCircle className="w-3.5 h-3.5" />
+          和念念聊聊
+        </Link>
+      </div>
 
       {notes.trim() && integratedSummary && (
         <div className="mb-4 rounded-xl bg-[#F5FFF8] border border-[#D4EDDA] px-4 py-3.5">
@@ -360,36 +124,36 @@ export default function UserSupplementPanel({
         </div>
       )}
 
-      <AccessibleChatPanel messages={thread} className="mb-3 h-[320px]" wechat />
+      <AccessibleChatPanel messages={threadWithWelcome} className="mb-3 h-[320px]" wechat />
 
-      {loadingQuestions && (
+      {chat.loadingQuestions && (
         <p className="text-xs text-center text-[#B8A898] mb-2">念念正在准备问题…</p>
       )}
 
-      {waitingForReply ? (
+      {chat.waitingForReply ? (
         <AccessibleChatComposer
           wechat
-          value={draft}
-          onChange={setDraft}
-          onSubmit={() => submitReply(draft)}
+          value={chat.draft}
+          onChange={chat.setDraft}
+          onSubmit={() => chat.submitReply(chat.draft)}
           disabled={busy}
           placeholder="输入回答，Enter 发送"
           submitLabel="发送"
           extraActions={
             <Button
               type="button"
-              variant={voice.isRecording ? 'default' : 'outline'}
+              variant={chat.voice.isRecording ? 'default' : 'outline'}
               size="icon"
               className={`shrink-0 h-10 w-10 rounded-xl ${
-                voice.isRecording ? 'bg-[#C04040] hover:bg-[#A03030] border-none' : ''
+                chat.voice.isRecording ? 'bg-[#C04040] hover:bg-[#A03030] border-none' : ''
               }`}
-              onClick={() => voice.start(appendVoiceText)}
-              disabled={disabled || saving || reanalyzing || voice.isTranscribing || !voice.supported}
+              onClick={() => chat.voice.start(chat.appendVoiceText)}
+              disabled={disabled || chat.saving || chat.reanalyzing || chat.voice.isTranscribing || !chat.voice.supported}
               aria-label={voiceLabel}
             >
-              {voice.isTranscribing ? (
+              {chat.voice.isTranscribing ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : voice.isRecording ? (
+              ) : chat.voice.isRecording ? (
                 <Square className="w-4 h-4 fill-current" />
               ) : (
                 <Mic className="w-4 h-4" />
@@ -401,25 +165,25 @@ export default function UserSupplementPanel({
         <p className="text-sm text-center text-[#8B7355] py-2 mb-2">本轮对话已完成</p>
       )}
 
-      {!voice.supported && (
+      {!chat.voice.supported && (
         <p className="text-xs text-muted-foreground text-center mt-2 leading-relaxed">
           {typeof window !== 'undefined' && !window.isSecureContext
-            ? '语音需要 HTTPS 安全连接。请使用 https://niannian-years.top:8799 访问，或改用文字输入'
+            ? '语音需要 HTTPS 安全连接，请改用文字输入'
             : '当前浏览器不支持语音，请改用文字输入'}
         </p>
       )}
 
-      {voice.error && (
-        <p className="text-sm text-destructive text-center mt-2 leading-relaxed">{voice.error}</p>
+      {chat.voice.error && (
+        <p className="text-sm text-destructive text-center mt-2 leading-relaxed">{chat.voice.error}</p>
       )}
 
-      {message && (
+      {chat.message && (
         <p
           className={`text-sm mt-2 text-center leading-relaxed ${
-            message.includes('失败') ? 'text-destructive' : 'text-[#D98A45]'
+            chat.message.includes('失败') ? 'text-destructive' : 'text-[#D98A45]'
           }`}
         >
-          {message}
+          {chat.message}
         </p>
       )}
 
@@ -428,18 +192,18 @@ export default function UserSupplementPanel({
           type="button"
           variant="outline"
           className="flex-1"
-          onClick={() => saveSupplement()}
-          disabled={busy || !dirty}
+          onClick={() => chat.saveSupplement()}
+          disabled={busy || !chat.dirty}
         >
-          {saving ? '保存中…' : '保存'}
+          {chat.saving ? '保存中…' : '保存'}
         </Button>
         <Button
           type="button"
           className="flex-1"
-          onClick={handleReanalyzeWithSupplement}
-          disabled={busy || !hasSupplement}
+          onClick={() => chat.reanalyzeWithSupplement()}
+          disabled={busy || !chat.hasSupplement}
         >
-          {reanalyzing ? '理解中…' : '结合补充重新理解'}
+          {chat.reanalyzing ? '理解中…' : '结合补充重新理解'}
         </Button>
       </div>
     </section>
