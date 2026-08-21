@@ -12,7 +12,12 @@ export async function POST(request: NextRequest) {
     const rateLimited = heavyApiRateLimitResponse(request, 'analyze');
     if (rateLimited) return rateLimited;
 
-    const { familyId } = await request.json();
+    const body = await request.json();
+    const { familyId, photoIds: requestedPhotoIds, enableOcr } = body as {
+      familyId?: string;
+      photoIds?: string[];
+      enableOcr?: boolean;
+    };
 
     if (!familyId) {
       return NextResponse.json({ error: '缺少家庭ID' }, { status: 400 });
@@ -24,8 +29,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '家庭不存在' }, { status: 404 });
     }
 
-    const photos = getPhotosByFamily(familyId);
-    if (photos.length === 0) {
+    let photoIds: string[];
+    if (Array.isArray(requestedPhotoIds) && requestedPhotoIds.length > 0) {
+      for (const id of requestedPhotoIds) {
+        const photo = getPhoto(id);
+        if (!photo || photo.family_id !== familyId) {
+          return NextResponse.json({ error: '照片不存在或不属于该家庭' }, { status: 400 });
+        }
+      }
+      photoIds = requestedPhotoIds;
+    } else {
+      photoIds = getPhotosByFamily(familyId).map((p) => p.id);
+    }
+
+    if (photoIds.length === 0) {
       return NextResponse.json({ error: '该家庭没有照片，请先上传照片' }, { status: 400 });
     }
 
@@ -40,8 +57,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const photoIds = photos.map((p) => p.id);
-    const job = createPhotoAnalysisJob({ familyId, photoIds });
+    const job = createPhotoAnalysisJob({ familyId, photoIds, enableOcr: !!enableOcr });
 
     return NextResponse.json({
       status: 'processing',

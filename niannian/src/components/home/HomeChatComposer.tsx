@@ -19,9 +19,9 @@ interface HomeChatComposerProps {
   onExpandChange?: (expanded: boolean) => void;
 }
 
-const DEFAULT_CHIPS = ['帮我上传照片', '帮我补充记忆卡', '生成这张照片的描述'];
+const DEFAULT_CHIPS = ['扫描老照片', '帮我补充记忆卡', '生成这张照片的描述'];
 
-const PHOTO_CHIPS = ['识别这张照片的场景', '帮我补充记忆卡', '生成这张照片的描述'];
+const PHOTO_CHIPS = ['识别这张照片的文字', '帮我补充记忆卡', '生成这张照片的描述'];
 
 export default function HomeChatComposer({
   familyId,

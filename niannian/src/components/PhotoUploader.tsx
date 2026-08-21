@@ -11,6 +11,8 @@ interface PhotoUploaderProps {
     metadata?: { jsonFiles: number; matched: number };
   }) => void;
   familyId: string;
+  /** 老照片 OCR 扫描模式：单张/少量，优先调起相机 */
+  mode?: 'default' | 'ocr';
 }
 
 const UPLOAD_TIMEOUT_MS = 120_000;
@@ -74,7 +76,8 @@ function isRetryableUploadError(err: unknown, status?: number): boolean {
   return false;
 }
 
-export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploaderProps) {
+export default function PhotoUploader({ onUploadComplete, familyId, mode = 'default' }: PhotoUploaderProps) {
+  const isOcrMode = mode === 'ocr';
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<Array<{ url: string; isJson: boolean }>>([]);
   const [uploading, setUploading] = useState(false);
@@ -115,8 +118,9 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
 
       const newImageCount = validFiles.filter((f) => isImageFile(f.name)).length;
       const existingImageCount = files.filter((f) => isImageFile(f.name)).length;
-      if (newImageCount + existingImageCount > 50) {
-        setError('最多上传 50 张照片');
+      const maxImages = isOcrMode ? 5 : 50;
+      if (newImageCount + existingImageCount > maxImages) {
+        setError(isOcrMode ? '老照片扫描一次最多 5 张' : '最多上传 50 张照片');
         return;
       }
 
@@ -128,7 +132,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
       setPreviews((prev) => [...prev, ...validPreviews]);
       if (skippedLarge.length === 0) setError('');
     },
-    [files]
+    [files, isOcrMode]
   );
 
   const removeFile = (index: number) => {
@@ -143,7 +147,7 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
       return;
     }
 
-    if (imageCount < 10) {
+    if (!isOcrMode && imageCount < 10) {
       setError('建议上传至少 10 张照片以获得更好的故事效果');
     }
 
@@ -292,19 +296,31 @@ export default function PhotoUploader({ onUploadComplete, familyId }: PhotoUploa
           ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,image/heic,image/heif,image/webp,.json,application/json"
-          multiple
+          multiple={!isOcrMode}
+          capture={isOcrMode ? 'environment' : undefined}
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
 
         <NianNianIconBox icon={CameraIcon} className="mb-3 mx-auto" />
-        <p className="text-[#4B3B2F] font-medium mb-1">点击或拖拽上传照片</p>
-        <p className="text-sm text-[#B8A898] mb-2">
-          支持 JPG / PNG / HEIC，建议 10–50 张，单张不超过 20MB
+        <p className="text-[#4B3B2F] font-medium mb-1">
+          {isOcrMode ? '拍摄或选择老照片' : '点击或拖拽上传照片'}
         </p>
+        <p className="text-sm text-[#B8A898] mb-2">
+          {isOcrMode
+            ? '念念会识别图中文字（日期、姓名、背面手写等）并理解场景'
+            : '支持 JPG / PNG / HEIC，建议 10–50 张，单张不超过 20MB'}
+        </p>
+        {!isOcrMode && (
         <p className="text-xs text-[#D98A45]">
           Google Photos 导出包：请同时选中照片 + .json 侧车文件
         </p>
+        )}
+        {isOcrMode && (
+          <p className="text-xs text-[#D98A45]">
+            适合扫描泛黄老照片、证件、信件、照片背面手写说明
+          </p>
+        )}
       </div>
 
       {files.length > 0 && (

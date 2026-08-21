@@ -15,6 +15,7 @@ import { useAppreciateMode } from '@/components/providers/appreciate-mode-provid
 import { useNianNianAgentOverride } from '@/components/providers/niannian-agent-provider';
 import { computeMemoryCardCompletion } from '@/lib/memory-card-completion';
 import { analyzePhotoAsync } from '@/lib/poll-job';
+import PhotoOcrSection from '@/components/PhotoOcrSection';
 
 interface Tag {
   layer: number;
@@ -428,6 +429,15 @@ export default function MemoryCardPage() {
               </div>
             )}
           </section>
+
+          {!appreciate && (
+            <PhotoOcrSection
+              photoId={photoId}
+              userNotes={userNotes}
+              onNotesUpdated={setUserNotes}
+              disabled={reanalyzing}
+            />
+          )}
 
           {/* 用户层 · 补充记忆 — 紧跟理解层 */}
           {!appreciate && (

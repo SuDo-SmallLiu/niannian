@@ -35,7 +35,7 @@ const RULES: Array<{ intent: NianNianIntent; patterns: RegExp[] }> = [
   },
   {
     intent: 'analyze_photos',
-    patterns: [/识别|分析|解析|看懂|智能识别/i],
+    patterns: [/识别|分析|解析|看懂|智能识别|ocr|扫描|老照片|文字识别/i],
   },
   {
     intent: 'supplement_memory',

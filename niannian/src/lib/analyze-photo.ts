@@ -16,6 +16,7 @@ import {
   saveTagsForPhoto,
 } from '@/lib/db';
 import { regenerateMemoryCardQuestions } from '@/lib/memory-card-questions';
+import { applyOcrToPhoto } from '@/lib/photo-ocr';
 
 const LAYER_MAP: Record<string, number> = {
   objective: 1,
@@ -109,7 +110,7 @@ export function saveMemoryCardFromAnalysis(
 
 export async function analyzeAndSavePhoto(
   photoId: string,
-  options?: { withSupplement?: boolean; skipQuestions?: boolean }
+  options?: { withSupplement?: boolean; skipQuestions?: boolean; enableOcr?: boolean }
 ): Promise<PhotoAnalysis> {
   const photo = getPhoto(photoId);
   if (!photo) {
@@ -164,6 +165,27 @@ export async function analyzeAndSavePhoto(
   saveMemoryCardFromAnalysis(photo.family_id, photo.id, analysis, sourceFacts, {
     preserveUserNotes: true,
   });
+
+  if (options?.enableOcr) {
+    try {
+      const cardAfter = getMemoryCardByPhoto(photoId);
+      const { user_notes } = await applyOcrToPhoto(
+        base64,
+        mimeType,
+        cardAfter?.user_notes || ''
+      );
+      if (user_notes !== (cardAfter?.user_notes || '')) {
+        upsertMemoryCard({
+          photo_id: photoId,
+          family_id: photo.family_id,
+          user_notes,
+          analysis_status: 'analyzed',
+        });
+      }
+    } catch (err) {
+      console.warn(`照片 ${photoId} OCR 失败（已保留场景识别结果）:`, err);
+    }
+  }
 
   if (!options?.skipQuestions) {
     await regenerateMemoryCardQuestions(photo.id);

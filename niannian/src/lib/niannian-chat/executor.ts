@@ -17,7 +17,7 @@ export function resolveIntentHref(
     case 'upload_photos':
       return familyId ? `/family/${familyId}/upload` : '/?create=1';
     case 'analyze_photos':
-      return familyId ? `/family/${familyId}/photos` : '/family/memories';
+      return familyId ? `/family/${familyId}/upload?mode=ocr` : '/family/memories';
     case 'supplement_memory':
       if (photoId) return `/photos/${photoId}/supplement`;
       return familyId

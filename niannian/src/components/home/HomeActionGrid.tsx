@@ -20,7 +20,7 @@ const ACTIONS = [
   {
     id: 'analyze',
     title: '智能识别',
-    desc: '识别照片内容和场景',
+    desc: '识别场景与老照片文字',
     Icon: Sparkles,
     tone: 'create' as const,
   },
@@ -55,7 +55,7 @@ export default function HomeActionGrid({ familyId, onCreateFamily }: HomeActionG
         router.push(`/family/${familyId}/upload`);
         break;
       case 'analyze':
-        router.push(`/family/${familyId}/photos`);
+        router.push(`/family/${familyId}/upload?mode=ocr`);
         break;
       case 'beautify':
         await alert({

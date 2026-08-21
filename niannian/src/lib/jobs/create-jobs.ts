@@ -25,6 +25,7 @@ export function createStoryComposeJob(input: {
 export function createPhotoAnalysisJob(input: {
   familyId: string;
   photoIds: string[];
+  enableOcr?: boolean;
 }): JobRecord {
   const existing = findActiveJobByIdempotencyKey(`photo_analysis:${input.familyId}`);
   if (existing) return existing;
@@ -33,7 +34,7 @@ export function createPhotoAnalysisJob(input: {
     type: 'photo_analysis',
     familyId: input.familyId,
     idempotencyKey: `photo_analysis:${input.familyId}`,
-    payload: { photoIds: input.photoIds },
+    payload: { photoIds: input.photoIds, enableOcr: !!input.enableOcr },
   });
 
   updateJobProgress(job.id, {
@@ -52,6 +53,7 @@ export function createPhotoAnalyzeSingleJob(input: {
   familyId: string;
   photoId: string;
   withSupplement?: boolean;
+  enableOcr?: boolean;
   mode?: 'analyze' | 'retry';
 }): string {
   const keySuffix = input.mode === 'retry' ? 'retry' : 'analyze';
@@ -62,6 +64,7 @@ export function createPhotoAnalyzeSingleJob(input: {
     idempotencyKey: `photo_${keySuffix}:${input.photoId}`,
     payload: {
       withSupplement: !!input.withSupplement,
+      enableOcr: !!input.enableOcr,
       mode: input.mode || 'analyze',
     },
   });

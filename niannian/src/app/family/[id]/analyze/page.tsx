@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import AnalysisProgress from '@/components/memory/AnalysisProgress';
 import PageShell from '@/components/PageShell';
 import PageHero from '@/components/PageHero';
@@ -42,9 +42,29 @@ interface PollPayload {
 }
 
 export default function AnalyzePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F8F4ED]">
+          <div className="w-8 h-8 border-2 border-[#D98A45]/30 border-t-[#D98A45] rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <AnalyzePageContent />
+    </Suspense>
+  );
+}
+
+function AnalyzePageContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const familyId = params.id as string;
+  const enableOcr = searchParams.get('ocr') === '1';
+  const photoIdsParam = searchParams.get('photoIds');
+  const targetPhotoIds = photoIdsParam
+    ? photoIdsParam.split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined;
 
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [error, setError] = useState('');
@@ -131,7 +151,11 @@ export default function AnalyzePage() {
       const startRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ familyId }),
+        body: JSON.stringify({
+          familyId,
+          enableOcr,
+          ...(targetPhotoIds?.length ? { photoIds: targetPhotoIds } : {}),
+        }),
       });
       const startData = await startRes.json();
 
@@ -184,7 +208,7 @@ export default function AnalyzePage() {
         hasRun.current = false;
       }
     }
-  }, [familyId, refreshAnalyzeView, finishSuccess]);
+  }, [familyId, refreshAnalyzeView, finishSuccess, enableOcr, targetPhotoIds]);
 
   useEffect(() => {
     if (hasRun.current) return;
@@ -202,7 +226,10 @@ export default function AnalyzePage() {
 
   return (
     <PageShell minimalHeader bodyClassName="pt-4">
-      <PageHero title="念念正在读懂照片" subtitle="并发解析中，完成一张保存一张" />
+      <PageHero
+        title={enableOcr ? '念念正在识别老照片' : '念念正在读懂照片'}
+        subtitle={enableOcr ? '场景理解 + 图中文字 OCR' : '并发解析中，完成一张保存一张'}
+      />
 
         <AnalysisProgress
           completed={summary.completed}

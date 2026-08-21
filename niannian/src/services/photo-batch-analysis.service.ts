@@ -58,6 +58,8 @@ export async function executePhotoAnalysisJob(job: JobRecord): Promise<void> {
 
   syncProgress(job.id, tasks, '开始解析照片…');
 
+  const enableOcr = !!job.payload.enableOcr;
+
   await Promise.all(
     photoIds.map((photoId) =>
       limit(async () => {
@@ -67,7 +69,7 @@ export async function executePhotoAnalysisJob(job: JobRecord): Promise<void> {
         syncProgress(job.id, tasks);
 
         try {
-          await analyzeAndSavePhoto(photoId, { skipQuestions: true });
+          await analyzeAndSavePhoto(photoId, { skipQuestions: true, enableOcr });
           tasks = tasks.map((t) =>
             t.photoId === photoId ? { ...t, status: 'completed', error: undefined } : t
           );
@@ -105,7 +107,8 @@ export async function executePhotoAnalyzeSingleJob(job: JobRecord): Promise<void
   if (!photoId || !familyId) throw new Error('缺少 photoId 或 familyId');
 
   const withSupplement = !!job.payload.withSupplement;
-  updateJobProgress(job.id, { message: '正在解析照片…' });
+  const enableOcr = !!job.payload.enableOcr;
+  updateJobProgress(job.id, { message: enableOcr ? '正在识别场景与文字…' : '正在解析照片…' });
 
   upsertMemoryCard({
     photo_id: photoId,
@@ -113,7 +116,7 @@ export async function executePhotoAnalyzeSingleJob(job: JobRecord): Promise<void
     analysis_status: 'pending',
   });
 
-  await analyzeAndSavePhoto(photoId, { withSupplement });
+  await analyzeAndSavePhoto(photoId, { withSupplement, enableOcr });
   const data = getMemoryCardWithPhoto(photoId);
   if (!data) throw new Error('照片不存在');
 
